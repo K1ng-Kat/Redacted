@@ -1,0 +1,125 @@
+#!/bin/bash
+# REDACTED — safe two-way GitHub sync for macOS
+# Local edits are committed first, then the GitHub main branch is integrated,
+# then the result is pushed. No reset, forced update, or auto-resolved conflict.
+set -euo pipefail
+
+PROJECT="${REDACTED_PROJECT:-$HOME/Documents/Redacted}"
+REPO="https://github.com/K1ng-Kat/Redacted.git"
+
+printf '\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
+printf '       REDACTED GITHUB SYNC\n'
+printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n'
+printf '📁 Project: %s\n' "$PROJECT"
+
+if ! command -v git >/dev/null 2>&1; then
+    echo '❌ Git is not installed or available in PATH.'
+    exit 1
+fi
+
+if [[ ! -e "$PROJECT" ]]; then
+    echo '📦 Local project not found. Cloning from GitHub...'
+    mkdir -p "$(dirname "$PROJECT")"
+    git clone "$REPO" "$PROJECT"
+fi
+
+if ! git -C "$PROJECT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo '❌ This folder is not a Git repository. No files were changed.'
+    exit 1
+fi
+
+root="$(git -C "$PROJECT" rev-parse --show-toplevel)"
+if [[ "$root" != "$PROJECT" ]]; then
+    echo "❌ Expected repository root: $PROJECT"
+    echo "   Found: $root"
+    exit 1
+fi
+
+remote="$(git -C "$PROJECT" remote get-url origin 2>/dev/null || true)"
+case "$remote" in
+    https://github.com/K1ng-Kat/Redacted|https://github.com/K1ng-Kat/Redacted.git|git@github.com:K1ng-Kat/Redacted|git@github.com:K1ng-Kat/Redacted.git|ssh://git@github.com/K1ng-Kat/Redacted|ssh://git@github.com/K1ng-Kat/Redacted.git)
+        ;;
+    *)
+        echo '❌ The origin remote is not K1ng-Kat/Redacted. Sync cancelled.'
+        echo "   Found: $remote"
+        exit 1
+        ;;
+esac
+
+branch="$(git -C "$PROJECT" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+if [[ "$branch" != 'main' ]]; then
+    echo "❌ Checked-out branch is '${branch:-DETACHED}', not 'main'."
+    echo '   Switch to main yourself before running red-sync.'
+    exit 1
+fi
+
+gitdir="$(git -C "$PROJECT" rev-parse --absolute-git-dir)"
+if [[ -d "$gitdir/rebase-merge" || -d "$gitdir/rebase-apply" || -f "$gitdir/MERGE_HEAD" || -f "$gitdir/CHERRY_PICK_HEAD" ]]; then
+    echo '❌ A merge, rebase, or cherry-pick is in progress. Resolve it first.'
+    exit 1
+fi
+
+if [[ -n "$(git -C "$PROJECT" status --porcelain)" ]]; then
+    echo ''
+    echo '📝 Local edits found:'
+    git -C "$PROJECT" status --short
+    echo ''
+    echo '📦 Saving local changes in a Git commit...'
+    git -C "$PROJECT" add -A
+
+    # Avoid accidentally uploading credentials, private signing keys or profiles.
+    unsafe=''
+    while IFS= read -r -d '' path; do
+        if printf '%s\n' "$path" | LC_ALL=C grep -Eiq '(^|/)\.env($|\.)|(^|/)GoogleService-Info\.plist$|\.(p8|p12|pem|key|mobileprovision)$|(^|/)(id_rsa|id_ed25519)$'; then
+            unsafe="$path"
+            break
+        fi
+    done < <(git -C "$PROJECT" diff --cached --name-only --diff-filter=ACMR -z)
+
+    if [[ -n "$unsafe" ]]; then
+        echo "❌ Potentially sensitive file detected: $unsafe"
+        echo '   Nothing was committed or pushed. Review your staged files.'
+        exit 1
+    fi
+
+    if ! git -C "$PROJECT" diff --cached --quiet; then
+        git -C "$PROJECT" commit -m "Sync local Redacted changes ($(date '+%Y-%m-%d %H:%M:%S'))"
+        echo '✅ Local changes safely committed.'
+    else
+        echo '✅ No tracked changes needed committing.'
+    fi
+else
+    echo '✅ No uncommitted local changes.'
+fi
+
+echo ''
+echo '🔄 Fetching latest GitHub main...'
+if ! git -C "$PROJECT" fetch origin main; then
+    echo '❌ Fetch failed. Your local commits and files are safe.'
+    exit 1
+fi
+
+echo '📥 Integrating GitHub updates...'
+if ! git -C "$PROJECT" rebase origin/main; then
+    echo ''
+    echo '⚠️ GitHub and local changes overlap. Aborting the rebase safely...'
+    if git -C "$PROJECT" rebase --abort; then
+        echo '❌ Nothing was overwritten or force-pushed.'
+        echo '   Your local work is still committed. Resolve the conflict manually.'
+    else
+        echo '❌ Rebase abort failed. Please inspect Git status before continuing.'
+    fi
+    exit 1
+fi
+
+echo '📤 Pushing the synchronized project to GitHub...'
+if ! git -C "$PROJECT" push origin main; then
+    echo '❌ Push failed (possibly due to authentication or new remote commits).'
+    echo '   Local commits are safe. Fix the issue and run red-sync again.'
+    exit 1
+fi
+
+printf '\n✅ REDACTED FULLY SYNCED!\n'
+printf '✅ Local and GitHub main match\n'
+printf '🔖 Commit: %s\n' "$(git -C "$PROJECT" rev-parse --short HEAD)"
+printf '📂 %s\n\n' "$PROJECT"

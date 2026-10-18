@@ -66,3 +66,23 @@ The initial Case 001 prototype source/save is retained in the existing repositor
 3. Open any level: the soundtrack should switch to the quieter Shop Theme arrangement.
 4. Turn music off and on from Settings, then adjust both sliders; verify no music continues in the background when off.
 5. Visit Settings' last section, verify dynamic app version and links open the original artists' pages.
+
+## red-sync — safe two-way Mac/GitHub synchronization
+
+Install or update the command on a Mac with:
+
+```bash
+mkdir -p "$HOME/.local/bin" && curl -fsSL https://raw.githubusercontent.com/K1ng-Kat/Redacted/main/Scripts/red-sync -o "$HOME/.local/bin/red-sync" && chmod +x "$HOME/.local/bin/red-sync" && "$HOME/.local/bin/red-sync"
+```
+
+Once installed, simply run `red-sync` whenever you want to synchronize.
+
+- Detects changed/new/deleted files in `~/Documents/Redacted`.
+- Automatically stages and commits local changes with a timestamp.
+- Fetches and rebases onto GitHub's `main` (no forced pushes or resets).
+- Pushes local commits to GitHub, including Xcode project and app icon updates.
+- If Git cannot reconcile remote and local edits, stops and safely aborts the rebase. Local changes stay committed so you can resolve the conflict.
+- Blocks common signing key, secret and credential files from automated upload.
+- Requires local Git author identity and push authentication to be configured.
+
+The script checks `origin` belongs to this repository and refuses other checked-out branches. It does not execute on a schedule: run `red-sync` to initiate the sync.

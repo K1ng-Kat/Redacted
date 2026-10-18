@@ -88,21 +88,22 @@ struct ContentView: View {
         withAnimation(.easeInOut(duration: 0.25)) {
             startupProgress = 0.48
         }
-        await Task.yield()
+        // Allow the player to see the first progress milestone.
+        try? await Task.sleep(for: .milliseconds(260))
 
         startupStep = "PREPARING AUDIO"
         GameMusicController.shared.prepare()
         withAnimation(.easeInOut(duration: 0.25)) {
             startupProgress = 0.82
         }
-        await Task.yield()
+        try? await Task.sleep(for: .milliseconds(260))
 
         startupStep = "WELCOME, DETECTIVE"
         withAnimation(.easeInOut(duration: 0.25)) {
             startupProgress = 1
         }
         // A brief hold lets the completed progress bar be seen before transitioning.
-        try? await Task.sleep(for: .milliseconds(350))
+        try? await Task.sleep(for: .milliseconds(450))
         withAnimation(.easeInOut(duration: 0.32)) {
             startupComplete = true
         }

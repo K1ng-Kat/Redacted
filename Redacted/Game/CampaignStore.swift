@@ -69,7 +69,7 @@ enum RankRewards {
 
     static func threshold(for rank: Int) -> Int {
         // XP needed to go from rank N to N+1.
-        150 + (rank * 70)
+        140 + (rank * 50)
     }
 
     static func rank(for totalXP: Int) -> Int {

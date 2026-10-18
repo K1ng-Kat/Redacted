@@ -2,6 +2,34 @@
 
 A native, narrative-driven detective game for iPhone built with SwiftUI.
 
+## 0.3 — Playable guided game redesign
+
+The previous five-tab desk was too confusing. The default player experience has been rebuilt from scratch:
+
+- **One home screen and one big PLAY button**
+- **Four illustrated locations** with exactly two tappable hotspots each
+- **Clue reveal screens** with the original evidence and one-sentence explanation
+- **Three illustrated suspect interviews**, presented as direct question/answer conversations
+- **Two deduction puzzles** after you finish investigating
+- **A final culprit choice** and three-star case summary
+- **Always-visible task instruction**, in-context HELP, persistent progress and automatic resume at the first unfinished chapter
+- Original vector room art and portraits bundled in code, animated press states, tactile feedback, a clear chapter tracker, and strong hierarchy
+
+The existing story, evidence, progress storage and game logic remain intact.
+Old UI files remain in the repository for now but are no longer reachable from the app.
+This is still a handcrafted solo mystery, not an online multiplayer game.
+
+### Quick validation on iPhone
+1. Tap PLAY. Only the two yellow hotspots in the room should demand attention.
+2. Collect both clues, tap NEXT LOCATION, and repeat for four locations.
+3. Interview all three characters by asking at least one question each.
+4. Solve the two evidence-based choices, accuse the culprit and view the case result.
+5. Force-quit during a case, reopen and ensure PLAY resumes at the next unfinished chapter.
+6. Restart Case 001 in Settings and verify that the case starts from the vault again.
+
+An actual iPhone/Xcode compile and hands-on usability pass are still required.
+
+
 ## 0.2 — Game-feel overhaul
 
 A new original art direction focused on tactile mobile-game polish: a custom vector vault illustration, deeper color and lighting, extruded animated buttons, prominent mission navigation, animated clue and deduction rewards, earned Agent XP, redesigned suspect interviews, and a one-to-three-star case conclusion. This is not a clone of another game's art or interface.

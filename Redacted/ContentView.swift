@@ -1,23 +1,29 @@
 import SwiftUI
 
+/// Single entry point: one home screen and one guided case.
+/// The legacy multi-tab investigation remains out of the player journey.
 struct ContentView: View {
-    @StateObject private var investigation = InvestigationStore()
-    @State private var isInvestigating = false
+    @StateObject private var store = InvestigationStore()
+    @State private var playing = false
 
     var body: some View {
         Group {
-            if isInvestigating {
-                InvestigationView(store: investigation) {
-                    isInvestigating = false
+            if playing {
+                CaseAdventureView(store: store) {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        playing = false
+                    }
                 }
             } else {
-                HomeView(store: investigation) {
-                    investigation.start()
-                    isInvestigating = true
+                GameHomeView(store: store) {
+                    store.start()
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        playing = true
+                    }
                 }
             }
         }
-        .tint(Noir.accent)
+        .preferredColorScheme(.dark)
     }
 }
 

@@ -8,7 +8,7 @@ struct MissionPlayView: View {
 
     @AppStorage("redacted.fx.hints") private var hintsEnabled = true
     @State private var selectedSequence: [Int] = []
-    @State private var keypad = ""
+    @State private var typed = ""
     @State private var usedLetterIndices: [Int] = []
     @State private var frequency: Double = 50
     @State private var matchedItems: Set<Int> = []

@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import Combine
 
 struct CaseProgress: Codable {
     var started = false

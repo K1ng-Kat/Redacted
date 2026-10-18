@@ -32,6 +32,10 @@ struct InvestigationView: View {
     @State private var showFeedback = false
     @State private var feedbackTitle = ""
     @State private var feedbackText = ""
+    @State private var rewardText: String?
+    @State private var rewardIsClue = true
+    @State private var rewardToken = UUID()
+    @State private var newestEvidenceID: String?
 
     var body: some View {
         ZStack {
@@ -50,6 +54,8 @@ struct InvestigationView: View {
                         case .theory: theoryContent
                         }
                     }
+                    .id(tab)
+                    .transition(.opacity.combined(with: .offset(x: 12)))
                     .frame(maxWidth: 630)
                     .padding(.horizontal, 20)
                     .padding(.top, 25)
@@ -60,8 +66,35 @@ struct InvestigationView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .overlay(alignment: .top) {
+            if let rewardText {
+                HStack(spacing: 13) {
+                    Image(systemName: rewardIsClue ? "sparkles.rectangle.stack.fill" : "lightbulb.fill")
+                        .font(.system(size: 25, weight: .black))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(rewardIsClue ? "NEW CLUE! +25 XP" : "THEORY SOLVED! +80 XP")
+                            .font(.system(size: 15, weight: .black, design: .rounded))
+                        Text(rewardText)
+                            .font(.system(size: 12, weight: .bold))
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                    Image(systemName: "checkmark.seal.fill")
+                }
+                .foregroundStyle(Noir.deep)
+                .padding(17)
+                .background(Noir.gold.gradient)
+                .clipShape(RoundedRectangle(cornerRadius: 18))
+                .overlay(RoundedRectangle(cornerRadius: 18).stroke(.white.opacity(0.65), lineWidth: 2))
+                .shadow(color: Noir.deep.opacity(0.75), radius: 20, y: 8)
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .zIndex(10)
+            }
+        }
         .sheet(item: $inspectedEvidence) { evidence in
-            EvidenceDetail(evidence: evidence)
+            EvidenceDetail(evidence: evidence, discoveredNow: newestEvidenceID == evidence.id)
                 .presentationDragIndicator(.visible)
         }
         .sheet(item: $interviewedSuspect) { suspect in
@@ -110,40 +143,58 @@ struct InvestigationView: View {
                 FileLabel(text: "Northpoint · Classified", color: Noir.muted)
             }
             Spacer()
-            StatusPill(title: store.state.caseClosed ? "Case closed" : "In progress",
-                       highlighted: store.state.caseClosed)
+            VStack(alignment: .trailing, spacing: 4) {
+                FileLabel(text: "Evidence", color: Noir.cyan)
+                Text("\(store.evidenceCount) / \(CaseData.evidence.count)")
+                    .font(.system(size: 17, weight: .black, design: .rounded))
+                    .foregroundStyle(Noir.gold)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(Noir.card)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Noir.line, lineWidth: 1))
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
     }
 
     private var tabBar: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 5) {
             ForEach(InvestigationTab.allCases) { item in
+                let selected = tab == item
                 Button {
                     Feedback.tap()
-                    tab = item
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        tab = item
+                    }
                 } label: {
                     VStack(spacing: 6) {
                         Image(systemName: item.symbol)
-                            .font(.system(size: 18, weight: tab == item ? .bold : .regular))
-                            .frame(height: 24)
-                        Text(item.rawValue)
-                            .font(.system(size: 10, weight: tab == item ? .bold : .medium))
+                            .font(.system(size: 19, weight: .black))
+                            .frame(height: 26)
+                        Text(item.rawValue.uppercased())
+                            .font(.system(size: 9, weight: .black, design: .rounded))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                     }
-                    .foregroundStyle(tab == item ? Noir.accent : Noir.muted)
+                    .foregroundStyle(selected ? Noir.deep : Noir.muted)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 55)
-                    .contentShape(Rectangle())
+                    .frame(height: 64)
+                    .background(selected ? Noir.gold : Noir.elevated)
+                    .clipShape(RoundedRectangle(cornerRadius: 13))
+                    .overlay(RoundedRectangle(cornerRadius: 13)
+                        .stroke(selected ? Color.white.opacity(0.5) : Noir.line, lineWidth: selected ? 2 : 1))
+                    .offset(y: selected ? -4 : 0)
                 }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(tab == item ? [.isSelected] : [])
+                .buttonStyle(TactileButtonStyle())
+                .accessibilityAddTraits(selected ? [.isSelected] : [])
             }
         }
         .padding(.horizontal, 12)
-        .padding(.top, 10)
+        .padding(.top, 15)
         .padding(.bottom, 5)
-        .background(Noir.card)
+        .background(Noir.deep.opacity(0.96))
         .overlay(alignment: .top) { FileRule() }
     }
 
@@ -155,7 +206,7 @@ struct InvestigationView: View {
             FileCard {
                 VStack(alignment: .leading, spacing: 14) {
                     HStack {
-                        FileLabel(text: "Confidential briefing", color: Noir.accent)
+                        FileLabel(text: "NEW MISSION / BRIEFING", color: Noir.gold)
                         Spacer()
                         Image(systemName: "lock.shield")
                             .foregroundStyle(Noir.accent)
@@ -178,7 +229,7 @@ struct InvestigationView: View {
             FileCard {
                 VStack(alignment: .leading, spacing: 13) {
                     HStack {
-                        FileLabel(text: "Case completion")
+                        FileLabel(text: "MISSION PROGRESS", color: Noir.cyan)
                         Spacer()
                         Text("\(Int(store.progressFraction * 100))%")
                             .font(.system(size: 17, weight: .bold, design: .monospaced))
@@ -264,7 +315,8 @@ struct InvestigationView: View {
                             }
                             Spacer()
                             let items = CaseData.evidence(in: location.id)
-                            StatusPill(title: "\(items.filter { store.hasEvidence($0.id) }.count)/\(items.count)")
+                            StatusPill(title: "\(items.filter { store.hasEvidence($0.id) }.count)/\(items.count) found",
+                                       highlighted: items.allSatisfy { store.hasEvidence($0.id) })
                         }
                         Text(location.description)
                             .font(.system(size: 13))
@@ -273,14 +325,23 @@ struct InvestigationView: View {
                         FileRule()
                         ForEach(CaseData.evidence(in: location.id)) { evidence in
                             Button {
+                                let isNewClue = !store.hasEvidence(evidence.id)
                                 store.discover(evidence.id)
-                                Feedback.tap()
+                                if isNewClue {
+                                    newestEvidenceID = evidence.id
+                                    Feedback.reward()
+                                    celebrate(evidence.title, clue: true)
+                                } else {
+                                    newestEvidenceID = nil
+                                    Feedback.tap()
+                                }
                                 inspectedEvidence = evidence
                             } label: {
                                 HStack(spacing: 12) {
-                                    Image(systemName: store.hasEvidence(evidence.id) ? "checkmark.circle.fill" : "magnifyingglass")
-                                        .foregroundStyle(store.hasEvidence(evidence.id) ? Noir.green : Noir.accent)
-                                        .frame(width: 23)
+                                    Image(systemName: store.hasEvidence(evidence.id) ? "checkmark.seal.fill" : "questionmark.folder.fill")
+                                        .font(.system(size: 22, weight: .bold))
+                                        .foregroundStyle(store.hasEvidence(evidence.id) ? Noir.green : Noir.gold)
+                                        .frame(width: 29)
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(evidence.title)
                                             .font(.system(size: 14, weight: .semibold))
@@ -288,9 +349,9 @@ struct InvestigationView: View {
                                         FileLabel(text: store.hasEvidence(evidence.id) ? "Collected · Reopen" : "Unexamined · Inspect")
                                     }
                                     Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 12, weight: .bold))
-                                        .foregroundStyle(Noir.muted)
+                                    Image(systemName: "arrow.up.right.circle.fill")
+                                        .font(.system(size: 21))
+                                        .foregroundStyle(Noir.cyan)
                                 }
                                 .contentShape(Rectangle())
                                 .padding(.vertical, 4)
@@ -323,9 +384,12 @@ struct InvestigationView: View {
                         FileCard {
                             HStack(spacing: 14) {
                                 Image(systemName: evidence.category.symbol)
-                                    .font(.system(size: 24))
-                                    .foregroundStyle(Noir.accent)
-                                    .frame(width: 44)
+                                    .font(.system(size: 23, weight: .bold))
+                                    .foregroundStyle(Noir.deep)
+                                    .frame(width: 49, height: 49)
+                                    .background(Noir.gold.gradient)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .rotationEffect(.degrees(-4))
                                 VStack(alignment: .leading, spacing: 7) {
                                     FileLabel(text: evidence.category.rawValue + " · " + evidence.time)
                                     Text(evidence.title)
@@ -362,11 +426,12 @@ struct InvestigationView: View {
                         VStack(alignment: .leading, spacing: 14) {
                             HStack(spacing: 13) {
                                 Text(suspect.initials)
-                                    .font(.system(size: 17, weight: .heavy, design: .monospaced))
-                                    .foregroundStyle(Noir.ivory)
-                                    .frame(width: 53, height: 53)
-                                    .background(Noir.elevated)
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .font(.system(size: 20, weight: .black, design: .rounded))
+                                    .foregroundStyle(Noir.deep)
+                                    .frame(width: 57, height: 57)
+                                    .background(Noir.cyan.gradient)
+                                    .clipShape(RoundedRectangle(cornerRadius: 15))
+                                    .rotationEffect(.degrees(-4))
                                 VStack(alignment: .leading, spacing: 5) {
                                     Text(suspect.name)
                                         .font(.system(size: 18, weight: .bold))
@@ -455,7 +520,7 @@ struct InvestigationView: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 if solved {
-                    Label("DEDUCTION VERIFIED", systemImage: "checkmark.seal.fill")
+                    Label("THEORY CONFIRMED! +80 XP", systemImage: "checkmark.seal.fill")
                         .font(.system(size: 11, weight: .bold, design: .monospaced))
                         .foregroundStyle(Noir.green)
                     Text(deduction.explanation)
@@ -473,6 +538,7 @@ struct InvestigationView: View {
                             Feedback.tap()
                             if store.submitDeduction(deduction, option: index) {
                                 Feedback.success()
+                                celebrate(deduction.heading, clue: false)
                             } else {
                                 announce("Not supported by evidence", deduction.wrongHint)
                             }
@@ -489,9 +555,10 @@ struct InvestigationView: View {
                                 Image(systemName: "arrow.up.right")
                                     .foregroundStyle(Noir.muted)
                             }
-                            .padding(13)
+                            .padding(16)
                             .background(Noir.elevated)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .clipShape(RoundedRectangle(cornerRadius: 13))
+                            .overlay(RoundedRectangle(cornerRadius: 13).stroke(Noir.line, lineWidth: 1.5))
                         }
                         .buttonStyle(.plain)
                     }
@@ -516,6 +583,22 @@ struct InvestigationView: View {
         }
     }
 
+    private func celebrate(_ text: String, clue: Bool) {
+        let token = UUID()
+        rewardToken = token
+        rewardIsClue = clue
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.72)) {
+            rewardText = text
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.5))
+            guard rewardToken == token else { return }
+            withAnimation(.easeOut(duration: 0.25)) {
+                rewardText = nil
+            }
+        }
+    }
+
     private func makeAccusation(_ suspectID: String) {
         if store.accuse(suspectID) {
             Feedback.success()
@@ -534,6 +617,7 @@ struct InvestigationView: View {
 
 private struct EvidenceDetail: View {
     let evidence: CaseEvidence
+    let discoveredNow: Bool
 
     var body: some View {
         ZStack {
@@ -541,9 +625,27 @@ private struct EvidenceDetail: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     HStack {
-                        FileLabel(text: "Evidence / Secured", color: Noir.accent)
+                        FileLabel(text: "Evidence / Secured", color: Noir.cyan)
                         Spacer()
                         StatusPill(title: evidence.category.rawValue)
+                    }
+                    if discoveredNow {
+                        HStack(spacing: 15) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 30, weight: .heavy))
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text("CLUE UNLOCKED!")
+                                    .font(.system(size: 21, weight: .black, design: .rounded))
+                                Text("+25 XP  ·  Added to Evidence Locker")
+                                    .font(.system(size: 12, weight: .heavy, design: .monospaced))
+                            }
+                            Spacer()
+                        }
+                        .foregroundStyle(Noir.deep)
+                        .padding(18)
+                        .background(Noir.gold.gradient)
+                        .clipShape(RoundedRectangle(cornerRadius: 17))
+                        .overlay(RoundedRectangle(cornerRadius: 17).stroke(.white.opacity(0.55), lineWidth: 2))
                     }
                     SectionHeading(kicker: "Evidence file · " + evidence.time,
                                    title: evidence.title, subtitle: evidence.summary)
@@ -595,8 +697,17 @@ private struct SuspectInterview: View {
             RedactedBackdrop()
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    SectionHeading(kicker: "Interview / " + suspect.code, title: suspect.name,
-                                   subtitle: suspect.position)
+                    HStack(spacing: 15) {
+                        Text(suspect.initials)
+                            .font(.system(size: 30, weight: .black, design: .rounded))
+                            .foregroundStyle(Noir.deep)
+                            .frame(width: 75, height: 75)
+                            .background(Noir.cyan.gradient)
+                            .clipShape(RoundedRectangle(cornerRadius: 20))
+                            .rotationEffect(.degrees(-4))
+                        SectionHeading(kicker: "Interview / " + suspect.code, title: suspect.name,
+                                       subtitle: suspect.position)
+                    }
                     FileCard {
                         VStack(alignment: .leading, spacing: 12) {
                             FileLabel(text: "Initial statement", color: Noir.accent)
@@ -645,6 +756,12 @@ private struct SuspectInterview: View {
 
 private struct CaseEnding: View {
     @ObservedObject var store: InvestigationStore
+    @State private var revealed = false
+
+    private var earnedStars: Int {
+        let penalties = store.state.incorrectAccusations + store.state.incorrectDeductions
+        return penalties == 0 ? 3 : penalties <= 2 ? 2 : 1
+    }
 
     var body: some View {
         ZStack {
@@ -658,10 +775,29 @@ private struct CaseEnding: View {
                             .font(.system(size: 30))
                             .foregroundStyle(Noir.green)
                     }
-                    Text("CASE\nCLOSED.")
-                        .font(.system(size: 54, weight: .black, design: .rounded))
-                        .foregroundStyle(Noir.ivory)
-                        .tracking(-1)
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("CASE\nCLOSED!")
+                            .font(.system(size: 54, weight: .black, design: .rounded))
+                            .foregroundStyle(Noir.ivory)
+                            .tracking(-1)
+                        HStack(spacing: 12) {
+                            ForEach(0..<3, id: \.self) { index in
+                                Image(systemName: index < earnedStars ? "star.fill" : "star")
+                                    .font(.system(size: 46, weight: .black))
+                                    .foregroundStyle(index < earnedStars ? Noir.gold : Noir.muted)
+                                    .shadow(color: Noir.gold.opacity(index < earnedStars ? 0.45 : 0),
+                                            radius: 12, y: 3)
+                                    .scaleEffect(revealed ? 1 : 0.3)
+                                    .opacity(revealed ? 1 : 0)
+                                    .animation(.spring(response: 0.52, dampingFraction: 0.56)
+                                        .delay(Double(index) * 0.14), value: revealed)
+                            }
+                        }
+                        Text(earnedStars == 3 ? "FLAWLESS INVESTIGATION" :
+                             earnedStars == 2 ? "CASE SOLVED · WELL DONE" : "CASE SOLVED · KEEP SHARP")
+                            .font(.system(size: 13, weight: .black, design: .monospaced))
+                            .foregroundStyle(Noir.cyan)
+                    }
                     FileCard(highlighted: true) {
                         VStack(alignment: .leading, spacing: 13) {
                             FileLabel(text: "Responsible party", color: Noir.accent)
@@ -710,6 +846,9 @@ private struct CaseEnding: View {
             }
         }
         .preferredColorScheme(.dark)
+        .onAppear {
+            revealed = true
+        }
     }
 
     private func timeline(_ time: String, _ detail: String) -> some View {

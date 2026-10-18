@@ -2,6 +2,15 @@
 
 A native, narrative-driven detective game for iPhone built with SwiftUI.
 
+## 0.2 — Game-feel overhaul
+
+A new original art direction focused on tactile mobile-game polish: a custom vector vault illustration, deeper color and lighting, extruded animated buttons, prominent mission navigation, animated clue and deduction rewards, earned Agent XP, redesigned suspect interviews, and a one-to-three-star case conclusion. This is not a clone of another game's art or interface.
+
+Agent XP is derived from real case progress (25 per clue, 40 per interviewed suspect, 80 per solved deduction, and 150 for closing the case). Scores are reproducible across launches, with no network or microtransactions.
+
+The first playable investigation remains intact; progress saves continue using the original key and data model.
+
+
 ## Version 0.1 — Case 001: The Missing Archive
 
 The first playable single-player case takes place at Northpoint Research, where a confidential drive disappears during a six-minute surveillance blackout.

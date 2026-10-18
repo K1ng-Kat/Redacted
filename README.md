@@ -1,98 +1,47 @@
-# REDACTED
+# REDACTED — Single-player Detective Campaign
 
-A native, narrative-driven detective game for iPhone built with SwiftUI.
+## Version 0.4 / Build 5
 
-## 0.3 — Playable guided game redesign
+A complete overhaul of the first playable prototype into a **100-level offline campaign** with ten original mystery districts and ten different puzzle interaction patterns. The game is now presented as a light, easy-to-navigate, replayable mobile puzzler rather than a confusing dossier interface.
 
-The previous five-tab desk was too confusing. The default player experience has been rebuilt from scratch:
+### Play
+- A simple home screen with one large PLAY action.
+- A LEVELS map with 10 themed districts and 100 numbered challenges, each with its own scenario and resolution.
+- Puzzle types: spot a clue, reconstruct a timeline, code keypad, expose a contradiction, find an anomaly, select a hidden route, unscramble a word, tune a radio, match two pieces of evidence, and choose the culprit.
+- Contextual prompts, optional hints, tutorial, error feedback, stars and case-completion summaries.
+- Accessible back navigation, safe area scrolling, larger tap targets and optional animations.
+- Locally saved completion status, unlocked stages and best star rating for each level.
 
-- **One home screen and one big PLAY button**
-- **Four illustrated locations** with exactly two tappable hotspots each
-- **Clue reveal screens** with the original evidence and one-sentence explanation
-- **Three illustrated suspect interviews**, presented as direct question/answer conversations
-- **Two deduction puzzles** after you finish investigating
-- **A final culprit choice** and three-star case summary
-- **Always-visible task instruction**, in-context HELP, persistent progress and automatic resume at the first unfinished chapter
-- Original vector room art and portraits bundled in code, animated press states, tactile feedback, a clear chapter tracker, and strong hierarchy
+### Detective account / rewards
+- Start with 50 coins and two free hints.
+- First solve: 90 XP + 20 XP per earned star, 35 coins + 8 per star.
+- Solve the final level of a district: an extra 80 XP and 100 coins (first clear only).
+- Every rank increase awards 60 coins and a free hint ticket.
+- Rank-based titles and six unlockable background themes (ranks 1, 3, 6, 10, 15 and 20).
+- Hint ticket first; if none remain, a hint costs 30 coins. Hints lower potential star ratings.
+- Replays pay only for improved best star ratings, preventing infinite coin farming.
+- Campaign and account data stored locally in `UserDefaults`, with no paid currency or network dependency.
 
-The existing story, evidence, progress storage and game logic remain intact.
-Old UI files remain in the repository for now but are no longer reachable from the app.
-This is still a handcrafted solo mystery, not an online multiplayer game.
+### Menus
+PLAY / LEVEL SELECT / DETECTIVE PROFILE & REWARDS / HOW TO PLAY / SETTINGS.
+Settings include sound, haptics, motion, hint-button visibility and a confirmed reset action.
 
-### Quick validation on iPhone
-1. Tap PLAY. Only the two yellow hotspots in the room should demand attention.
-2. Collect both clues, tap NEXT LOCATION, and repeat for four locations.
-3. Interview all three characters by asking at least one question each.
-4. Solve the two evidence-based choices, accuse the culprit and view the case result.
-5. Force-quit during a case, reopen and ensure PLAY resumes at the next unfinished chapter.
-6. Restart Case 001 in Settings and verify that the case starts from the vault again.
+### Visual bug fix
+Replaced all visible legacy views and removed inherited text effects. The new interface uses solid colors and backgrounds with depth behind the surface; **text itself receives no offset, shadow or reflection effects**. This targets the reported mirrored/ghosted text appearance, but requires validation on an iPhone.
 
-An actual iPhone/Xcode compile and hands-on usability pass are still required.
+### Technical
+Native SwiftUI and Apple frameworks. Minimum iOS 18. Existing shared `Redacted` scheme remains available for Xcode Cloud. New sources are automatically included by Xcode's synchronized source group. No external assets, API keys, ads, servers or accounts needed.
 
+### Manual QA on iPhone
+1. Launch and verify the first-time tutorial appears and the home screen is legible.
+2. Solve Levels 1–10 to validate all ten mechanics and the district rewards.
+3. Leave a level midway and resume; previously solved levels should remain unlocked.
+4. Open Detective Profile, check coins/XP, unlock/equip cosmetics.
+5. Use two free hint tickets, then use 30 coins for another hint; confirm spending and star deductions.
+6. Replay a cleared case; ensure XP/coins aren't repeatedly granted unless stars improve.
+7. Inspect screens at different Dynamic Type sizes and light/dark system settings for ghosted text.
+8. Reset the campaign and verify coins, tickets, levels, stars and account level return to defaults.
 
-## 0.2 — Game-feel overhaul
+The initial Case 001 prototype source/save is retained in the existing repository history and device storage; this campaign starts with a new separate save namespace. No online multiplayer functionality is claimed.
 
-A new original art direction focused on tactile mobile-game polish: a custom vector vault illustration, deeper color and lighting, extruded animated buttons, prominent mission navigation, animated clue and deduction rewards, earned Agent XP, redesigned suspect interviews, and a one-to-three-star case conclusion. This is not a clone of another game's art or interface.
-
-Agent XP is derived from real case progress (25 per clue, 40 per interviewed suspect, 80 per solved deduction, and 150 for closing the case). Scores are reproducible across launches, with no network or microtransactions.
-
-The first playable investigation remains intact; progress saves continue using the original key and data model.
-
-
-## Version 0.1 — Case 001: The Missing Archive
-
-The first playable single-player case takes place at Northpoint Research, where a confidential drive disappears during a six-minute surveillance blackout.
-
-### Current gameplay
-
-- A fully navigable classified-file home screen and Case Archive
-- Four locations with eight discoverable evidence records
-- Three suspects with six interactive interview prompts
-- Two evidence-gated deduction challenges
-- A final accusation with meaningful success/failure states
-- A case conclusion and timeline reconstruction
-- Automatic local save/resume and a reset option
-- Optional iPhone haptics
-
-There are no online features yet. Multiplayer, accounts, matchmaking, procedural cases, achievements, audio and additional episodes are future work, not present-day capabilities.
-
-## Getting started
-
-1. Open \`Redacted.xcodeproj\` in Xcode.
-2. Select the shared \`Redacted\` scheme.
-3. Select an iPhone running iOS 18 or later (device or simulator).
-4. Build and run with Cmd-R.
-
-The app uses only Apple system frameworks and bundled Swift code. No API keys, server, user account, paid assets or third-party dependencies are required.
-
-### Code layout
-
-- \`Redacted/RedactedApp.swift\`: App entry
-- \`Redacted/ContentView.swift\`: Root navigation
-- \`Redacted/Game/CaseData.swift\`: Case content and rules
-- \`Redacted/Game/InvestigationStore.swift\`: State, validation and persistence
-- \`Redacted/UI/Noir.swift\`: Visual design system
-- \`Redacted/UI/HomeView.swift\`: Home, archive, settings
-- \`Redacted/UI/InvestigationView.swift\`: Investigation, evidence, interviews, deductions, ending
-
-The project uses Xcode's file-system-synchronized group: newly added Swift source files in \`Redacted/\` are included in the app target automatically.
-
-### Xcode Cloud
-
-A shared \`Redacted\` scheme is checked in at \`Redacted.xcodeproj/xcshareddata/xcschemes/Redacted.xcscheme\`. Select it when creating the Xcode Cloud workflow. Code signing remains configured with the existing team's settings.
-
-### Suggested manual QA
-
-1. Start Case 001 and discover all eight evidence files.
-2. Ask at least one question to every suspect.
-3. Verify that deduction answers cannot be submitted before the required evidence is collected.
-4. Submit incorrect deduction answers and retry.
-5. Solve both deductions, accuse the wrong suspect, and then accuse Jules Hart.
-6. Leave the app and reopen to verify progress persists.
-7. Reset progress in Settings and verify the case is fresh.
-
-This is a first playable prototype. iOS/Xcode build verification must be performed on a Mac or Xcode Cloud; it is not included as a passing test claim.
-
-## Creative direction
-
-No combat, no cards, no towers, and no arena combat. The core is observation, interactive fiction, deduction, and eventually social deception in online multiplayer.
+**Build status:** Source/static checks performed; an Xcode/device build and playtesting remain required.

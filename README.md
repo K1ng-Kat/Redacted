@@ -54,14 +54,14 @@ The initial Case 001 prototype source/save is retained in the existing repositor
 - Main menu and out-of-game screens use **Bossa Nova** by Joth; active levels use **Shop Theme** by Cleyton Kauffman at a quiet default of 12% of full volume.
 - Settings now contain a Music toggle and independent volume sliders for menu and level soundtracks. Sound effects remain a separate control.
 - New **App Info & Credits** section at the bottom of Settings includes dynamic version/build numbers, track titles and creator names, OpenGameArt source links and the CC0 license link.
-- The soundtrack only plays from local bundled AAC/M4A files, with no internet streaming. It respects the user's Music setting and pauses when the app backgrounds.
-- **Asset-import step**: GitHub Actions workflow in \`.github/workflows/import-cc0-music.yml\` runs on the v0.5 commit to download the CC0 track files, select the normal Shop Theme arrangement, convert them with ffmpeg, and commit two \`.m4a\` resources under \`Redacted/Audio/\`.
-- If that workflow cannot run (e.g. GitHub Actions is disabled or its bot cannot push), run \`python3 Scripts/import_cc0_music.py\` on a machine with ffmpeg installed, commit both generated \`.m4a\` files, and sync.
+- The soundtrack only plays from local bundled MP3 files, with no internet streaming. It respects the user's Music setting and pauses when the app backgrounds.
+- **Asset-import step**: GitHub Actions workflow in \`.github/workflows/import-cc0-music.yml\` runs on the v0.5 commit to download the CC0 track files, select the normal Shop Theme arrangement, convert them with ffmpeg, and commit two \`.mp3\` resources under \`Redacted/Audio/\`.
+- If that workflow cannot run (e.g. GitHub Actions is disabled or its bot cannot push), run \`python3 Scripts/import_cc0_music.py\` on a machine with Python 3, commit both generated \`.m4a\` files, and sync.
 - \`MUSIC_CREDITS.md\` documents sources and licensing. OpenGameArt licenses are reported as CC0; copyright ownership of uploads is not independently guaranteed.
 
 ### Soundtrack QA
 
-1. Confirm the audio import workflow succeeded and both \`Redacted/Audio/*.m4a\` files exist in GitHub before expecting playback.
+1. Confirm the audio import workflow succeeded and both \`Redacted/Audio/*.mp3\` files exist in GitHub before expecting playback.
 2. Launch the app: the progress bar and completed state should appear, followed by main menu music.
 3. Open any level: the soundtrack should switch to the quieter Shop Theme arrangement.
 4. Turn music off and on from Settings, then adjust both sliders; verify no music continues in the background when off.

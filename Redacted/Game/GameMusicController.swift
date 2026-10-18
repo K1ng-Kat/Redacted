@@ -62,7 +62,7 @@ final class GameMusicController {
     }
 
     private func load(named name: String) -> AVAudioPlayer? {
-        guard let url = Bundle.main.url(forResource: name, withExtension: "m4a") else {
+        guard let url = Bundle.main.url(forResource: name, withExtension: "mp3") else {
             return nil
         }
 

@@ -100,16 +100,51 @@ if ! git -C "$PROJECT" fetch origin main; then
 fi
 
 echo '📥 Integrating GitHub updates...'
-if ! git -C "$PROJECT" rebase origin/main; then
-    echo ''
-    echo '⚠️ GitHub and local changes overlap. Aborting the rebase safely...'
-    if git -C "$PROJECT" rebase --abort; then
-        echo '❌ Nothing was overwritten or force-pushed.'
-        echo '   Your local work is still committed. Resolve the conflict manually.'
-    else
-        echo '❌ Rebase abort failed. Please inspect Git status before continuing.'
+# A named recovery branch protects every pre-merge local commit.
+if ! git -C "$PROJECT" merge-base --is-ancestor HEAD origin/main; then
+    backup="red-sync-backup-$(date '+%Y%m%d-%H%M%S')-$(git -C "$PROJECT" rev-parse --short HEAD)"
+    git -C "$PROJECT" branch "$backup"
+    echo "🛟 Local recovery branch: $backup"
+fi
+
+# A normal merge preserves the local commit history and the app icon.
+if ! git -C "$PROJECT" merge --no-edit origin/main; then
+    conflict='Redacted.xcodeproj/project.pbxproj'
+    files="$(git -C "$PROJECT" diff --name-only --diff-filter=U)"
+    resolved=false
+
+    if [[ "$files" == "$conflict" ]] &&
+       command -v python3 >/dev/null 2>&1 &&
+       [[ -f "$PROJECT/Scripts/resolve_xcode_project.py" ]]; then
+        tmp="$(mktemp -d)"
+        echo '🔧 Checking if only the Xcode version/build changed on GitHub...'
+        if git -C "$PROJECT" show ":1:$conflict" > "$tmp/base" &&
+           git -C "$PROJECT" show ":2:$conflict" > "$tmp/local" &&
+           git -C "$PROJECT" show ":3:$conflict" > "$tmp/remote" &&
+           python3 "$PROJECT/Scripts/resolve_xcode_project.py" "$tmp/base" "$tmp/local" "$tmp/remote" "$tmp/combined"; then
+            cp "$tmp/combined" "$PROJECT/$conflict"
+            git -C "$PROJECT" add -- "$conflict"
+            if git -C "$PROJECT" diff --cached --check &&
+               git -C "$PROJECT" commit --no-edit; then
+                resolved=true
+                echo '✅ Xcode project safely merged.'
+            fi
+        fi
+        rm -rf "$tmp"
     fi
-    exit 1
+
+    if [[ "$resolved" != true ]]; then
+        echo '⚠️ Merge needs manual review; safely aborting.'
+        if git -C "$PROJECT" rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; then
+            git -C "$PROJECT" merge --abort || {
+                echo '❌ Automatic rollback failed. Inspect git status before continuing.'
+                exit 1
+            }
+        fi
+        echo '❌ Local and GitHub commits were preserved; nothing was force-pushed.'
+        echo '   Your recovery branch is still available. Send the conflict output.'
+        exit 1
+    fi
 fi
 
 echo '📤 Pushing the synchronized project to GitHub...'

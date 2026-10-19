@@ -79,9 +79,10 @@ Once installed, simply run `red-sync` whenever you want to synchronize.
 
 - Detects changed/new/deleted files in `~/Documents/Redacted`.
 - Automatically stages and commits local changes with a timestamp.
-- Fetches and rebases onto GitHub's `main` (no forced pushes or resets).
+- Fetches and merges GitHub's `main` (no forced pushes or resets).
 - Pushes local commits to GitHub, including Xcode project and app icon updates.
-- If Git cannot reconcile remote and local edits, stops and safely aborts the rebase. Local changes stay committed so you can resolve the conflict.
+- Automatically reconciles an Xcode `project.pbxproj` conflict **only when GitHub changed the app version/build settings**, preserving your local project and app-icon settings.
+- Creates a named local backup branch before a divergent merge. If other changes conflict, it stops and aborts the merge without discarding local commits.
 - Blocks common signing key, secret and credential files from automated upload.
 - Requires local Git author identity and push authentication to be configured.
 

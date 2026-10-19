@@ -65,9 +65,39 @@ enum CosmeticCatalog {
         .init(id: "hat_director", name: "Director's Cap", slot: .headwear, symbol: "crown.fill", requiredRank: 20, snippetPrice: 20, crystalPrice: 8, tint: Art.gold),
         .init(id: "badge_director", name: "Director's Insignia", slot: .badge, symbol: "crown.fill", requiredRank: 19, snippetPrice: 24, crystalPrice: 9, tint: Art.gold),
         .init(id: "coat_royal", name: "Royal Operative", slot: .coat, symbol: "sparkles", requiredRank: 20, snippetPrice: 30, crystalPrice: 10, tint: Art.cyan)
+,
+        .init(id: "hat_beanie", name: "Midnight Beanie", slot: .headwear, symbol: "hat.widebrim.fill", requiredRank: 2, snippetPrice: 5, crystalPrice: 2, tint: Art.cyan),
+        .init(id: "hat_newsboy", name: "Newsboy Cap", slot: .headwear, symbol: "hat.widebrim.fill", requiredRank: 5, snippetPrice: 7, crystalPrice: 3, tint: Art.gold),
+        .init(id: "hat_visor", name: "Field Visor", slot: .headwear, symbol: "sun.max.fill", requiredRank: 7, snippetPrice: 9, crystalPrice: 4, tint: Art.mint),
+        .init(id: "hat_winter", name: "Snow Patrol", slot: .headwear, symbol: "snowflake", requiredRank: 9, snippetPrice: 12, crystalPrice: 5, tint: Art.paper),
+        .init(id: "hat_hood", name: "Covert Hood", slot: .headwear, symbol: "person.fill", requiredRank: 13, snippetPrice: 16, crystalPrice: 6, tint: Art.coral),
+        .init(id: "hat_pilot", name: "Air Marshal", slot: .headwear, symbol: "airplane", requiredRank: 17, snippetPrice: 20, crystalPrice: 7, tint: Art.gold),
+        .init(id: "glasses_amber", name: "Amber Shades", slot: .eyewear, symbol: "sunglasses.fill", requiredRank: 2, snippetPrice: 5, crystalPrice: 2, tint: Art.gold),
+        .init(id: "glasses_monocle", name: "Inspector Lens", slot: .eyewear, symbol: "eyeglasses", requiredRank: 4, snippetPrice: 7, crystalPrice: 3, tint: Art.cyan),
+        .init(id: "glasses_clear", name: "Clear Frames", slot: .eyewear, symbol: "eyeglasses", requiredRank: 6, snippetPrice: 9, crystalPrice: 3, tint: Art.paper),
+        .init(id: "glasses_ruby", name: "Ruby Optics", slot: .eyewear, symbol: "sunglasses.fill", requiredRank: 9, snippetPrice: 12, crystalPrice: 4, tint: Art.coral),
+        .init(id: "glasses_ice", name: "Frost Goggles", slot: .eyewear, symbol: "eyeglasses", requiredRank: 13, snippetPrice: 17, crystalPrice: 6, tint: Art.mint),
+        .init(id: "glasses_holo", name: "Hologram Visor", slot: .eyewear, symbol: "eye.fill", requiredRank: 18, snippetPrice: 22, crystalPrice: 8, tint: Art.cyan),
+        .init(id: "badge_compass", name: "Compass Crest", slot: .badge, symbol: "safari.fill", requiredRank: 3, snippetPrice: 6, crystalPrice: 3, tint: Art.gold),
+        .init(id: "badge_case", name: "Case Citation", slot: .badge, symbol: "checkmark.seal.fill", requiredRank: 5, snippetPrice: 8, crystalPrice: 3, tint: Art.cyan),
+        .init(id: "badge_onyx", name: "Onyx Shield", slot: .badge, symbol: "shield.fill", requiredRank: 8, snippetPrice: 11, crystalPrice: 4, tint: Art.paper),
+        .init(id: "badge_diamond", name: "Diamond Citation", slot: .badge, symbol: "diamond.fill", requiredRank: 11, snippetPrice: 14, crystalPrice: 5, tint: Art.mint),
+        .init(id: "badge_royal", name: "Royal Eagle", slot: .badge, symbol: "bird.fill", requiredRank: 15, snippetPrice: 19, crystalPrice: 7, tint: Art.gold),
+        .init(id: "badge_neon", name: "Neon Emblem", slot: .badge, symbol: "sparkle", requiredRank: 20, snippetPrice: 27, crystalPrice: 9, tint: Art.cyan),
+        .init(id: "coat_sand", name: "Sand Trench", slot: .coat, symbol: "jacket.fill", requiredRank: 2, snippetPrice: 5, crystalPrice: 2, tint: Art.gold),
+        .init(id: "coat_evergreen", name: "Forest Ranger", slot: .coat, symbol: "jacket.fill", requiredRank: 5, snippetPrice: 8, crystalPrice: 3, tint: Art.mint),
+        .init(id: "coat_noir", name: "Noir Detective", slot: .coat, symbol: "jacket.fill", requiredRank: 7, snippetPrice: 11, crystalPrice: 4, tint: Art.paper),
+        .init(id: "coat_arctic", name: "Arctic Explorer", slot: .coat, symbol: "jacket.fill", requiredRank: 10, snippetPrice: 14, crystalPrice: 5, tint: Art.cyan),
+        .init(id: "coat_sunset", name: "Sunset Agent", slot: .coat, symbol: "jacket.fill", requiredRank: 14, snippetPrice: 19, crystalPrice: 7, tint: Art.coral),
+        .init(id: "coat_cipher", name: "Cipher Commander", slot: .coat, symbol: "jacket.fill", requiredRank: 19, snippetPrice: 27, crystalPrice: 9, tint: Art.gold)
     ]
     static func item(_ id: String?) -> DetectiveCosmetic? { all.first { $0.id == id } }
-    static func items(in slot: CosmeticSlot) -> [DetectiveCosmetic] { all.filter { $0.slot == slot } }
+    static func items(in slot: CosmeticSlot) -> [DetectiveCosmetic] {
+        all.filter { $0.slot == slot }
+            .sorted { $0.requiredRank == $1.requiredRank
+                ? $0.snippetPrice < $1.snippetPrice
+                : $0.requiredRank < $1.requiredRank }
+    }
 }
 
 /// All item previews and every in-game appearance now share one geometric

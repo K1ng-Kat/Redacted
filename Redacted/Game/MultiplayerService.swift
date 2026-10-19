@@ -2,6 +2,36 @@ import CloudKit
 import Combine
 import Foundation
 
+/// Expressive, preset-only emotes for a live 1v1 duel.
+enum DuelEmote: String, CaseIterable, Identifiable {
+    case gg, wave, clue, brilliant, wow, hurry, thinking, applause
+    var id: String { rawValue }
+    var emoji: String {
+        switch self {
+        case .gg: "🤝"
+        case .wave: "👋"
+        case .clue: "🔍"
+        case .brilliant: "💡"
+        case .wow: "😮"
+        case .hurry: "⏳"
+        case .thinking: "🤔"
+        case .applause: "👏"
+        }
+    }
+    var label: String {
+        switch self {
+        case .gg: "Good game"
+        case .wave: "Hello"
+        case .clue: "Found a clue"
+        case .brilliant: "Brilliant"
+        case .wow: "Wow"
+        case .hurry: "Time's ticking"
+        case .thinking: "Thinking"
+        case .applause: "Well played"
+        }
+    }
+}
+
 struct DetectiveFriend: Codable, Identifiable, Equatable {
     let id: String
     let alias: String
@@ -37,6 +67,12 @@ final class MultiplayerService: ObservableObject {
     }
 
     @Published private(set) var phase: Phase = .idle
+    @Published private(set) var opponentEmote: DuelEmote?
+    @Published private(set) var opponentEmoteLabel = ""
+    @Published private(set) var emoteMessage = ""
+    private var lastEmoteSent = Date.distantPast
+    private var lastReceivedEmote = Date.distantPast
+    private var displayEmoteTask: Task<Void, Never>?
     @Published private(set) var roomCode = ""
     @Published private(set) var opponent = ""
     @Published private(set) var message = "Create a room or enter a friend's code."
@@ -224,6 +260,10 @@ final class MultiplayerService: ObservableObject {
         guestID = ""
         currentMystery = nil
         myResultCreated = false
+        opponentEmote = nil
+        emoteMessage = ""
+        lastReceivedEmote = .distantPast
+        displayEmoteTask?.cancel()
         message = "Create a room or enter a friend's code."
     }
 
@@ -258,6 +298,23 @@ final class MultiplayerService: ObservableObject {
             let myRecord = try await fetch("rd-finish-" + code + "-" + playerID)
             let otherID = host ? guestID : (room["host"] as? String ?? "")
             if !otherID.isEmpty {
+                // Read only the opponent's single mutable emote record. Avoid
+                // collecting chat, history, or unbounded public queries.
+                if phase == .playing,
+                   let emoteRecord = try? await fetch("rd-emote-" + code + "-" + otherID),
+                   let raw = emoteRecord["emote"] as? String,
+                   let stamp = emoteRecord["sentAt"] as? Date,
+                   stamp > lastReceivedEmote, stamp <= Date().addingTimeInterval(5),
+                   let emote = DuelEmote(rawValue: raw) {
+                    lastReceivedEmote = stamp
+                    displayEmoteTask?.cancel()
+                    opponentEmote = emote
+                    opponentEmoteLabel = opponent.isEmpty ? "OPPONENT" : opponent
+                    displayEmoteTask = Task { [weak self] in
+                        try? await Task.sleep(for: .seconds(3))
+                        if !Task.isCancelled { self?.opponentEmote = nil }
+                    }
+                }
                 let other = try await fetch("rd-finish-" + code + "-" + otherID)
                 if myResultCreated || myRecord != nil || other != nil {
                     if myRecord == nil && other != nil {
@@ -276,6 +333,28 @@ final class MultiplayerService: ObservableObject {
             }
         } catch {
             message = "Connection interrupted. Retrying…"
+        }
+    }
+
+    /// Preset-only emotes, scoped to an active two-person room. Enforce a
+    /// client cooldown; production should also rate-limit writes server-side.
+    func sendEmote(_ emote: DuelEmote) async {
+        guard phase == .playing, !roomCode.isEmpty else { return }
+        guard Date().timeIntervalSince(lastEmoteSent) >= 5 else {
+            emoteMessage = "Wait a moment before sending another emote."
+            return
+        }
+        do {
+            let id = "rd-emote-" + roomCode + "-" + playerID
+            let record = try await fetch(id)
+                ?? CKRecord(recordType: "RDEmote", recordID: CKRecord.ID(recordName: id))
+            record["emote"] = emote.rawValue as NSString
+            record["sentAt"] = NSDate()
+            _ = try await db.save(record)
+            lastEmoteSent = Date()
+            emoteMessage = "Sent " + emote.emoji
+        } catch {
+            emoteMessage = "Emote unavailable: " + error.localizedDescription
         }
     }
 

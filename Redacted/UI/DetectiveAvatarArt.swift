@@ -126,6 +126,24 @@ struct DetectiveAvatarArt: View {
         case "coat_royal":
             baseCoat = Color(red: 0.26, green: 0.19, blue: 0.56)
             trim = Color(red: 0.95, green: 0.76, blue: 0.40)
+        case "coat_sand":
+            baseCoat = Color(red: 0.62, green: 0.49, blue: 0.31)
+            trim = Color(red: 0.95, green: 0.82, blue: 0.56)
+        case "coat_evergreen":
+            baseCoat = Color(red: 0.17, green: 0.39, blue: 0.32)
+            trim = Color(red: 0.60, green: 0.91, blue: 0.68)
+        case "coat_noir":
+            baseCoat = Color(red: 0.10, green: 0.13, blue: 0.20)
+            trim = Color(red: 0.67, green: 0.73, blue: 0.79)
+        case "coat_arctic":
+            baseCoat = Color(red: 0.65, green: 0.81, blue: 0.89)
+            trim = Color(red: 0.19, green: 0.51, blue: 0.74)
+        case "coat_sunset":
+            baseCoat = Color(red: 0.79, green: 0.37, blue: 0.22)
+            trim = Color(red: 1.00, green: 0.84, blue: 0.45)
+        case "coat_cipher":
+            baseCoat = Color(red: 0.16, green: 0.19, blue: 0.40)
+            trim = Color(red: 0.96, green: 0.78, blue: 0.28)
         default:
             baseCoat = Color(red: 0.13, green: 0.24, blue: 0.39)
             trim = highlight
@@ -144,8 +162,10 @@ struct DetectiveAvatarArt: View {
         }
 
         // Coat and shoulders BEFORE head so the neckline aligns perfectly.
-        paint(&g, polygon([24,300, 30,262, 54,232, 110,212, 150,222,
-                           190,212, 246,232, 270,262, 276,300]),
+        // Natural bust: wider head (about 108pt) against a 215pt
+        // shoulder line. The collar follows the visible neck, no balloon torso.
+        paint(&g, polygon([38,300, 42,264, 60,236, 110,213, 150,222,
+                           190,213, 240,236, 258,264, 262,300]),
               baseCoat, border: outline, width: 7)
         paint(&g, polygon([114,214, 150,228, 186,214, 173,298, 127,298]),
               Color(red: 0.19, green: 0.27, blue: 0.39), border: outline, width: 4)
@@ -168,7 +188,27 @@ struct DetectiveAvatarArt: View {
         // Sleeve blocks follow shoulder contour.
         line(&g, [65,241, 61,292], outline.opacity(0.48), width: 4)
         line(&g, [235,241, 239,292], outline.opacity(0.48), width: 4)
-        if outfit == "coat_ghost" {
+        if outfit == "coat_sand" {
+            line(&g, [104,267,124,267], trim, width: 4)
+            line(&g, [175,267,196,267], trim, width: 4)
+            paint(&g, circle(145,270,8,8), trim)
+        } else if outfit == "coat_evergreen" {
+            line(&g, [67,261,97,261], trim, width: 4)
+            line(&g, [203,261,233,261], trim, width: 4)
+        } else if outfit == "coat_noir" {
+            line(&g, [103,248,122,261], trim, width: 3)
+            line(&g, [197,248,178,261], trim, width: 3)
+        } else if outfit == "coat_arctic" {
+            line(&g, [77,235,110,218,131,225], trim, width: 7)
+            line(&g, [223,235,190,218,169,225], trim, width: 7)
+        } else if outfit == "coat_sunset" {
+            line(&g, [72,284,111,284], trim, width: 4)
+            line(&g, [189,284,228,284], trim, width: 4)
+        } else if outfit == "coat_cipher" {
+            line(&g, [82,261,107,261], trim, width: 5)
+            line(&g, [193,261,218,261], trim, width: 5)
+            paint(&g, circle(146,243,7,7), trim)
+        } else if outfit == "coat_ghost" {
             line(&g, [88,277,116,277], trim, width: 5)
             line(&g, [184,277,212,277], trim, width: 5)
         } else if outfit == "coat_royal" {
@@ -177,12 +217,12 @@ struct DetectiveAvatarArt: View {
             paint(&g, circle(149,248,5,5), trim)
         }
 
-        // Head and all eyewear/headwear share a single transform. Keep the
-        // chin anchored at the narrowed collar so accessories cannot drift.
+        // Natural face to shoulder ratio. All eye/hair/hat anchors transform
+        // with the skull, so cosmetics retain exact face alignment.
         var headG = g
-        headG.translateBy(x: 150, y: 172)
-        headG.scaleBy(x: 0.88, y: 0.90)
-        headG.translateBy(x: -150, y: -172)
+        headG.translateBy(x: 150, y: 174)
+        headG.scaleBy(x: 1.04, y: 1.01)
+        headG.translateBy(x: -150, y: -174)
         // Neck and ears.
         paint(&headG, rect(131,165,38,53,13), skinShade, border: outline, width: 3)
         paint(&headG, circle(91,125,23,31), skinColor, border: outline)
@@ -248,6 +288,24 @@ struct DetectiveAvatarArt: View {
                   Color(red: 0.08, green: 0.13, blue: 0.20), border: highlight, width: 4)
             line(&headG, [115,126,138,126], Color(red: 0.46, green: 0.98, blue: 0.76), width: 3)
             line(&headG, [162,126,184,126], Color(red: 0.46, green: 0.98, blue: 0.76), width: 3)
+        case "glasses_amber", "glasses_ruby":
+            let tint = loadout[.eyewear] == "glasses_ruby" ? Color.red : Color.orange
+            paint(&headG, circle(110,122,38,30), tint.opacity(0.64), border: outline, width: 4)
+            paint(&headG, circle(154,122,38,30), tint.opacity(0.64), border: outline, width: 4)
+            line(&headG, [148,132,153,132], outline, width: 4)
+        case "glasses_monocle":
+            headG.stroke(circle(156,117,40,40), with: .color(Art.gold), lineWidth: 5)
+            line(&headG, [194,137,189,166,180,181], Art.gold, width: 2.5)
+        case "glasses_clear":
+            headG.stroke(rect(108,120,39,34,11), with: .color(Color.white), lineWidth: 4)
+            headG.stroke(rect(154,120,39,34,11), with: .color(Color.white), lineWidth: 4)
+            line(&headG, [147,130,154,130], Color.white, width: 4)
+        case "glasses_ice", "glasses_holo":
+            let ice = loadout[.eyewear] == "glasses_ice"
+            paint(&headG, polygon([105,120, 195,120, 188,154, 150,156, 111,154]),
+                  ice ? Art.cyan.opacity(0.58) : Art.blueLight.opacity(0.84),
+                  border: ice ? Color.white : Art.mint, width: 4)
+            line(&headG, [117,127,186,127], Color.white.opacity(0.8), width: 2.5)
         default: break
         }
 
@@ -275,6 +333,28 @@ struct DetectiveAvatarArt: View {
                                badgeX-15,badgeY+14]),
                   Color(red: 0.99, green: 0.81, blue: 0.38), border: outline, width: 3)
             paint(&g, circle(badgeX-3,badgeY+1,6,6), Color.white)
+        case "badge_compass":
+            paint(&g, star(cx: badgeX,cy: badgeY,radius: 19), Art.gold, border: outline, width: 3)
+            paint(&g, circle(badgeX-3,badgeY-3,6,6), Art.blueDeep)
+        case "badge_case":
+            paint(&g, rect(badgeX-16,badgeY-16,32,32,8), Art.cyan, border: outline, width: 3)
+            line(&g, [badgeX-9,badgeY, badgeX-2,badgeY+8, badgeX+11,badgeY-9], outline, width: 4)
+        case "badge_onyx":
+            paint(&g, polygon([badgeX,badgeY-19, badgeX+15,badgeY-12,
+                               badgeX+12,badgeY+10, badgeX,badgeY+19,
+                               badgeX-12,badgeY+10, badgeX-15,badgeY-12]),
+                  Art.ink, border: Art.paper, width: 3)
+        case "badge_diamond":
+            paint(&g, polygon([badgeX,badgeY-19, badgeX+17,badgeY,
+                               badgeX,badgeY+19, badgeX-17,badgeY]),
+                  Art.mint, border: outline, width: 3)
+        case "badge_royal":
+            paint(&g, star(cx: badgeX,cy: badgeY,radius: 20), Art.gold, border: outline,width: 3)
+            paint(&g, circle(badgeX-6,badgeY-6,12,12), Art.coral)
+        case "badge_neon":
+            paint(&g, circle(badgeX-19,badgeY-19,38,38),
+                  Art.blueDeep, border: Art.cyan, width: 4)
+            paint(&g, star(cx: badgeX,cy: badgeY,radius: 14), Art.mint)
         default: break
         }
 
@@ -306,6 +386,32 @@ struct DetectiveAvatarArt: View {
                   Color(red: 0.17, green: 0.23, blue: 0.38), border: outline, width: 4)
             paint(&headG, rect(98,81,105,14,6), Color(red: 0.94, green: 0.75, blue: 0.37))
             paint(&headG, star(cx: 151, cy: 64, radius: 12), Color.white)
+        case "hat_beanie", "hat_winter":
+            let winter = loadout[.headwear] == "hat_winter"
+            paint(&headG, polygon([102,89, 102,70, 119,51, 150,47, 181,51,
+                                   198,70, 198,89]), winter ? Art.paper : Art.blueLight,
+                  border: outline, width: 4)
+            paint(&headG, rect(99,83,102,14,5), winter ? Art.cyan : Art.blueDeep,
+                  border: outline, width: 2)
+            if winter { paint(&headG, circle(141,37,18,18), Art.paper) }
+        case "hat_newsboy":
+            paint(&headG, circle(95,59,110,40), Art.goldDark, border: outline, width: 4)
+            paint(&headG, polygon([101,88, 201,88, 217,98, 155,102, 100,98]),
+                  Art.gold, border: outline, width: 3)
+        case "hat_visor":
+            paint(&headG, rect(99,77,103,16,7), Art.mint, border: outline, width: 3)
+            paint(&headG, polygon([105,90, 209,90, 218,101, 172,105, 105,98]),
+                  Art.blueDeep, border: outline, width: 3)
+        case "hat_hood":
+            paint(&headG, polygon([92,120, 92,79, 108,46, 136,35, 170,36,
+                                    195,54, 209,84, 208,122, 194,95, 188,74,
+                                    172,62, 130,64, 110,84, 105,121]),
+                  Art.blueDeep, border: Art.cyan, width: 5)
+        case "hat_pilot":
+            paint(&headG, polygon([95,90, 102,55, 123,46, 177,46, 196,55, 204,91]),
+                  Art.blueLight, border: outline, width: 4)
+            paint(&headG, rect(101,78,100,15,5), Art.gold, border: outline, width: 2)
+            paint(&headG, star(cx: 150,cy: 62,radius: 11), Art.paper)
         default: break
         }
 

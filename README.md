@@ -285,3 +285,15 @@ QA: verify character anatomy and hat/eyewear alignment, the wardrobe's two-colum
 - All existing social IDs, accepted friends, friend requests, private CloudKit save data and multiplayer room codes are retained. No reset or wallet changes.
 - Playing together still requires the public CloudKit schema and entitlement setup described above; clicking PLAY opens the existing invite-based multiplayer lobby to create and share a room.
 - iPhone/iPad: check bottom-tab placement, safe-area spacing, friend-code sheet entry, large online/offline indicators, and return to case after navigating away from tabs.
+
+## REDACTED 1.5 — Build 18: Task Forces, sliding tabs, cosmetics, and 1v1 emotes
+
+- Social now uses an independent account-backed Friends/Task Forces network rather than requiring iCloud. Supabase Auth, Postgres SQL and client-side code are included. The network remains visibly **unconfigured** until a real Supabase project is connected. Full activation guide: [Backend/SOCIAL_SETUP.md](Backend/SOCIAL_SETUP.md).
+- Invite-only **Task Forces** support a name, eight-character squad code, 20 members, leader transfer, and online presence. A detective belongs to one squad.
+- The compact Social page replaces the oversized Friends cards with an online-first contact list, a short invitation strip, and a Task Force segment.
+- The bottom Home/Duels/Social bar now has a spring-sliding gold selector, contiguous tab track and safe-area background, eliminating the odd gap and Liquid Glass styling. Horizontal swipes can switch pages except during a live duel.
+- The original avatar head/coat ratio is rebalanced with a wider face relative to the shoulders while accessories continue to use the same anchors.
+- **39 illustrated cosmetics** total (24 new), with actual drawn variation in all four equipment slots. Prices/ranks/previous ownership and saves are retained.
+- **Eight preset emotes** only in active 1v1 matches, with a five-second cooldown, opponent display, and local mute. CloudKit requires a new \`RDEmote\` record type for live delivery.
+- The independent Friends backend requires manual Supabase provisioning: social networking is **not live from the GitHub code alone**. Existing 1v1 CloudKit matchmaking is still a separate service and is not migrated by this patch.
+- Anonymous accounts do not require Apple/iCloud but are device-bound until a later account-linking/recovery feature. Never ship a Supabase secret or service-role key inside the app.

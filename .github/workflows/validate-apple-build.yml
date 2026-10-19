@@ -23,6 +23,9 @@ jobs:
         uses: actions/checkout@v4
       - name: Show Xcode version
         run: xcodebuild -version
+      - name: Validate cosmetic catalog and duel emote coverage
+        run: |
+          python3 Scripts/validate_cosmetics.py
       - name: Build universal game for iOS Simulator
         run: |
           set -o pipefail

@@ -5,7 +5,8 @@ struct ContentView: View {
     @State private var route: Route = .home
     @State private var navigationHistory: [Route] = []
     @State private var activeLevel = 1
-    @ObservedObject private var social = MultiplayerService.shared
+    @ObservedObject private var social = DetectiveSocialNetwork.shared
+    @Namespace private var tabIndicator
     @State private var pendingInvite: String?
     @State private var startupComplete = false
     @AppStorage("redacted.setup.complete") private var setupComplete = false
@@ -89,7 +90,9 @@ struct ContentView: View {
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
                 syncMusic()
-                MultiplayerService.shared.startPresence()
+                if route == .multiplayer {
+                    MultiplayerService.shared.startPresence()
+                }
             } else {
                 GameMusicController.shared.pause()
                 MultiplayerService.shared.stopPresence()
@@ -181,64 +184,96 @@ struct ContentView: View {
     private var mainGame: some View {
         screen(for: route)
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                if showsMainTabs { mainTabBar }
+                if showsMainTabs {
+                    mainTabBar
+                }
             }
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 45)
+                    .onEnded { gesture in
+                        guard showsMainTabs,
+                              !(route == .multiplayer && MultiplayerService.shared.phase == .playing),
+                              abs(gesture.translation.width) > 75,
+                              abs(gesture.translation.width) > abs(gesture.translation.height) * 1.7
+                        else { return }
+                        let all: [Route] = [.home, .multiplayer, .friends]
+                        guard let index = all.firstIndex(of: route) else { return }
+                        let next = index + (gesture.translation.width < 0 ? 1 : -1)
+                        if all.indices.contains(next) {
+                            withAnimation(.spring(response: 0.30, dampingFraction: 0.82)) {
+                                selectTab(all[next])
+                            }
+                        }
+                    }
+            )
     }
 
+    // A single contiguous game tab control. Selected backing SLIDES between
+    // cells; no Liquid Glass and no separator gaps or uncovered safe-area band.
     private var mainTabBar: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 0) {
             mainTab(.home, symbol: "house.fill", label: "HOME")
-            mainTab(.multiplayer, symbol: "gamecontroller.fill", label: "MULTIPLAYER")
-            mainTab(.friends, symbol: "person.2.fill", label: "FRIENDS")
+            mainTab(.multiplayer, symbol: "gamecontroller.fill", label: "DUELS")
+            mainTab(.friends, symbol: "person.2.fill", label: "SOCIAL")
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 9)
+        .padding(5)
+        .background(Art.blueDeep)
+        .clipShape(RoundedRectangle(cornerRadius: 17))
+        .overlay(RoundedRectangle(cornerRadius: 17)
+            .stroke(Art.edge.opacity(0.35), lineWidth: 1))
+        .padding(.horizontal, 12)
+        .padding(.top, 7)
+        .padding(.bottom, 3)
         .frame(maxWidth: .infinity)
         .background {
             Art.ink
-                .overlay(alignment: .top) {
-                    Rectangle()
-                        .fill(Art.edge.opacity(0.48))
-                        .frame(height: 1)
-                }
                 .ignoresSafeArea(edges: .bottom)
         }
+        .accessibilityElement(children: .contain)
     }
 
     private func mainTab(_ target: Route, symbol: String, label: String) -> some View {
         let selected = route == target
-        let onlineCount = social.onlineFriends.filter { $0.online }.count
+        let onlineCount = social.onlineFriends.count
         return Button {
             GameEffects.shared.tap()
-            selectTab(target)
+            withAnimation(.spring(response: 0.30, dampingFraction: 0.82)) {
+                selectTab(target)
+            }
         } label: {
             VStack(spacing: 5) {
                 ZStack(alignment: .topTrailing) {
                     Image(systemName: symbol)
-                        .font(.system(size: 21, weight: .bold))
-                        .frame(width: 39, height: 28)
+                        .font(.system(size: 20, weight: .bold))
+                        .frame(width: 34, height: 24)
                     if target == .friends && onlineCount > 0 {
                         Circle()
                             .fill(Art.mint)
                             .frame(width: 10, height: 10)
-                            .overlay(Circle().stroke(Art.ink, lineWidth: 2))
-                            .offset(x: 5, y: -2)
+                            .overlay(Circle().stroke(Art.blueDeep, lineWidth: 2))
+                            .offset(x: 4, y: -2)
                     }
                 }
                 Text(label)
                     .font(.system(size: 10, weight: .black, design: .rounded))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+                    .minimumScaleFactor(0.78)
             }
-            .foregroundStyle(selected ? Art.gold : Art.faded)
-            .frame(maxWidth: .infinity, minHeight: 51)
-            .background(selected ? Art.blueLight.opacity(0.52) : Color.clear)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .contentShape(RoundedRectangle(cornerRadius: 12))
+            .foregroundStyle(selected ? Art.ink : Art.faded)
+            .frame(maxWidth: .infinity, minHeight: 54)
+            .background {
+                if selected {
+                    RoundedRectangle(cornerRadius: 13)
+                        .fill(Art.gold)
+                        .matchedGeometryEffect(id: "tab-slider", in: tabIndicator)
+                        .shadow(color: Art.goldDark.opacity(0.4), radius: 0, y: 3)
+                }
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 13))
         }
         .buttonStyle(PressGameStyle())
-        .accessibilityLabel(label == "FRIENDS" && onlineCount > 0
-                            ? "Friends, \(onlineCount) online" : label)
+        .accessibilityLabel(target == .friends && onlineCount > 0
+                            ? "Social, \(onlineCount) friends online" : label)
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
@@ -291,7 +326,7 @@ struct ContentView: View {
         case .multiplayer:
             MultiplayerLobbyView(store: store, back: { selectTab(.home) })
         case .friends:
-            FriendsView(store: store, openMultiplayer: { selectTab(.multiplayer) })
+            DetectiveSocialHubView(openMultiplayer: { selectTab(.multiplayer) })
         }
     }
 

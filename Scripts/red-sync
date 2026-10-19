@@ -1,7 +1,8 @@
 #!/bin/bash
 # REDACTED — safe two-way GitHub sync for macOS
 # Local edits are committed first, then the GitHub main branch is integrated,
-# then the result is pushed. No reset, forced update, or auto-resolved conflict.
+# then the result is pushed. Only proven-safe metadata conflicts auto-resolve;
+# no reset, forced push, or unverified file-content preference.
 set -euo pipefail
 
 PROJECT="${REDACTED_PROJECT:-$HOME/Documents/Redacted}"
@@ -109,40 +110,157 @@ fi
 
 # A normal merge preserves the local commit history and the app icon.
 if ! git -C "$PROJECT" merge --no-edit origin/main; then
-    conflict='Redacted.xcodeproj/project.pbxproj'
+    xcode_conflict='Redacted.xcodeproj/project.pbxproj'
+    plist_conflict='Redacted-Info.plist'
     files="$(git -C "$PROJECT" diff --name-only --diff-filter=U)"
     resolved=false
+    supported=true
+    have_xcode=false
+    have_plist=false
 
-    if [[ "$files" == "$conflict" ]] &&
-       command -v python3 >/dev/null 2>&1 &&
-       [[ -f "$PROJECT/Scripts/resolve_xcode_project.py" ]]; then
+    # Only auto-resolve these two known app metadata files. Unknown conflicts
+    # are left untouched, and the merge is rolled back to the recovery branch.
+    while IFS= read -r file; do
+        [[ -z "$file" ]] && continue
+        case "$file" in
+            "$xcode_conflict") have_xcode=true ;;
+            "$plist_conflict") have_plist=true ;;
+            *) supported=false ;;
+        esac
+    done <<< "$files"
+
+    if [[ "$supported" == true ]] &&
+       [[ "$have_xcode" == true || "$have_plist" == true ]] &&
+       command -v python3 >/dev/null 2>&1; then
+
         tmp="$(mktemp -d)"
-        echo '🔧 Checking if only the Xcode version/build changed on GitHub...'
-        if git -C "$PROJECT" show ":1:$conflict" > "$tmp/base" &&
-           git -C "$PROJECT" show ":2:$conflict" > "$tmp/local" &&
-           git -C "$PROJECT" show ":3:$conflict" > "$tmp/remote" &&
-           python3 "$PROJECT/Scripts/resolve_xcode_project.py" "$tmp/base" "$tmp/local" "$tmp/remote" "$tmp/combined"; then
-            cp "$tmp/combined" "$PROJECT/$conflict"
-            git -C "$PROJECT" add -- "$conflict"
-            if git -C "$PROJECT" diff --cached --check &&
-               git -C "$PROJECT" commit --no-edit; then
-                resolved=true
-                echo '✅ Xcode project safely merged.'
+        merge_ready=true
+        echo '🔧 Safely reconciling Xcode settings and app Info.plist...'
+
+        if [[ "$have_xcode" == true ]]; then
+            # This pre-existing helper preserves the ENTIRE local project file,
+            # including signing/team/capability edits. It only accepts the
+            # remote version/build change; anything else is a hard stop.
+            if [[ ! -f "$PROJECT/Scripts/resolve_xcode_project.py" ]] ||
+               ! git -C "$PROJECT" show ":1:$xcode_conflict" > "$tmp/pbx-base" ||
+               ! git -C "$PROJECT" show ":2:$xcode_conflict" > "$tmp/pbx-local" ||
+               ! git -C "$PROJECT" show ":3:$xcode_conflict" > "$tmp/pbx-remote" ||
+               ! python3 "$PROJECT/Scripts/resolve_xcode_project.py" \
+                    "$tmp/pbx-base" "$tmp/pbx-local" "$tmp/pbx-remote" "$tmp/pbx-result"; then
+                merge_ready=false
+            fi
+        fi
+
+        if [[ "$have_plist" == true ]]; then
+            if ! git -C "$PROJECT" show ":1:$plist_conflict" > "$tmp/plist-base" ||
+               ! git -C "$PROJECT" show ":2:$plist_conflict" > "$tmp/plist-local" ||
+               ! git -C "$PROJECT" show ":3:$plist_conflict" > "$tmp/plist-remote"; then
+                merge_ready=false
+            elif ! python3 - "$tmp/plist-base" "$tmp/plist-local" \
+                "$tmp/plist-remote" "$tmp/plist-result" <<'PYTHON_PLIST_MERGE'
+import plistlib
+import sys
+from pathlib import Path
+
+base_path, local_path, remote_path, result_path = map(Path, sys.argv[1:])
+missing = object()
+base, local, remote = [
+    plistlib.loads(path.read_bytes()) for path in (base_path, local_path, remote_path)
+]
+
+def merge(base_value, local_value, remote_value, location):
+    if local_value == remote_value:
+        return local_value
+    if local_value == base_value:
+        return remote_value
+    if remote_value == base_value:
+        return local_value
+    if all(isinstance(value, dict) for value in
+           (base_value, local_value, remote_value)):
+        merged = {}
+        for key in dict.fromkeys([*base_value, *local_value, *remote_value]):
+            value = merge(
+                base_value.get(key, missing),
+                local_value.get(key, missing),
+                remote_value.get(key, missing),
+                f"{location}.{key}"
+            )
+            if value is not missing:
+                merged[key] = value
+        return merged
+    raise ValueError(f"Both sides changed {location} differently; review required.")
+
+try:
+    result = merge(base, local, remote, "Info.plist")
+    if not isinstance(result, dict):
+        raise ValueError("Unexpected non-dictionary Info.plist")
+
+    # Don't accidentally lose the QR deep link, Game Mode or camera permission.
+    if result.get("LSSupportsGameMode") is not True:
+        raise ValueError("Game Mode plist setting missing")
+    if result.get("UILaunchStoryboardName") != "LaunchScreen":
+        raise ValueError("Launch storyboard setting missing")
+    if not result.get("NSCameraUsageDescription"):
+        raise ValueError("QR scanner camera permission missing")
+    schemes = [
+        scheme
+        for item in result.get("CFBundleURLTypes", [])
+        for scheme in item.get("CFBundleURLSchemes", [])
+    ]
+    if "redacted-detective" not in schemes:
+        raise ValueError("Multiplayer invite URL scheme missing")
+
+    result_path.write_bytes(plistlib.dumps(result, sort_keys=False))
+    print("✅ Preserved local plist settings and GitHub camera/QR/Game Mode keys.")
+except (ValueError, TypeError, plistlib.InvalidFileException) as error:
+    print(f"❌ Plist cannot be safely auto-merged: {error}", file=sys.stderr)
+    sys.exit(1)
+PYTHON_PLIST_MERGE
+            then
+                merge_ready=false
+            fi
+        fi
+
+        # Commit only after BOTH outputs have been validated.
+        if [[ "$merge_ready" == true ]]; then
+            if [[ "$have_xcode" == true ]]; then
+                cp "$tmp/pbx-result" "$PROJECT/$xcode_conflict"
+            fi
+            if [[ "$have_plist" == true ]]; then
+                cp "$tmp/plist-result" "$PROJECT/$plist_conflict"
+            fi
+
+            if command -v plutil >/dev/null 2>&1 &&
+               { [[ "$have_xcode" != true ]] ||
+                 plutil -lint -s "$PROJECT/$xcode_conflict"; } &&
+               { [[ "$have_plist" != true ]] ||
+                 plutil -lint -s "$PROJECT/$plist_conflict"; }; then
+                if [[ "$have_xcode" == true ]]; then
+                    git -C "$PROJECT" add -- "$xcode_conflict"
+                fi
+                if [[ "$have_plist" == true ]]; then
+                    git -C "$PROJECT" add -- "$plist_conflict"
+                fi
+                if git -C "$PROJECT" diff --cached --check &&
+                   git -C "$PROJECT" commit --no-edit; then
+                    resolved=true
+                    echo '✅ Xcode project and Info.plist safely merged.'
+                fi
             fi
         fi
         rm -rf "$tmp"
     fi
 
     if [[ "$resolved" != true ]]; then
-        echo '⚠️ Merge needs manual review; safely aborting.'
+        echo '⚠️ Settings overlap could not be reconciled safely; aborting.'
         if git -C "$PROJECT" rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; then
             git -C "$PROJECT" merge --abort || {
                 echo '❌ Automatic rollback failed. Inspect git status before continuing.'
                 exit 1
             }
         fi
-        echo '❌ Local and GitHub commits were preserved; nothing was force-pushed.'
-        echo '   Your recovery branch is still available. Send the conflict output.'
+        echo '❌ All local and GitHub commits are preserved. Nothing was force-pushed.'
+        echo '   The recovery branch remains available for manual review.'
         exit 1
     fi
 fi

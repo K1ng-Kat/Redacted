@@ -24,74 +24,25 @@ enum DetectiveIdentity {
     }
 }
 
+/// Rank identities use the same professionally aligned vector character art
+/// as the wardrobe, rather than a second incompatible portrait renderer.
 struct DetectivePortrait: View {
     let theme: String
     var size: CGFloat = 83
 
-    private var index: Int { DetectiveIdentity.index(for: theme) }
-    private var highlight: Color { DetectiveIdentity.colors[index] }
+    private var hair: DetectiveHair {
+        switch DetectiveIdentity.index(for: theme) {
+        case 1, 3: .swept
+        case 2, 5: .textured
+        case 4: .cropped
+        default: .classic
+        }
+    }
 
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: size * 0.20)
-                .fill(LinearGradient(colors: [highlight, Art.blueDeep],
-                                     startPoint: .topLeading, endPoint: .bottomTrailing))
-
-            // Stylized shoulders and collar.
-            Ellipse()
-                .fill(index % 2 == 0 ? Art.ink : Art.blue)
-                .frame(width: size * 0.91, height: size * 0.53)
-                .offset(y: size * 0.39)
-            Ellipse()
-                .fill(Color(red: 0.95 - Double(index % 3) * 0.12,
-                            green: 0.75 - Double(index % 3) * 0.08,
-                            blue: 0.57 - Double(index % 3) * 0.05))
-                .frame(width: size * 0.47, height: size * 0.52)
-                .offset(y: -size * 0.043)
-
-            if index == 0 || index == 4 {
-                Ellipse().fill(Art.ink)
-                    .frame(width: size * 0.55, height: size * 0.20)
-                    .offset(y: -size * 0.30)
-            } else if index == 1 || index == 5 {
-                RoundedRectangle(cornerRadius: size * 0.08)
-                    .fill(Art.ink)
-                    .frame(width: size * 0.57, height: size * 0.19)
-                    .offset(y: -size * 0.27)
-                Capsule().fill(Art.gold)
-                    .frame(width: size * 0.65, height: size * 0.07)
-                    .offset(y: -size * 0.20)
-            } else {
-                Ellipse().fill(Color(red: 0.20, green: 0.14, blue: 0.20))
-                    .frame(width: size * 0.60, height: size * 0.26)
-                    .offset(y: -size * 0.27)
-            }
-
-            HStack(spacing: size * 0.13) {
-                Circle().frame(width: size * 0.035)
-                Circle().frame(width: size * 0.035)
-            }
-            .foregroundStyle(Art.ink)
-            .offset(y: -size * 0.02)
-
-            if index == 2 || index == 5 {
-                Image(systemName: "eyeglasses")
-                    .font(.system(size: size * 0.34, weight: .regular))
-                    .foregroundStyle(Art.ink)
-                    .offset(y: -size * 0.03)
-            }
-            if index == 3 || index == 4 {
-                Image(systemName: index == 3 ? "star.circle.fill" : "eye.fill")
-                    .font(.system(size: size * 0.18, weight: .black))
-                    .foregroundStyle(Art.gold)
-                    .offset(x: size * 0.20, y: size * 0.33)
-            }
-        }
-        .frame(width: size, height: size)
-        .clipShape(RoundedRectangle(cornerRadius: size * 0.20))
-        .overlay(RoundedRectangle(cornerRadius: size * 0.20)
-            .stroke(highlight.opacity(0.86), lineWidth: 2))
-        .accessibilityLabel("\(DetectiveIdentity.names[index]) detective portrait")
+        DetectiveAvatarArt(theme: theme, skin: .peach,
+                           hair: hair, loadout: [:], size: size)
+            .accessibilityLabel("\(DetectiveIdentity.names[DetectiveIdentity.index(for: theme)]) detective portrait")
     }
 }
 

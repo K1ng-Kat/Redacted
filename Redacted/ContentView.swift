@@ -438,9 +438,7 @@ struct CampaignHomeView: View {
             GameCard(accent: Art.gold) {
                 VStack(spacing: 11) {
                     HStack(spacing: 12) {
-                        Image(systemName: "star.shield.fill")
-                            .font(.system(size: 27, weight: .black))
-                            .foregroundStyle(Art.gold)
+                        DetectiveCharacter(store: store, size: 48)
                         VStack(alignment: .leading, spacing: 4) {
                             Text("DETECTIVE LEVEL \(store.accountLevel)")
                                 .font(.system(size: 16, weight: .black, design: .rounded))

@@ -475,6 +475,12 @@ struct CampaignStatsView: View {
                 rankHero
                 GameButton(title: "CUSTOMIZE CHARACTER", icon: "paintbrush.fill", action: customize)
                 HStack(spacing: 9) {
+                    StatChip(icon: "bolt.fill", value: "\(store.accountXP)", label: "TOTAL XP", tint: Art.mint)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    StatChip(icon: "circle.hexagongrid.fill", value: "\(store.coins)", label: "COINS")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                HStack(spacing: 9) {
                     StatChip(icon: "crystal", value: "\(store.crystals)", label: "CRYSTALS")
                     Spacer(minLength: 1)
                     StatChip(icon: "lightbulb.fill", value: "\(store.hintTickets)", label: "FREE HINTS", tint: Art.cyan)
@@ -484,7 +490,7 @@ struct CampaignStatsView: View {
                 GameCard {
                     VStack(alignment: .leading, spacing: 10) {
                         GameKicker(text: "HOW REWARDS WORK", color: Art.gold)
-                        Text("Each solved case awards XP, coins and stars. Every detective rank gives 60 coins. Higher ranks take more XP and unlock new characters.")
+                        Text("XP and coins are completely separate. XP increases your detective rank and is never spent. Coins can be spent on snippets without changing XP or rank. Completing cases rewards both independently; rank-ups grant bonus coins.")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(Art.paper)
                             .fixedSize(horizontal: false, vertical: true)

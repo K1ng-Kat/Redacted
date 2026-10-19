@@ -19,6 +19,10 @@ struct CampaignProgress: Codable {
     var snippets = 0
     var ownedCosmetics: Set<String> = []
     var equippedCosmetics: [String: String] = [:]
+    // Free appearance options live with the campaign save and private iCloud
+    // snapshot, independently of owned or equipped cosmetic inventory.
+    var skinStyle = DetectiveSkin.peach.rawValue
+    var hairStyle = DetectiveHair.classic.rawValue
     var friendContacts: [DetectiveFriend] = []
     var socialID: String = CampaignProgress.newSocialID()
 
@@ -30,7 +34,8 @@ struct CampaignProgress: Codable {
     enum CodingKeys: String, CodingKey {
         case bestStars, lastLevel, tutorialComplete, totalAttempts,
              firstLaunchDate, xp, coins, crystals, crystalDistricts, hintTickets, hintsBought,
-             snippets, ownedCosmetics, equippedCosmetics, friendContacts, socialID
+             snippets, ownedCosmetics, equippedCosmetics, skinStyle, hairStyle,
+             friendContacts, socialID
     }
 
     init() {}
@@ -61,6 +66,8 @@ struct CampaignProgress: Codable {
         snippets = max(0, try box.decodeIfPresent(Int.self, forKey: .snippets) ?? 0)
         ownedCosmetics = try box.decodeIfPresent(Set<String>.self, forKey: .ownedCosmetics) ?? []
         equippedCosmetics = try box.decodeIfPresent([String: String].self, forKey: .equippedCosmetics) ?? [:]
+        skinStyle = try box.decodeIfPresent(String.self, forKey: .skinStyle) ?? DetectiveSkin.peach.rawValue
+        hairStyle = try box.decodeIfPresent(String.self, forKey: .hairStyle) ?? DetectiveHair.classic.rawValue
         friendContacts = try box.decodeIfPresent([DetectiveFriend].self, forKey: .friendContacts) ?? []
         socialID = try box.decodeIfPresent(String.self, forKey: .socialID)
             ?? UserDefaults.standard.string(forKey: "redacted.social.code")
@@ -151,6 +158,18 @@ final class CampaignStore: ObservableObject {
     var hintTickets: Int { progress.hintTickets }
     var snippets: Int { progress.snippets }
     var ownedCosmetics: Set<String> { progress.ownedCosmetics }
+    var skin: DetectiveSkin { DetectiveSkin(rawValue: progress.skinStyle) ?? .peach }
+    var hair: DetectiveHair { DetectiveHair(rawValue: progress.hairStyle) ?? .classic }
+
+    func setSkin(_ newSkin: DetectiveSkin) {
+        guard skin != newSkin else { return }
+        progress.skinStyle = newSkin.rawValue
+    }
+
+    func setHair(_ newHair: DetectiveHair) {
+        guard hair != newHair else { return }
+        progress.hairStyle = newHair.rawValue
+    }
     func equippedCosmetic(in slot: CosmeticSlot) -> String? { progress.equippedCosmetics[slot.rawValue] }
     var accountXP: Int { progress.xp }
     var accountLevel: Int { RankRewards.rank(for: progress.xp) }

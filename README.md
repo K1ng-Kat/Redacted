@@ -236,3 +236,22 @@ The Xcode simulator CI checks **compilation only**. Online matches / presence **
 
 ### Account portability
 The player's anonymous 8-character detective friend code and accepted friend list are also fields of the campaign save. When the *same* account's private iCloud save is restored, the code and list can follow to the next device. Do not play or make new friends before initial iCloud restoration completes; CloudKit private sync and social rooms must be provisioned first. Using multiplayer on two devices concurrently under one friend identity is not supported.
+
+## Version 1.2 / Build 14 — complete detective wardrobe art overhaul
+
+- Replaces the previous floating SF Symbol character accessories with an **original unified SwiftUI Canvas vector illustration**. Headwear sits on the skull, glasses sit at eye level, badges are pinned to the right lapel, and outfits actually recolor/redesign the torso and coat. Every item is drawn in the exact same coordinate system at any preview size.
+- The visual is authored entirely as geometry in `DetectiveAvatarArt.swift`; no externally sourced or copyrighted avatar image dependencies.
+- Existing cosmetic IDs, rank gates, snippet and crystal prices, purchases, owned items, and equipped slots are retained. No user progress wipe or currency reset.
+- Six rank identity portraits, the Home rank chip, the Profile and the Wardrobe all share the new illustration system instead of incompatible portrait styles.
+- Redesigned Style Lab: prominent centered live try-on, four organized category tabs, two-column item preview cards, purchase confirmation, clear owned/equipped/locked states, and a collapsible snippet exchange.
+- Adds five selectable **free skin tones** and four **free hairstyles**. Saved as `skinStyle` and `hairStyle` in backward-compatible `CampaignProgress` Codable fields; retained across relaunches and included in the existing iCloud save.
+- **XP and coins are strictly independent balances:** XP can increase rank but can never be spent for cosmetics; coins are spent on snippets, which unlock cosmetics. Existing `CampaignStore.complete` calculates XP and coins independently and credits each into separate fields. The Profile shows Total XP and Coins as separate HUD values.
+- The App Store iOS/iPadOS 17 compatibility target is unchanged and the iPad 6 remains supported.
+
+### Character QA
+1. Equip each of the four cosmetic slots and inspect the same character in Style Lab, Home, and Profile. Verify no floating SF Symbol accessories are left and all layers stay aligned on compact iPhone and iPad screens.
+2. Preview a locked or unowned item; confirm preview does not unlock it or change any balances.
+3. Purchase snippets with coins: confirm coins decrease, snippets increase, and XP/rank are unchanged.
+4. Spend snippets or crystals on a cosmetic: confirm the item becomes permanently owned and auto-equipped without changes to XP/rank.
+5. Equip/unequip previously owned items, reopen the app, and verify appearance and balances persist; verify the new skin/hair fields survive a private iCloud restoration on another signed device.
+6. Check existing 1.1 save migration (no skin/hair keys) defaults to Peach/Classic, with all existing cosmetic IDs still valid.

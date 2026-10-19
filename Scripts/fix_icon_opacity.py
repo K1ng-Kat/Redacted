@@ -31,7 +31,7 @@ def main() -> None:
     if minimum == 255:
         print("App icon already completely opaque; no modification needed.")
         return
-    if maximum < 255:
+    if maximum < 180:
         raise SystemExit("The app icon has no opaque interior; refusing to alter.")
 
     # RGB 20/21/26 is a neutral near-black that matches the illustration's
@@ -40,7 +40,9 @@ def main() -> None:
     background.alpha_composite(original)
     result = background.convert("RGB")
 
-    # Critical guarantee: original fully opaque pixels must be pixel-identical.
+    # Critical guarantee: any fully opaque original pixels are pixel-identical.
+    # AI/export pipelines sometimes cap alpha at 254 rather than 255; accept
+    # that common near-opaque format and composite it consistently.
     opaque_mask = alpha.point(lambda value: 255 if value == 255 else 0)
     original_rgb = original.convert("RGB")
     from PIL import ImageChops

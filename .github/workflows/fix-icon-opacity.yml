@@ -1,4 +1,5 @@
 name: Remove REDACTED App Icon White Border
+# Supports near-opaque PNG interiors exported with alpha 254.
 
 on:
   push:

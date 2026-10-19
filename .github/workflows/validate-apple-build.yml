@@ -9,6 +9,8 @@ on:
       - "Redacted/**/*.storyboard"
       - "Redacted/*.swift"
       - "Redacted.xcodeproj/project.pbxproj"
+      - "Scripts/validate_cosmetics.py"
+      - "Backend/**/*.sql"
   workflow_dispatch:
 
 permissions:

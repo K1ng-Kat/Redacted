@@ -187,3 +187,19 @@ The game opts in using a **source Info.plist at the repository root** (`Redacted
 3. Spend the two starting hint tickets, then verify 2 crystals per new hint and the confirmation prompt.
 4. Enable the two Apple developer capabilities and CloudKit container, install signed builds on two devices using the same Apple/iCloud account; sign in on each and verify actual backed-up/recovered progress, equipped detective, age profile and spent crystals.
 5. Test offline and conflict behavior with separate device progress; newest timestamp wins, so avoid making progress offline on both devices until a merge strategy is introduced.
+
+## Build 12 — Home screen and startup layout polish
+
+- Organized all three Home navigation controls (Help, Settings, Detective Profile) as same-sized 44-point touch targets in one horizontal row next to the game logo.
+- Moved Profile out of the separate Stars/Solved stats row, leaving two consistently aligned progress chips underneath the header.
+- Disabled elastic pull/overscroll on **Home only** using a scoped UIKit scroll-view marker. Normal vertical scrolling remains enabled, and other screens' scrolling remains unchanged.
+- Fixed startup foreground safe-area overlap (clock/dynamic island) by **removing** the foreground's `ignoresSafeArea()`. The background still extends edge-to-edge.
+- Rescaled the startup dossier to a maximum of 84% of its previous size and calculated a smaller size for compact iPhones. Top logo, central artwork, animated meter and copyright now use safe-area-aware vertical layout.
+- Settings now displays one small Age & Difficulty summary card. **Edit** opens all age-mode choices in a modal; Cancel dismisses without changing the profile, and **Save Difficulty** commits the change to local preferences/cloud sync.
+- Keeps all 100 case levels, hint/free-ticket rules, currency progression, native startup bar animation, and the existing Apple/iCloud account section intact.
+
+### Device QA
+- Check iPhone Home header at normal and large text sizes; Help, Settings and Profile should be aligned and all tappable.
+- Pull the Home screen downward from the top: no rubber-band/stretch. Scroll upward through the campaign: content should scroll normally.
+- Cold-launch iPhone with notch or Dynamic Island: no REDACTED title under the time, and entire dossier plus bottom loading meter visible.
+- Settings age: tap Edit, change option, Cancel (old remains); Edit again and Save (new profile persists).

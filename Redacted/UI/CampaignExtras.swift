@@ -15,6 +15,9 @@ struct CampaignSettingsView: View {
     @AppStorage("redacted.music.menu.volume") private var menuVolume = 0.55
     @AppStorage("redacted.music.level.volume") private var levelVolume = 0.12
     @State private var confirmingReset = false
+    @State private var showingAgeEditor = false
+    @State private var draftAgeMode = DetectiveAgeMode.investigator.rawValue
+
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -36,47 +39,35 @@ struct CampaignSettingsView: View {
                     }
                 }
                 GameCard(accent: Art.cyan) {
-                    VStack(alignment: .leading, spacing: 13) {
-                        GameKicker(text: "DETECTIVE AGE & READING PROFILE", color: Art.cyan)
-                        Text("Choose the kind of mystery you want to play. This changes clues, question wording, answer choices, lock codes, and radio puzzles across all 100 cases.")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(Art.paper)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                        ForEach(DetectiveAgeMode.allCases) { mode in
-                            Button {
-                                GameEffects.shared.tap()
-                                ageModeRaw = mode.rawValue
-                            } label: {
-                                HStack(spacing: 12) {
-                                    Image(systemName: ageModeRaw == mode.rawValue ? "checkmark.circle.fill" : "circle")
-                                        .font(.system(size: 24, weight: .bold))
-                                        .foregroundStyle(ageModeRaw == mode.rawValue ? Art.mint : Art.cyan)
-                                    VStack(alignment: .leading, spacing: 5) {
-                                        Text(mode.title)
-                                            .font(.system(size: 15, weight: .black, design: .rounded))
-                                            .foregroundStyle(Art.paper)
-                                        Text(mode.subtitle)
-                                            .font(.system(size: 11, weight: .medium))
-                                            .foregroundStyle(Art.faded)
-                                            .fixedSize(horizontal: false, vertical: true)
-                                    }
-                                    Spacer(minLength: 0)
-                                }
-                                .padding(12)
-                                .background(ageModeRaw == mode.rawValue ? Art.blueLight : Art.blueDeep)
-                                .clipShape(RoundedRectangle(cornerRadius: 13))
-                                .overlay(RoundedRectangle(cornerRadius: 13)
-                                    .stroke(ageModeRaw == mode.rawValue ? Art.gold : Art.edge.opacity(0.5),
-                                            lineWidth: ageModeRaw == mode.rawValue ? 2 : 1))
-                                .contentShape(RoundedRectangle(cornerRadius: 13))
-                            }
-                            .buttonStyle(PressGameStyle())
+                    HStack(spacing: 12) {
+                        Image(systemName: "person.crop.circle.badge.checkmark")
+                            .font(.system(size: 26, weight: .semibold))
+                            .foregroundStyle(Art.cyan)
+                            .frame(width: 34)
+                        VStack(alignment: .leading, spacing: 4) {
+                            GameKicker(text: "AGE & DIFFICULTY", color: Art.cyan)
+                            Text((DetectiveAgeMode(rawValue: ageModeRaw) ?? .investigator).title)
+                                .font(.system(size: 14, weight: .heavy, design: .rounded))
+                                .foregroundStyle(Art.paper)
+                                .lineLimit(2)
+                                .minimumScaleFactor(0.85)
                         }
-                        Text("Your exact age is never stored or sent to the developers. Only this difficulty preference is saved on your device. You can change it anytime.")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(Art.faded)
-                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 4)
+                        Button {
+                            GameEffects.shared.tap()
+                            draftAgeMode = ageModeRaw
+                            showingAgeEditor = true
+                        } label: {
+                            Label("EDIT", systemImage: "pencil")
+                                .font(.system(size: 12, weight: .black, design: .rounded))
+                                .foregroundStyle(Art.ink)
+                                .padding(.horizontal, 12)
+                                .frame(height: 44)
+                                .background(Art.cyan)
+                                .clipShape(RoundedRectangle(cornerRadius: 11))
+                        }
+                        .buttonStyle(PressGameStyle())
+                        .accessibilityLabel("Edit age and game difficulty")
                     }
                 }
                 GameCard(accent: Art.gold) {
@@ -209,6 +200,11 @@ struct CampaignSettingsView: View {
             .frame(maxWidth: .infinity)
         }
         .background(GameBackdrop())
+        .sheet(isPresented: $showingAgeEditor) {
+            ageProfileEditor
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
         .onChange(of: "\(sound)|\(haptics)|\(motion)|\(hints)|\(ageModeRaw)|\(musicEnabled)|\(menuVolume)|\(levelVolume)") { _, _ in
             cloud.settingsChanged()
         }
@@ -224,6 +220,75 @@ struct CampaignSettingsView: View {
         }
     }
 
+    private var ageProfileEditor: some View {
+        ZStack {
+            GameBackdrop()
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 15) {
+                    HStack {
+                        GameTitle(text: "EDIT GAME DIFFICULTY", size: 25)
+                        Spacer()
+                        Button("CANCEL") {
+                            showingAgeEditor = false
+                        }
+                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .foregroundStyle(Art.cyan)
+                        .frame(minWidth: 64, minHeight: 44)
+                    }
+                    Text("Choose the reading and puzzle level you want. Nothing changes until you tap Save.")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Art.faded)
+                        .fixedSize(horizontal: false, vertical: true)
+                    ForEach(DetectiveAgeMode.allCases) { mode in
+                        Button {
+                            GameEffects.shared.tap()
+                            draftAgeMode = mode.rawValue
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: draftAgeMode == mode.rawValue
+                                      ? "checkmark.circle.fill" : "circle")
+                                    .font(.system(size: 23, weight: .bold))
+                                    .foregroundStyle(draftAgeMode == mode.rawValue ? Art.mint : Art.cyan)
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text(mode.title)
+                                        .font(.system(size: 15, weight: .black, design: .rounded))
+                                        .foregroundStyle(Art.paper)
+                                    Text(mode.subtitle)
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(Art.faded)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                Spacer(minLength: 0)
+                            }
+                            .padding(13)
+                            .background(draftAgeMode == mode.rawValue ? Art.blueLight : Art.blueDeep)
+                            .clipShape(RoundedRectangle(cornerRadius: 15))
+                            .overlay(RoundedRectangle(cornerRadius: 15)
+                                .stroke(draftAgeMode == mode.rawValue ? Art.gold : Art.edge,
+                                        lineWidth: draftAgeMode == mode.rawValue ? 2 : 1))
+                            .contentShape(RoundedRectangle(cornerRadius: 15))
+                        }
+                        .buttonStyle(PressGameStyle())
+                    }
+                    Text("Your exact age is not stored or sent to the developers. Only your selected difficulty profile is saved on this device.")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Art.faded)
+                        .fixedSize(horizontal: false, vertical: true)
+                    GameButton(title: "SAVE DIFFICULTY", icon: "checkmark") {
+                        ageModeRaw = draftAgeMode
+                        showingAgeEditor = false
+                        GameEffects.shared.success()
+                    }
+                }
+                .frame(maxWidth: 500)
+                .padding(18)
+                .padding(.bottom, 22)
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+
     private var appInfo: some View {
         GameCard(accent: Art.edge) {
             VStack(alignment: .leading, spacing: 13) {
@@ -233,7 +298,7 @@ struct CampaignSettingsView: View {
                         .font(.system(size: 15, weight: .black, design: .rounded))
                         .foregroundStyle(Art.paper)
                     Spacer()
-                    Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "11"))")
+                    Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "12"))")
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
                         .foregroundStyle(Art.faded)
                 }

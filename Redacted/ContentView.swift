@@ -322,31 +322,50 @@ struct CampaignHomeView: View {
             .padding(.top, 9)
             .padding(.bottom, 25)
             .frame(maxWidth: .infinity)
+            .background {
+                HomeScrollBounceLock().frame(width: 0, height: 0)
+            }
         }
         .background(GameBackdrop())
     }
 
     private var topBar: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             ZStack {
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: 11)
                     .fill(Art.coral)
-                    .frame(width: 46, height: 46)
-                    .rotationEffect(.degrees(-6))
+                    .frame(width: 40, height: 40)
+                    .rotationEffect(.degrees(-5))
                 Image(systemName: "eye.fill")
-                    .font(.system(size: 25, weight: .black))
+                    .font(.system(size: 23, weight: .black))
                     .foregroundStyle(.white)
             }
+            .accessibilityHidden(true)
+
             VStack(alignment: .leading, spacing: 1) {
                 Text("REDACTED")
-                    .font(.system(size: 21, weight: .black, design: .rounded))
+                    .font(.system(size: 19, weight: .black, design: .rounded))
                     .foregroundStyle(Art.paper)
-                GameKicker(text: "DETECTIVE AGENCY", color: Art.cyan)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.74)
+                Text("DETECTIVE AGENCY")
+                    .font(.system(size: 9, weight: .black, design: .monospaced))
+                    .tracking(0.2)
+                    .foregroundStyle(Art.cyan)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
             }
-            Spacer()
-            smallTopButton("questionmark.circle.fill", name: "How to play", action: guide)
-            smallTopButton("gearshape.fill", name: "Settings", action: settings)
+            .layoutPriority(1)
+
+            Spacer(minLength: 2)
+
+            HStack(spacing: 6) {
+                smallTopButton("questionmark.circle.fill", name: "How to play", action: guide)
+                smallTopButton("gearshape.fill", name: "Settings", action: settings)
+                smallTopButton("person.crop.circle.fill", name: "Detective profile", action: stats)
+            }
         }
+        .frame(minHeight: 45)
     }
 
     private func smallTopButton(_ symbol: String, name: String, action: @escaping () -> Void) -> some View {
@@ -355,13 +374,14 @@ struct CampaignHomeView: View {
             action()
         } label: {
             Image(systemName: symbol)
-                .font(.system(size: 21, weight: .black))
+                .font(.system(size: 18, weight: .black))
                 .foregroundStyle(Art.paper)
-                .frame(width: 44, height: 44)
+                .frame(width: 41, height: 44)
                 .background(Art.blueDeep)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .overlay(RoundedRectangle(cornerRadius: 12)
                     .stroke(Art.edge.opacity(0.65), lineWidth: 1.5))
+                .contentShape(RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(PressGameStyle())
         .accessibilityLabel(name)
@@ -369,26 +389,12 @@ struct CampaignHomeView: View {
 
     private var identity: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
+            HStack(spacing: 9) {
                 StatChip(icon: "star.fill", value: "\(store.totalStars)", label: "STARS")
-                Spacer(minLength: 4)
-                StatChip(icon: "checkmark.seal.fill", value: "\(store.levelsCompleted)/100", label: "SOLVED", tint: Art.mint)
-                Spacer(minLength: 4)
-                Button {
-                    GameEffects.shared.tap()
-                    stats()
-                } label: {
-                    Image(systemName: "chart.bar.xaxis")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundStyle(Art.cyan)
-                        .frame(width: 45, height: 46)
-                        .background(Art.blueDeep)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .overlay(RoundedRectangle(cornerRadius: 12)
-                            .stroke(Art.edge.opacity(0.65), lineWidth: 1))
-                }
-                .buttonStyle(PressGameStyle())
-                .accessibilityLabel("Detective statistics")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                StatChip(icon: "checkmark.seal.fill", value: "\(store.levelsCompleted)/100",
+                         label: "SOLVED", tint: Art.mint)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             GameCard(accent: Art.gold) {
                 VStack(spacing: 11) {

@@ -168,6 +168,25 @@ base, local, remote = [
     plistlib.loads(path.read_bytes()) for path in (base_path, local_path, remote_path)
 ]
 
+# These three keys are app-owned runtime requirements. Xcode may silently
+# remove them from the locally generated Info.plist while updating signing.
+# Keep the GitHub versions of these keys, but merge all unrelated local keys.
+mandatory = {
+    "LSSupportsGameMode": True,
+    "UILaunchStoryboardName": "LaunchScreen",
+}
+for key, expected in mandatory.items():
+    if remote.get(key) != expected:
+        sys.exit(f"❌ GitHub's required {key} value is missing/changed.")
+if not isinstance(remote.get("NSCameraUsageDescription"), str) or not remote["NSCameraUsageDescription"]:
+    sys.exit("❌ GitHub's QR camera description is missing.")
+
+app_owned = {*mandatory, "NSCameraUsageDescription"}
+base = {key: value for key, value in base.items() if key not in app_owned}
+local = {key: value for key, value in local.items() if key not in app_owned}
+remote_owned = {key: value for key, value in remote.items() if key in app_owned}
+remote = {key: value for key, value in remote.items() if key not in app_owned}
+
 def merge(base_value, local_value, remote_value, location):
     if local_value == remote_value:
         return local_value
@@ -194,6 +213,10 @@ try:
     result = merge(base, local, remote, "Info.plist")
     if not isinstance(result, dict):
         raise ValueError("Unexpected non-dictionary Info.plist")
+
+    # Restore the fixed, GitHub-authored runtime keys even when Xcode removed
+    # them locally. Do not overwrite unrelated local signing/privacy settings.
+    result.update(remote_owned)
 
     # Don't accidentally lose the QR deep link, Game Mode or camera permission.
     if result.get("LSSupportsGameMode") is not True:

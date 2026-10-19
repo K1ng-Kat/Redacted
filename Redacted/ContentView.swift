@@ -5,6 +5,7 @@ struct ContentView: View {
     @State private var route: Route = .home
     @State private var navigationHistory: [Route] = []
     @State private var activeLevel = 1
+    @ObservedObject private var social = MultiplayerService.shared
     @State private var pendingInvite: String?
     @State private var startupComplete = false
     @AppStorage("redacted.setup.complete") private var setupComplete = false
@@ -172,9 +173,73 @@ struct ContentView: View {
         }
     }
 
+    private var showsMainTabs: Bool {
+        route == .home || route == .multiplayer || route == .friends
+    }
+
     @ViewBuilder
     private var mainGame: some View {
         screen(for: route)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if showsMainTabs { mainTabBar }
+            }
+    }
+
+    private var mainTabBar: some View {
+        HStack(spacing: 8) {
+            mainTab(.home, symbol: "house.fill", label: "HOME")
+            mainTab(.multiplayer, symbol: "gamecontroller.fill", label: "MULTIPLAYER")
+            mainTab(.friends, symbol: "person.2.fill", label: "FRIENDS")
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+        .frame(maxWidth: .infinity)
+        .background {
+            Art.ink
+                .overlay(alignment: .top) {
+                    Rectangle()
+                        .fill(Art.edge.opacity(0.48))
+                        .frame(height: 1)
+                }
+                .ignoresSafeArea(edges: .bottom)
+        }
+    }
+
+    private func mainTab(_ target: Route, symbol: String, label: String) -> some View {
+        let selected = route == target
+        let onlineCount = social.onlineFriends.filter { $0.online }.count
+        return Button {
+            GameEffects.shared.tap()
+            selectTab(target)
+        } label: {
+            VStack(spacing: 5) {
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: symbol)
+                        .font(.system(size: 21, weight: .bold))
+                        .frame(width: 39, height: 28)
+                    if target == .friends && onlineCount > 0 {
+                        Circle()
+                            .fill(Art.mint)
+                            .frame(width: 10, height: 10)
+                            .overlay(Circle().stroke(Art.ink, lineWidth: 2))
+                            .offset(x: 5, y: -2)
+                    }
+                }
+                Text(label)
+                    .font(.system(size: 10, weight: .black, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+            .foregroundStyle(selected ? Art.gold : Art.faded)
+            .frame(maxWidth: .infinity, minHeight: 51)
+            .background(selected ? Art.blueLight.opacity(0.52) : Color.clear)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .contentShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(PressGameStyle())
+        .accessibilityLabel(label == "FRIENDS" && onlineCount > 0
+                            ? "Friends, \(onlineCount) online" : label)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     @ViewBuilder
@@ -194,9 +259,7 @@ struct ContentView: View {
                 settings: { show(.settings) },
                 guide: { show(.guide) },
                 stats: { show(.stats) },
-                wardrobe: { show(.wardrobe) },
-                multiplayer: { show(.multiplayer) },
-                friends: { show(.friends) }
+                wardrobe: { show(.wardrobe) }
             )
         case .levels:
             LevelSelectView(store: store, launch: launch, back: { popScreen() })
@@ -226,9 +289,9 @@ struct ContentView: View {
         case .wardrobe:
             DetectiveWardrobeView(store: store, back: { popScreen() })
         case .multiplayer:
-            MultiplayerLobbyView(store: store, back: { popScreen() })
+            MultiplayerLobbyView(store: store, back: { selectTab(.home) })
         case .friends:
-            FriendsView(store: store, back: { popScreen() })
+            FriendsView(store: store, openMultiplayer: { selectTab(.multiplayer) })
         }
     }
 
@@ -298,7 +361,20 @@ struct ContentView: View {
         }
     }
 
+    /// Switching primary tabs does not create back-stack history. Detail
+    /// screens continue to use the existing push/pop behavior.
+    private func selectTab(_ next: Route) {
+        guard next == .home || next == .multiplayer || next == .friends else { return }
+        navigationHistory.removeAll()
+        backDrag = 0
+        if route != next { setRoute(next) }
+    }
+
     private func show(_ next: Route) {
+        if next == .home || next == .multiplayer || next == .friends {
+            selectTab(next)
+            return
+        }
         guard next != route else { return }
         navigationHistory.append(route)
         setRoute(next)
@@ -312,7 +388,7 @@ struct ContentView: View {
     private func openPendingInvite() {
         guard startupComplete, setupComplete, let code = pendingInvite else { return }
         pendingInvite = nil
-        if route != .multiplayer { show(.multiplayer) }
+        if route != .multiplayer { selectTab(.multiplayer) }
         MultiplayerService.shared.attach(store)
         Task { await MultiplayerService.shared.joinRoom(code) }
     }
@@ -339,8 +415,6 @@ struct CampaignHomeView: View {
     let guide: () -> Void
     let stats: () -> Void
     let wardrobe: () -> Void
-    let multiplayer: () -> Void
-    let friends: () -> Void
 
     private var episode: CampaignEpisode {
         CampaignCatalog.episodes[(store.nextLevel - 1) / 10]
@@ -545,10 +619,6 @@ struct CampaignHomeView: View {
             }
             HStack(spacing: 10) {
                 quickAction(icon: "person.crop.square.fill", title: "DETECTIVE", detail: "Customize", color: Art.gold, action: wardrobe)
-                quickAction(icon: "person.2.fill", title: "MULTIPLAYER", detail: "Race a friend", color: Art.mint, action: multiplayer)
-            }
-            HStack(spacing: 10) {
-                quickAction(icon: "person.2.fill", title: "FRIENDS", detail: "Online network", color: Art.cyan, action: friends)
                 quickAction(icon: "bag.fill", title: "SHOP", detail: "Buy snippets", color: Art.gold, action: wardrobe)
             }
         }

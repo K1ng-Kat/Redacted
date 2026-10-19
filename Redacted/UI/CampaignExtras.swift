@@ -463,6 +463,7 @@ struct CampaignGuideView: View {
 struct CampaignStatsView: View {
     @ObservedObject var store: CampaignStore
     let back: () -> Void
+    let customize: () -> Void
     @AppStorage("redacted.profile.theme") private var selectedTheme = "midnight"
 
     var body: some View {
@@ -472,6 +473,7 @@ struct CampaignStatsView: View {
                              subtitle: "LEVELS · COINS · REWARDS", back: back)
 
                 rankHero
+                GameButton(title: "CUSTOMIZE CHARACTER", icon: "paintbrush.fill", action: customize)
                 HStack(spacing: 9) {
                     StatChip(icon: "crystal", value: "\(store.crystals)", label: "CRYSTALS")
                     Spacer(minLength: 1)
@@ -513,7 +515,7 @@ struct CampaignStatsView: View {
         GameCard(accent: Art.gold) {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 17) {
-                    DetectivePortrait(theme: selectedTheme, size: 78)
+                    DetectiveCharacter(store: store, size: 78)
                     VStack(alignment: .leading, spacing: 6) {
                         GameKicker(text: "DETECTIVE ACCOUNT", color: Art.cyan)
                         GameTitle(text: "LEVEL \(store.accountLevel)", size: 29)

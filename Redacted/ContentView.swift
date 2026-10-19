@@ -5,6 +5,7 @@ struct ContentView: View {
     @State private var route: Route = .home
     @State private var navigationHistory: [Route] = []
     @State private var activeLevel = 1
+    @State private var pendingInvite: String?
     @State private var startupComplete = false
     @AppStorage("redacted.setup.complete") private var setupComplete = false
     @AppStorage("redacted.age.mode") private var ageModeRaw = DetectiveAgeMode.investigator.rawValue
@@ -19,7 +20,7 @@ struct ContentView: View {
     @AppStorage("redacted.music.level.volume") private var levelVolume = 0.12
 
     private enum Route: Equatable {
-        case home, levels, play, settings, guide, stats
+        case home, levels, play, settings, guide, stats, wardrobe, multiplayer, friends
     }
 
     var body: some View {
@@ -36,6 +37,7 @@ struct ContentView: View {
                         ageModeRaw = mode.rawValue
                         setupComplete = true
                         GameEffects.shared.success()
+                        openPendingInvite()
                     }
                     .transition(.opacity)
                 }
@@ -63,17 +65,33 @@ struct ContentView: View {
         .task {
             await prepareStartup()
             CloudSaveManager.shared.attach(store)
+            MultiplayerService.shared.attach(store)
+            openPendingInvite()
+        }
+        .onOpenURL { url in
+            guard url.scheme == "redacted-detective",
+                  url.host == "join",
+                  let code = url.pathComponents.last,
+                  code.count == 6 else { return }
+            pendingInvite = code
+            openPendingInvite()
         }
         .onChange(of: route) { _, _ in syncMusic() }
-        .onChange(of: startupComplete) { _, _ in syncMusic() }
+        .onChange(of: startupComplete) { _, _ in
+            syncMusic()
+            openPendingInvite()
+        }
+        .onChange(of: setupComplete) { _, _ in openPendingInvite() }
         .onChange(of: musicEnabled) { _, _ in syncMusic() }
         .onChange(of: menuVolume) { _, _ in syncMusic() }
         .onChange(of: levelVolume) { _, _ in syncMusic() }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
                 syncMusic()
+                MultiplayerService.shared.startPresence()
             } else {
                 GameMusicController.shared.pause()
+                MultiplayerService.shared.stopPresence()
             }
         }
     }
@@ -175,7 +193,10 @@ struct ContentView: View {
                 levels: { show(.levels) },
                 settings: { show(.settings) },
                 guide: { show(.guide) },
-                stats: { show(.stats) }
+                stats: { show(.stats) },
+                wardrobe: { show(.wardrobe) },
+                multiplayer: { show(.multiplayer) },
+                friends: { show(.friends) }
             )
         case .levels:
             LevelSelectView(store: store, launch: launch, back: { popScreen() })
@@ -200,7 +221,14 @@ struct ContentView: View {
         case .guide:
             CampaignGuideView(back: { popScreen() }, begin: { launch(store.nextLevel) })
         case .stats:
-            CampaignStatsView(store: store, back: { popScreen() })
+            CampaignStatsView(store: store, back: { popScreen() },
+                              customize: { show(.wardrobe) })
+        case .wardrobe:
+            DetectiveWardrobeView(store: store, back: { popScreen() })
+        case .multiplayer:
+            MultiplayerLobbyView(store: store, back: { popScreen() })
+        case .friends:
+            FriendsView(store: store, back: { popScreen() })
         }
     }
 
@@ -244,7 +272,7 @@ struct ContentView: View {
     private func syncMusic() {
         guard startupComplete && scenePhase == .active else { return }
         GameMusicController.shared.update(
-            scene: route == .play ? .level : .menu,
+            scene: route == .play || route == .multiplayer ? .level : .menu,
             enabled: musicEnabled,
             menuVolume: menuVolume,
             levelVolume: levelVolume
@@ -255,7 +283,7 @@ struct ContentView: View {
         guard next != route else { return }
         if startupComplete && scenePhase == .active {
             GameMusicController.shared.update(
-                scene: next == .play ? .level : .menu,
+                scene: next == .play || next == .multiplayer ? .level : .menu,
                 enabled: musicEnabled,
                 menuVolume: menuVolume,
                 levelVolume: levelVolume
@@ -281,6 +309,14 @@ struct ContentView: View {
         setRoute(previous, animated: animated)
     }
 
+    private func openPendingInvite() {
+        guard startupComplete, setupComplete, let code = pendingInvite else { return }
+        pendingInvite = nil
+        if route != .multiplayer { show(.multiplayer) }
+        MultiplayerService.shared.attach(store)
+        Task { await MultiplayerService.shared.joinRoom(code) }
+    }
+
     private func launch(_ level: Int) {
         guard store.isUnlocked(level) else { return }
         store.recordStarted(level)
@@ -302,6 +338,9 @@ struct CampaignHomeView: View {
     let settings: () -> Void
     let guide: () -> Void
     let stats: () -> Void
+    let wardrobe: () -> Void
+    let multiplayer: () -> Void
+    let friends: () -> Void
 
     private var episode: CampaignEpisode {
         CampaignCatalog.episodes[(store.nextLevel - 1) / 10]
@@ -501,9 +540,19 @@ struct CampaignHomeView: View {
     }
 
     private var actions: some View {
-        HStack(spacing: 10) {
-            quickAction(icon: "square.grid.3x3.fill", title: "LEVELS", detail: "Choose a case", color: Art.cyan, action: levels)
-            quickAction(icon: "rosette", title: "RANK", detail: "Your progress", color: Art.gold, action: stats)
+        VStack(spacing: 10) {
+            HStack(spacing: 10) {
+                quickAction(icon: "square.grid.3x3.fill", title: "LEVELS", detail: "Choose a case", color: Art.cyan, action: levels)
+                quickAction(icon: "rosette", title: "RANK", detail: "Your progress", color: Art.gold, action: stats)
+            }
+            HStack(spacing: 10) {
+                quickAction(icon: "person.crop.square.fill", title: "DETECTIVE", detail: "Customize", color: Art.gold, action: wardrobe)
+                quickAction(icon: "person.2.fill", title: "MULTIPLAYER", detail: "Race a friend", color: Art.mint, action: multiplayer)
+            }
+            HStack(spacing: 10) {
+                quickAction(icon: "person.2.fill", title: "FRIENDS", detail: "Online network", color: Art.cyan, action: friends)
+                quickAction(icon: "bag.fill", title: "SHOP", detail: "Buy snippets", color: Art.gold, action: wardrobe)
+            }
         }
     }
 

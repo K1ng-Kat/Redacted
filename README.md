@@ -45,3 +45,45 @@ Native SwiftUI and Apple frameworks. Minimum iOS 18. Existing shared `Redacted` 
 The initial Case 001 prototype source/save is retained in the existing repository history and device storage; this campaign starts with a new separate save namespace. No online multiplayer functionality is claimed.
 
 **Build status:** Source/static checks performed; an Xcode/device build and playtesting remain required.
+
+
+## Version 0.5 — Startup, CC0 soundtrack and credits
+
+- Original REDACTED splash/loading screen: dossier, fingerprint, CLASSIFIED stamp, progress bar, preparation-stage caption and fade to menu.
+- Startup progress reflects case catalog and local save loading followed by soundtrack preparation; the brief completed-bar animation transitions into the game.
+- Main menu and out-of-game screens use **Bossa Nova** by Joth; active levels use **Shop Theme** by Cleyton Kauffman at a quiet default of 12% of full volume.
+- Settings now contain a Music toggle and independent volume sliders for menu and level soundtracks. Sound effects remain a separate control.
+- New **App Info & Credits** section at the bottom of Settings includes dynamic version/build numbers, track titles and creator names, OpenGameArt source links and the CC0 license link.
+- The soundtrack only plays from local bundled MP3 files, with no internet streaming. It respects the user's Music setting and pauses when the app backgrounds.
+- **Asset-import step**: GitHub Actions workflow in \`.github/workflows/import-cc0-music.yml\` runs on the v0.5 commit to download the CC0 track files, select the normal Shop Theme arrangement, convert them with ffmpeg, and commit two \`.mp3\` resources under \`Redacted/Audio/\`.
+- If that workflow cannot run (e.g. GitHub Actions is disabled or its bot cannot push), run \`python3 Scripts/import_cc0_music.py\` on a machine with Python 3, commit both generated \`.m4a\` files, and sync.
+- \`MUSIC_CREDITS.md\` documents sources and licensing. OpenGameArt licenses are reported as CC0; copyright ownership of uploads is not independently guaranteed.
+
+### Soundtrack QA
+
+1. Confirm the audio import workflow succeeded and both \`Redacted/Audio/*.mp3\` files exist in GitHub before expecting playback.
+2. Launch the app: the progress bar and completed state should appear, followed by main menu music.
+3. Open any level: the soundtrack should switch to the quieter Shop Theme arrangement.
+4. Turn music off and on from Settings, then adjust both sliders; verify no music continues in the background when off.
+5. Visit Settings' last section, verify dynamic app version and links open the original artists' pages.
+
+## red-sync — safe two-way Mac/GitHub synchronization
+
+Install or update the command on a Mac with:
+
+```bash
+mkdir -p "$HOME/.local/bin" && curl -fsSL https://raw.githubusercontent.com/K1ng-Kat/Redacted/main/Scripts/red-sync -o "$HOME/.local/bin/red-sync" && chmod +x "$HOME/.local/bin/red-sync" && "$HOME/.local/bin/red-sync"
+```
+
+Once installed, simply run `red-sync` whenever you want to synchronize.
+
+- Detects changed/new/deleted files in `~/Documents/Redacted`.
+- Automatically stages and commits local changes with a timestamp.
+- Fetches and merges GitHub's `main` (no forced pushes or resets).
+- Pushes local commits to GitHub, including Xcode project and app icon updates.
+- Automatically reconciles an Xcode `project.pbxproj` conflict **only when GitHub changed the app version/build settings**, preserving your local project and app-icon settings.
+- Creates a named local backup branch before a divergent merge. If other changes conflict, it stops and aborts the merge without discarding local commits.
+- Blocks common signing key, secret and credential files from automated upload.
+- Requires local Git author identity and push authentication to be configured.
+
+The script checks `origin` belongs to this repository and refuses other checked-out branches. It does not execute on a schedule: run `red-sync` to initiate the sync.

@@ -4,15 +4,47 @@ struct ContentView: View {
     @StateObject private var store = CampaignStore()
     @State private var route: Route = .home
     @State private var activeLevel = 1
+    @State private var startupComplete = false
+    @State private var startupProgress = 0.04
+    @State private var startupStep = "CONNECTING TO THE ARCHIVE"
+    @Environment(\.scenePhase) private var scenePhase
+    @AppStorage("redacted.music.enabled") private var musicEnabled = true
+    @AppStorage("redacted.music.menu.volume") private var menuVolume = 0.55
+    @AppStorage("redacted.music.level.volume") private var levelVolume = 0.12
 
-    private enum Route {
+    private enum Route: Equatable {
         case home, levels, play, settings, guide, stats
     }
 
     var body: some View {
         ZStack {
             GameBackdrop()
-            switch route {
+            if startupComplete {
+                mainGame
+            } else {
+                StartupLoadingView(progress: startupProgress, stage: startupStep)
+                    .transition(.opacity)
+            }
+        }
+        .preferredColorScheme(.dark)
+        .task { await prepareStartup() }
+        .onChange(of: route) { _, _ in syncMusic() }
+        .onChange(of: startupComplete) { _, _ in syncMusic() }
+        .onChange(of: musicEnabled) { _, _ in syncMusic() }
+        .onChange(of: menuVolume) { _, _ in syncMusic() }
+        .onChange(of: levelVolume) { _, _ in syncMusic() }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                syncMusic()
+            } else {
+                GameMusicController.shared.pause()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var mainGame: some View {
+        switch route {
             case .home:
                 CampaignHomeView(
                     store: store,
@@ -42,9 +74,49 @@ struct ContentView: View {
                 CampaignGuideView(back: { show(.home) }, begin: { launch(store.nextLevel) })
             case .stats:
                 CampaignStatsView(store: store, back: { show(.home) })
-            }
         }
-        .preferredColorScheme(.dark)
+    }
+
+    @MainActor
+    private func prepareStartup() async {
+        guard !startupComplete else { return }
+
+        startupStep = "VERIFYING CASE FILES"
+        // The campaign catalog and current save are loaded before gameplay.
+        _ = CampaignCatalog.levels.count
+        _ = store.nextLevel
+        withAnimation(.easeInOut(duration: 0.25)) {
+            startupProgress = 0.48
+        }
+        // Allow the player to see the first progress milestone.
+        try? await Task.sleep(for: .milliseconds(260))
+
+        startupStep = "PREPARING AUDIO"
+        GameMusicController.shared.prepare()
+        withAnimation(.easeInOut(duration: 0.25)) {
+            startupProgress = 0.82
+        }
+        try? await Task.sleep(for: .milliseconds(260))
+
+        startupStep = "WELCOME, DETECTIVE"
+        withAnimation(.easeInOut(duration: 0.25)) {
+            startupProgress = 1
+        }
+        // A brief hold lets the completed progress bar be seen before transitioning.
+        try? await Task.sleep(for: .milliseconds(450))
+        withAnimation(.easeInOut(duration: 0.32)) {
+            startupComplete = true
+        }
+    }
+
+    private func syncMusic() {
+        guard startupComplete && scenePhase == .active else { return }
+        GameMusicController.shared.update(
+            scene: route == .play ? .level : .menu,
+            enabled: musicEnabled,
+            menuVolume: menuVolume,
+            levelVolume: levelVolume
+        )
     }
 
     private func show(_ next: Route) {

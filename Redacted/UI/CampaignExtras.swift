@@ -8,6 +8,9 @@ struct CampaignSettingsView: View {
     @AppStorage("redacted.fx.haptics") private var haptics = true
     @AppStorage("redacted.fx.motion") private var motion = true
     @AppStorage("redacted.fx.hints") private var hints = true
+    @AppStorage("redacted.music.enabled") private var musicEnabled = true
+    @AppStorage("redacted.music.menu.volume") private var menuVolume = 0.55
+    @AppStorage("redacted.music.level.volume") private var levelVolume = 0.12
     @State private var confirmingReset = false
 
     var body: some View {
@@ -29,6 +32,35 @@ struct CampaignSettingsView: View {
                                symbol: "lightbulb.fill", enabled: $hints)
                     }
                 }
+                GameCard(accent: Art.gold) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        GameKicker(text: "BACKGROUND MUSIC", color: Art.gold)
+                        Toggle(isOn: $musicEnabled) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "music.note.list")
+                                    .font(.system(size: 24, weight: .bold))
+                                    .foregroundStyle(Art.gold)
+                                    .frame(width: 32)
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text("MUSIC")
+                                        .font(.system(size: 15, weight: .black, design: .rounded))
+                                        .foregroundStyle(Art.paper)
+                                    Text("Automatic looping music for menus and levels")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(Art.faded)
+                                }
+                            }
+                        }
+                        .tint(Art.mint)
+
+                        Divider().overlay(Art.edge.opacity(0.3))
+                        volumeControl("MENU MUSIC", note: "Bossa Nova by Joth",
+                                      value: $menuVolume, maximum: 1)
+                        Divider().overlay(Art.edge.opacity(0.3))
+                        volumeControl("LEVEL MUSIC", note: "Shop Theme by Cleyton Kauffman · quiet by default",
+                                      value: $levelVolume, maximum: 0.45)
+                    }
+                }
                 GameCard {
                     VStack(alignment: .leading, spacing: 11) {
                         GameKicker(text: "PRIVACY AND SAVES", color: Art.cyan)
@@ -46,6 +78,7 @@ struct CampaignSettingsView: View {
                     confirmingReset = true
                 }
                 GameButton(title: "DONE", icon: "checkmark", action: back)
+                appInfo
             }
             .frame(maxWidth: 560)
             .padding(18)
@@ -62,6 +95,96 @@ struct CampaignSettingsView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This is permanent. It erases all earned currency, account levels, stars, and unlocks on this device.")
+        }
+    }
+
+    private var appInfo: some View {
+        GameCard(accent: Art.edge) {
+            VStack(alignment: .leading, spacing: 13) {
+                GameKicker(text: "APP INFO & CREDITS", color: Art.cyan)
+                HStack {
+                    Text("REDACTED")
+                        .font(.system(size: 15, weight: .black, design: .rounded))
+                        .foregroundStyle(Art.paper)
+                    Spacer()
+                    Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.4") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "6"))")
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(Art.faded)
+                }
+                Divider().overlay(Art.edge.opacity(0.3))
+                GameKicker(text: "MUSIC CREDITS", color: Art.gold)
+                creditRow(
+                    title: "Bossa Nova", artist: "Joth",
+                    use: "Main menu",
+                    url: "https://opengameart.org/content/bossa-nova"
+                )
+                Divider().overlay(Art.edge.opacity(0.3))
+                creditRow(
+                    title: "Shop Theme", artist: "Cleyton Kauffman",
+                    use: "In-game levels",
+                    url: "https://opengameart.org/content/shop-theme"
+                )
+                Text("Both tracks are published under CC0 1.0 (public-domain dedication).")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Art.faded)
+                    .fixedSize(horizontal: false, vertical: true)
+                Link(destination: URL(string: "https://creativecommons.org/publicdomain/zero/1.0/")!) {
+                    Label("VIEW CC0 LICENSE", systemImage: "arrow.up.right.square")
+                        .font(.system(size: 11, weight: .black, design: .rounded))
+                        .foregroundStyle(Art.cyan)
+                }
+                Text("Game: REDACTED. Thanks to the creators who release their music for independent developers.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Art.faded)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func creditRow(title: String, artist: String, use: String, url: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack {
+                Text(title)
+                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .foregroundStyle(Art.paper)
+                Spacer()
+                Text(use)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Art.faded)
+            }
+            Text("Music by \(artist) · CC0")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Art.faded)
+            if let destination = URL(string: url) {
+                Link(destination: destination) {
+                    Label("TRACK SOURCE", systemImage: "arrow.up.right.square")
+                        .font(.system(size: 11, weight: .black, design: .rounded))
+                        .foregroundStyle(Art.cyan)
+                }
+            }
+        }
+    }
+
+    private func volumeControl(_ title: String, note: String, value: Binding<Double>,
+                               maximum: Double) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(title)
+                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .foregroundStyle(Art.paper)
+                Spacer()
+                Text("\(Int(value.wrappedValue * 100))%")
+                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .foregroundStyle(Art.gold)
+            }
+            Slider(value: value, in: 0...maximum)
+                .tint(Art.gold)
+                .disabled(!musicEnabled)
+                .accessibilityLabel(title)
+            Text(note)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Art.faded)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

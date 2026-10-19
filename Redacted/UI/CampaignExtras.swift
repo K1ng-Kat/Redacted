@@ -455,7 +455,7 @@ struct CampaignStatsView: View {
         }
         .background(GameBackdrop())
         .onChange(of: selectedTheme) { _, _ in
-            CloudSaveManager.shared.settingsChanged()
+            RedactedAccountSave.shared.scheduleUpload()
         }
     }
 

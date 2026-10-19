@@ -38,6 +38,7 @@ struct MultiplayerLobbyView: View {
     @ObservedObject var store: CampaignStore
     let back: () -> Void
     @ObservedObject private var service = MultiplayerService.shared
+    @ObservedObject private var network = DetectiveSocialNetwork.shared
     @State private var enteredCode = ""
     @State private var showingScanner = false
 
@@ -59,9 +60,17 @@ struct MultiplayerLobbyView: View {
                     }
                 }
 
+                if network.accountEmail == nil {
+                    RedactedAccountCard()
+                } else if !network.configured {
+                    Text("Multiplayer is not available until the REDACTED server is configured.")
+                        .foregroundStyle(Art.gold)
+                }
+
                 switch service.phase {
                 case .idle, .error:
-                    GameButton(title: "CREATE PRIVATE MATCH", icon: "plus.circle.fill") {
+                    GameButton(title: "CREATE PRIVATE MATCH", icon: "plus.circle.fill",
+                               inactive: network.accountEmail == nil || !network.configured) {
                         Task { await service.hostRoom() }
                     }
                     GameCard(accent: Art.gold) {
@@ -77,11 +86,13 @@ struct MultiplayerLobbyView: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
                                 .accessibilityLabel("Enter multiplayer room code")
                             GameButton(title: "JOIN MATCH", icon: "arrow.right.circle.fill",
-                                       inactive: enteredCode.trimmingCharacters(in: .whitespaces).count != 6) {
+                                       inactive: network.accountEmail == nil || !network.configured ||
+                                           enteredCode.trimmingCharacters(in: .whitespaces).count != 6) {
                                 Task { await service.joinRoom(enteredCode) }
                             }
                             GameButton(title: "SCAN INVITE QR", icon: "qrcode.viewfinder",
-                                       color: Art.blueLight, bottom: Art.blueDeep) {
+                                       color: Art.blueLight, bottom: Art.blueDeep,
+                                       inactive: network.accountEmail == nil || !network.configured) {
                                 showingScanner = true
                             }
                         }
@@ -171,9 +182,21 @@ struct MultiplayerLobbyView: View {
         }
         .onAppear {
             service.attach(store)
-            service.activate()
-            service.startPresence()
+            consumePendingInvite()
         }
+        .onChange(of: network.accountEmail) { _, email in
+            if email != nil { consumePendingInvite() }
+        }
+    }
+
+    private func consumePendingInvite() {
+        guard network.accountEmail != nil,
+              let code = UserDefaults.standard.string(
+                forKey: "redacted.multiplayer.pendingCode"),
+              !code.isEmpty else { return }
+        UserDefaults.standard.removeObject(forKey: "redacted.multiplayer.pendingCode")
+        enteredCode = code
+        Task { await service.joinRoom(code) }
     }
 }
 
@@ -183,6 +206,8 @@ private struct MultiplayerRaceView: View {
     @State private var step = 0
     @State private var chosen: Int?
     @State private var code = ""
+    @State private var selectedEvidence = -1
+    @State private var envelopeCode = ""
     @State private var penalty = false
     @State private var message = ""
 
@@ -376,13 +401,22 @@ private struct MultiplayerRaceView: View {
         if right {
             GameEffects.shared.success()
             message = "Correct. Move on to the next clue!"
-            chosen = nil
-            code = ""
             if step == 2 {
-                Task { await service.finishMystery() }
+                let suspect = chosen ?? -1
+                Task {
+                    await service.finishMystery(
+                        evidence: selectedEvidence,
+                        code: envelopeCode,
+                        suspect: suspect
+                    )
+                }
             } else {
+                if step == 0 { selectedEvidence = chosen ?? -1 }
+                if step == 1 { envelopeCode = code }
                 step += 1
             }
+            chosen = nil
+            code = ""
         } else {
             GameEffects.shared.mistake()
             message = "Not supported by the evidence. 3-second penalty."

@@ -81,6 +81,7 @@ private struct DetectiveSocialSession: Codable {
     let accessToken: String
     let refreshToken: String
     let expiresAt: Date
+    let email: String?
 }
 
 private struct DetectiveAuthResponse: Decodable {
@@ -127,6 +128,9 @@ final class DetectiveSocialNetwork: ObservableObject {
     @Published private(set) var myAlias = ""
     @Published private(set) var message = ""
     @Published private(set) var lastChecked: Date?
+    @Published private(set) var accountEmail: String?
+    @Published private(set) var codeSentTo: String?
+    @Published private(set) var codeSentAt: Date?
 
     var configured: Bool { DetectiveSocialConfiguration.isConfigured }
     var onlineFriends: [OnlineDetective] { friends.filter(\.online) }
@@ -138,6 +142,7 @@ final class DetectiveSocialNetwork: ObservableObject {
 
     private init() {
         token = readSession()
+        accountEmail = token?.email
         if !configured {
             message = "Friends and Task Forces will be available when the detective network server is connected."
         }
@@ -150,11 +155,15 @@ final class DetectiveSocialNetwork: ObservableObject {
             message = "The detective network server hasn't been connected yet. No iCloud account will be required."
             return
         }
+        guard accountEmail != nil else {
+            connected = false
+            message = "Sign in with your email to use REDACTED Friends and Task Forces."
+            return
+        }
         guard !isBusy else { return }
         isBusy = true
         defer { isBusy = false }
         do {
-            if token == nil { try await anonymousSignIn() }
             try await rpc("rd_social_bootstrap", body: [:])
             connected = true
             await heartbeat()
@@ -307,12 +316,118 @@ final class DetectiveSocialNetwork: ObservableObject {
         return data
     }
 
-    private func anonymousSignIn() async throws {
-        // GoTrue anonymous auth uses POST /signup with no email or password.
-        // Anonymous sign-ins MUST be enabled in the Supabase Auth settings.
-        let raw = try await call("/auth/v1/signup", body: Data("{}".utf8),
-                                 bearer: nil)
-        try persistAuth(raw)
+    /// Sign-in and sign-up share the same verified email-code flow.
+    /// Supabase Auth verifies codes on the server; the app never knows the
+    /// expected OTP and doesn't store it.
+    func sendEmailCode(to rawEmail: String) async {
+        guard configured else {
+            message = "Email service is not connected yet."
+            return
+        }
+        let email = rawEmail.trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        guard email.count <= 254,
+              email.range(of: #"^[A-Z0-9a-z._%+\-]+@[A-Z0-9a-z.\-]+\.[A-Za-z]{2,}$"#,
+                          options: .regularExpression) != nil else {
+            message = "Enter a valid email address."
+            return
+        }
+        guard !isBusy else { return }
+        if let last = codeSentAt, Date().timeIntervalSince(last) < 60 {
+            message = "Wait 60 seconds before requesting a new code."
+            return
+        }
+        isBusy = true
+        defer { isBusy = false }
+        do {
+            let body = try JSONSerialization.data(withJSONObject: [
+                "email": email, "create_user": true
+            ] as [String: Any])
+            _ = try await call("/auth/v1/otp", body: body, bearer: nil)
+            codeSentTo = email
+            codeSentAt = Date()
+            message = "Check your inbox for your six-digit REDACTED code."
+        } catch {
+            message = error.localizedDescription
+        }
+    }
+
+    func cancelEmailCode() {
+        codeSentTo = nil
+        // Keep last send time: changing email must not bypass rate limits.
+        message = ""
+    }
+
+    func verifyEmailCode(_ submitted: String) async {
+        guard configured, let email = codeSentTo else {
+            message = "Request an email code first."
+            return
+        }
+        let digits = submitted.filter(\.isNumber)
+        guard digits.count == 6 else {
+            message = "Enter all six digits of the verification code."
+            return
+        }
+        guard !isBusy else { return }
+        isBusy = true
+        defer { isBusy = false }
+        do {
+            let body = try JSONSerialization.data(withJSONObject: [
+                "email": email, "token": digits, "type": "email"
+            ])
+            let raw = try await call("/auth/v1/verify", body: body, bearer: nil)
+            try persistAuth(raw, email: email)
+            codeSentTo = nil
+            codeSentAt = nil
+            connected = false
+            try await rpc("rd_social_bootstrap", body: [:])
+            connected = true
+            try await loadSnapshot()
+            message = "Signed into REDACTED."
+            await RedactedAccountSave.shared.accountConnected()
+        } catch {
+            message = "Could not verify code: " + error.localizedDescription
+        }
+    }
+
+    func deleteAccount() async {
+        guard accountEmail != nil, !isBusy else { return }
+        isBusy = true
+        defer { isBusy = false }
+        do {
+            _ = try await rpc("rd_account_delete", body: [:])
+            // Account auth has already been deleted on the server.
+            clearLocalAccount()
+            RedactedAccountSave.shared.accountDeleted()
+            message = "REDACTED ID deleted. Local campaign remains on this device."
+        } catch {
+            message = "Could not delete account: " + error.localizedDescription
+        }
+    }
+
+    func signOut() async {
+        if configured, let access = token?.accessToken {
+            _ = try? await call("/auth/v1/logout", body: Data("{}".utf8),
+                                bearer: access)
+        }
+        clearLocalAccount()
+        message = "Signed out. Your local campaign remains on this device."
+        RedactedAccountSave.shared.accountSignedOut()
+    }
+
+    private func clearLocalAccount() {
+        clearKeychainSession()
+        token = nil
+        accountEmail = nil
+        codeSentTo = nil
+        codeSentAt = nil
+        connected = false
+        friends = []
+        requests = []
+        taskForce = nil
+        myCode = ""
+        myAlias = ""
+        lastChecked = nil
     }
 
     private func renewSession() async throws {
@@ -321,10 +436,10 @@ final class DetectiveSocialNetwork: ObservableObject {
             ["refresh_token": previous.refreshToken])
         let raw = try await call("/auth/v1/token?grant_type=refresh_token",
                                  body: body, bearer: nil)
-        try persistAuth(raw)
+        try persistAuth(raw, email: previous.email)
     }
 
-    private func persistAuth(_ raw: Data) throws {
+    private func persistAuth(_ raw: Data, email: String?) throws {
         let auth = try JSONDecoder().decode(DetectiveAuthResponse.self, from: raw)
         guard !auth.accessToken.isEmpty, !auth.refreshToken.isEmpty else {
             throw SocialNetworkError.signInFailed
@@ -332,13 +447,15 @@ final class DetectiveSocialNetwork: ObservableObject {
         let session = DetectiveSocialSession(
             accessToken: auth.accessToken,
             refreshToken: auth.refreshToken,
-            expiresAt: Date().addingTimeInterval(TimeInterval(max(60, auth.expiresIn)) - 30)
+            expiresAt: Date().addingTimeInterval(TimeInterval(max(60, auth.expiresIn)) - 30),
+            email: email
         )
         token = session
+        accountEmail = email
         saveSession(session)
     }
 
-    private func rpc(_ name: String, body: [String: Any]) async throws -> Data {
+    func rpc(_ name: String, body: [String: Any]) async throws -> Data {
         guard token != nil else { throw SocialNetworkError.invalidSession }
         if let session = token, Date() >= session.expiresAt {
             try await renewSession()
@@ -366,6 +483,15 @@ final class DetectiveSocialNetwork: ObservableObject {
         guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
               let data = item as? Data else { return nil }
         return try? JSONDecoder().decode(DetectiveSocialSession.self, from: data)
+    }
+
+    private func clearKeychainSession() {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainKey,
+            kSecAttrAccount as String: "social-user"
+        ]
+        SecItemDelete(query as CFDictionary)
     }
 
     private func saveSession(_ value: DetectiveSocialSession) {

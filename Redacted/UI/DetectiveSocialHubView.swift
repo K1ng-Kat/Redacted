@@ -28,12 +28,15 @@ struct DetectiveSocialHubView: View {
             VStack(alignment: .leading, spacing: 13) {
                 titleBar
                 compactStatus
-                picker
-
-                if section == .friends {
-                    friendsContent
+                if network.accountEmail == nil {
+                    RedactedAccountCard()
                 } else {
-                    taskForceContent
+                    picker
+                    if section == .friends {
+                        friendsContent
+                    } else {
+                        taskForceContent
+                    }
                 }
                 if !network.configured {
                     setupNotice
@@ -103,7 +106,8 @@ struct DetectiveSocialHubView: View {
             Circle()
                 .fill(network.connected ? Art.mint : Art.gold)
                 .frame(width: 10, height: 10)
-            Text(network.connected ? "CONNECTED" : "NETWORK NOT CONNECTED")
+            Text(network.connected ? "CONNECTED" :
+                     network.accountEmail == nil ? "SIGN IN REQUIRED" : "NETWORK NOT CONNECTED")
                 .font(.system(size: 11, weight: .black, design: .rounded))
                 .foregroundStyle(network.connected ? Art.mint : Art.gold)
                 .lineLimit(1)

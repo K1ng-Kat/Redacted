@@ -297,3 +297,31 @@ QA: verify character anatomy and hat/eyewear alignment, the wardrobe's two-colum
 - **Eight preset emotes** only in active 1v1 matches, with a five-second cooldown, opponent display, and local mute. CloudKit requires a new \`RDEmote\` record type for live delivery.
 - The independent Friends backend requires manual Supabase provisioning: social networking is **not live from the GitHub code alone**. Existing 1v1 CloudKit matchmaking is still a separate service and is not migrated by this patch.
 - Anonymous accounts do not require Apple/iCloud but are device-bound until a later account-linking/recovery feature. Never ship a Supabase secret or service-role key inside the app.
+
+## REDACTED 1.6 / Build 19 — REDACTED ID email-code accounts
+
+- Custom game-branded **REDACTED ID** email verification screens: enter your email,
+  receive a six-digit OTP, confirm in the app. Same flow for sign-up, sign-in,
+  returning users, and recovery on a new device. **No Apple ID or iCloud sign-in.**
+- Auth itself uses secure Supabase email OTP (not a homegrown password or code
+  generator); a configured verified SMTP sender and
+  \`Backend/REDACTED_OTP_EMAIL.html\` send REDACTED-branded code emails.
+- Verification sessions are stored in the device Keychain, and player email
+  never appears in other players' profiles or social data.
+- Settings now has **REDACTED ID** account management, with sign-out, account
+  deletion and explicit campaign-save restore vs keep-this-device choices.
+- Progress, coins, crystals, cosmetics, stars and preferences use revision-checked
+  private SQL account backup. Saves on two devices cannot silently overwrite
+  another device; XP and coins remain independent.
+- Friends, Task Forces, and **1v1 matches plus emotes** now use the REDACTED ID
+  authenticated database APIs. Server validates the three mystery answers
+  before accepting the race finish.
+- The old Apple sign-in Settings flow is removed from the active UI. Existing
+  local campaign saves remain intact. Old CloudKit friend/duel records are not
+  automatically migrated; old Apple-linked iCloud backup is not used by the
+  new account system.
+- Backend migrations and detailed deployment steps:
+  **[Backend/REDACTED_ID_SETUP.md](Backend/REDACTED_ID_SETUP.md)**.
+  The app will remain in visibly unconfigured mode until the external
+  Supabase project, transactional SMTP and security policies are activated.
+  Building Swift code alone **cannot send actual email**.

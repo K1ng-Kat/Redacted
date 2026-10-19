@@ -66,9 +66,21 @@ struct ContentView: View {
         }
         .task {
             await prepareStartup()
-            CloudSaveManager.shared.attach(store)
+            RedactedAccountSave.shared.attach(store)
             MultiplayerService.shared.attach(store)
+            if DetectiveSocialNetwork.shared.accountEmail != nil {
+                await DetectiveSocialNetwork.shared.connect()
+            }
             openPendingInvite()
+            // Presence follows app activity, not only the Social tab.
+            while !Task.isCancelled {
+                if scenePhase == .active,
+                   DetectiveSocialNetwork.shared.accountEmail != nil {
+                    await DetectiveSocialNetwork.shared.heartbeat()
+                }
+                do { try await Task.sleep(for: .seconds(40)) }
+                catch { break }
+            }
         }
         .onOpenURL { url in
             guard url.scheme == "redacted-detective",
@@ -425,7 +437,12 @@ struct ContentView: View {
         pendingInvite = nil
         if route != .multiplayer { selectTab(.multiplayer) }
         MultiplayerService.shared.attach(store)
-        Task { await MultiplayerService.shared.joinRoom(code) }
+        if DetectiveSocialNetwork.shared.accountEmail == nil {
+            // Deep link survives the login flow and auto-joins on verification.
+            UserDefaults.standard.set(code, forKey: "redacted.multiplayer.pendingCode")
+        } else {
+            Task { await MultiplayerService.shared.joinRoom(code) }
+        }
     }
 
     private func launch(_ level: Int) {

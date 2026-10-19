@@ -368,7 +368,7 @@ final class CampaignStore: ObservableObject {
         UserDefaults.standard.set(data, forKey: Self.saveKey)
         if !isApplyingCloudSave {
             UserDefaults.standard.set(Date(), forKey: "redacted.save.modified")
-            CloudSaveManager.shared.scheduleUpload(progress: progress)
+            RedactedAccountSave.shared.scheduleUpload()
         }
     }
 }

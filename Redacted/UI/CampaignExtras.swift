@@ -1,10 +1,8 @@
 import SwiftUI
-import AuthenticationServices
 
 struct CampaignSettingsView: View {
     @ObservedObject var store: CampaignStore
     let back: () -> Void
-    @ObservedObject private var cloud = CloudSaveManager.shared
 
     @AppStorage("redacted.fx.sound") private var sound = true
     @AppStorage("redacted.fx.haptics") private var haptics = true
@@ -99,62 +97,7 @@ struct CampaignSettingsView: View {
                                       value: $levelVolume, maximum: 0.45)
                     }
                 }
-                GameCard(accent: Art.cyan) {
-                    VStack(alignment: .leading, spacing: 13) {
-                        GameKicker(text: "ACCOUNT & CLOUD SAVE", color: Art.cyan)
-                        HStack(spacing: 12) {
-                            Image(systemName: cloud.signedIn ? "checkmark.icloud.fill" : "icloud")
-                                .font(.system(size: 27, weight: .bold))
-                                .foregroundStyle(cloud.signedIn ? Art.mint : Art.cyan)
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(cloud.signedIn ? "APPLE ACCOUNT CONNECTED" : "SIGN IN TO SAVE")
-                                    .font(.system(size: 15, weight: .black, design: .rounded))
-                                    .foregroundStyle(Art.paper)
-                                Text(cloud.status)
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundStyle(Art.faded)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                            Spacer(minLength: 0)
-                        }
-                        Text("Sign in with Apple to enable private iCloud backup of your progress, crystals, stars, detectives and settings. To restore on another device, sign in there with the same Apple and iCloud account.")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(Art.paper)
-                            .fixedSize(horizontal: false, vertical: true)
-                        if cloud.signedIn {
-                            HStack(spacing: 9) {
-                                GameButton(title: cloud.syncing ? "SYNCING…" : "SYNC NOW",
-                                           icon: "arrow.triangle.2.circlepath",
-                                           color: Art.blueLight, bottom: Art.blueDeep,
-                                           inactive: cloud.syncing) {
-                                    Task { await cloud.syncNow() }
-                                }
-                            }
-                            if let date = cloud.lastSynced {
-                                Text("Last successful sync: \(date.formatted(date: .abbreviated, time: .shortened))")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(Art.mint)
-                            }
-                            Button("SIGN OUT (KEEP LOCAL SAVE)") { cloud.signOut() }
-                                .font(.system(size: 12, weight: .black, design: .rounded))
-                                .foregroundStyle(Art.gold)
-                                .frame(minHeight: 44)
-                                .buttonStyle(PressGameStyle())
-                        } else {
-                            SignInWithAppleButton(.signIn, onRequest: { request in
-                                request.requestedScopes = []
-                            }, onCompletion: { result in
-                                cloud.handleSignIn(result)
-                            })
-                            .signInWithAppleButtonStyle(.white)
-                            .frame(height: 48)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                        }
-                        Text("Cloud sync needs iCloud enabled for REDACTED. A sign-in alone does not mean a backup has completed.")
-                            .font(.system(size: 11))
-                            .foregroundStyle(Art.faded)
-                    }
-                }
+                RedactedAccountCard()
                 GameCard(accent: Art.gold) {
                     VStack(alignment: .leading, spacing: 11) {
                         GameKicker(text: "CRYSTALS & HINTS", color: Art.gold)
@@ -178,11 +121,11 @@ struct CampaignSettingsView: View {
                 GameCard {
                     VStack(alignment: .leading, spacing: 11) {
                         GameKicker(text: "PRIVACY AND SAVES", color: Art.cyan)
-                        Text("Progress is always saved locally. Optional iCloud backup uses your private Apple iCloud account when available; it is not a custom REDACTED server.")
+                        Text("Progress is saved locally. A verified REDACTED ID can back it up to a private account, independent of Apple ID and iCloud. A secure email code is required on new devices.")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(Art.paper)
                             .fixedSize(horizontal: false, vertical: true)
-                        Text("REDACTED 1.5 — iPhone & iPad campaign")
+                        Text("REDACTED 1.6 — iPhone & iPad campaign")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(Art.faded)
                     }
@@ -206,7 +149,7 @@ struct CampaignSettingsView: View {
                 .presentationDragIndicator(.visible)
         }
         .onChange(of: "\(sound)|\(haptics)|\(motion)|\(hints)|\(ageModeRaw)|\(musicEnabled)|\(menuVolume)|\(levelVolume)") { _, _ in
-            cloud.settingsChanged()
+            RedactedAccountSave.shared.scheduleUpload()
         }
         .confirmationDialog("Delete your 100-level campaign progress?",
                             isPresented: $confirmingReset, titleVisibility: .visible) {
@@ -216,7 +159,7 @@ struct CampaignSettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This resets your local levels, crystals, coins, free hints and rank. If cloud sync is enabled, the reset may also sync to iCloud.")
+            Text("This resets your local levels, crystals, coins, free hints and rank. If REDACTED ID backup is enabled, the reset can also update that account backup.")
         }
     }
 
@@ -298,7 +241,7 @@ struct CampaignSettingsView: View {
                         .font(.system(size: 15, weight: .black, design: .rounded))
                         .foregroundStyle(Art.paper)
                     Spacer()
-                    Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.5") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "18"))")
+                    Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.6") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "19"))")
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
                         .foregroundStyle(Art.faded)
                 }

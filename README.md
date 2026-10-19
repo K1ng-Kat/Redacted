@@ -103,3 +103,20 @@ The script checks `origin` belongs to this repository and refuses other checked-
 
 ### Device testing
 Verify icon on device, music transitions, taps, victory coin ticks, edge back, failed attempts, replay, 7-of-10 gate, detective unlocks and portrait rendering. If iOS still caches the previous icon, first clean the Xcode build folder. Deleting/reinstalling removes local game progress, so only do that when necessary.
+
+## Version 0.7 / Build 8 — iPadOS 17, private age profiles and smooth loading
+
+- The single universal Xcode target now has iOS/iPadOS **17.0 as its shared deployment target** and supports iPhone and iPad device families. This enables the 2018 iPad 6th generation, which cannot update to iPadOS 18.
+- iPhone on iOS 17 sees an in-app iOS 18 required message. Note that the universal App Store minimum is still 17, so App Store download eligibility is not independently restricted by device family.
+- Settings now offers four locally stored gameplay/reading profiles: **6–8 Junior, 9–12 Explorer, 13–15 Investigator, 16+ Expert**. No birth date or identifying information is collected.
+- The same 100 authored cases adapt their question language, available choices, evidence prompts and hints. Junior mode uses vocabulary support, two-choice questions, first-event and word scaffolds, plus optional read-aloud. Explorer mode has three choices and read-aloud. Investigator and Expert use four choices and different timeline orders, as well as harder transformed lock codes and frequencies.
+- Existing save data, coins, star rewards, lock rules and credits are preserved. The same local save is used for every age profile on one device.
+- The startup bar and percentage now interpolate over each real preparation checkpoint with a longer easing curve and a clean fade into the game.
+- Research notes and design limitations: see AGE_PROFILES_AND_IPAD.md.
+
+### Test before release
+- Physical **iPad 6th generation with iPadOS 17**, portrait and landscape; verify all sound/music assets load and puzzle buttons fit.
+- iPhone iOS 18 or later plays normally; iPhone iOS 17 displays the update message.
+- For each age profile, play one of each ten puzzle types and verify there is always a reachable correct answer.
+- Verify iPad VoiceOver/read-aloud, Profile/Settings changes, startup progress, coins and star progression.
+- A separate Xcode build and actual hardware QA are still required. Static checks don't guarantee iPadOS 17 runtime behavior.

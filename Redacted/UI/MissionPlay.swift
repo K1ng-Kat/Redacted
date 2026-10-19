@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 
 struct MissionPlayView: View {
     @ObservedObject var store: CampaignStore
@@ -7,6 +8,16 @@ struct MissionPlayView: View {
     let next: () -> Void
 
     @AppStorage("redacted.fx.hints") private var hintsEnabled = true
+    @AppStorage("redacted.age.mode") private var ageModeRaw = DetectiveAgeMode.investigator.rawValue
+    @State private var narrator = AVSpeechSynthesizer()
+
+    private var ageMode: DetectiveAgeMode {
+        DetectiveAgeMode(rawValue: ageModeRaw) ?? .investigator
+    }
+
+    private var adjusted: AgeAdjustedMission {
+        AgeAdjustedMission(mission: mission, mode: ageMode)
+    }
     @AppStorage("redacted.profile.theme") private var equippedTheme = "midnight"
     @AppStorage("redacted.tutorial.lastDistrict") private var lastCoachedDistrict = 0
     @State private var selectedSequence: [Int] = []
@@ -56,7 +67,7 @@ struct MissionPlayView: View {
                             GameCard(accent: Art.gold) {
                                 VStack(alignment: .leading, spacing: 7) {
                                     GameKicker(text: "DETECTIVE'S HINT", color: Art.gold)
-                                    Text(mission.hint)
+                                    Text(adjusted.clue)
                                         .font(.system(size: 15, weight: .semibold))
                                         .foregroundStyle(Art.paper)
                                 }
@@ -73,6 +84,7 @@ struct MissionPlayView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .onDisappear { narrator.stopSpeaking(at: .immediate) }
         .onAppear {
             coaching = (mission.id == 1 && !store.progress.tutorialComplete) ||
                        (mission.id % 10 == 1 && mission.episode + 1 > lastCoachedDistrict)
@@ -124,9 +136,10 @@ struct MissionPlayView: View {
             .accessibilityLabel("Back to level map")
             VStack(alignment: .leading, spacing: 4) {
                 GameKicker(text: "LEVEL \(mission.id) / 100", color: Art.gold)
-                Text("DISTRICT \(mission.episode + 1)")
+                Text("DISTRICT \(mission.episode + 1) · \(ageMode.rawValue)")
                     .font(.system(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Art.paper)
+
             }
             Spacer()
             StatChip(icon: "circle.hexagongrid.fill", value: "\(store.coins)", label: "COINS")
@@ -150,17 +163,32 @@ struct MissionPlayView: View {
             GameCard(accent: Art.cyan) {
                 VStack(alignment: .leading, spacing: 9) {
                     GameKicker(text: "CASE BRIEF", color: Art.cyan)
-                    Text(mission.setup)
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                    Text(adjusted.brief)
+                        .font(.system(size: ageMode == .junior ? 19 : 16, weight: .bold, design: .rounded))
                         .foregroundStyle(Art.paper)
                         .fixedSize(horizontal: false, vertical: true)
                     HStack(alignment: .top, spacing: 9) {
                         Image(systemName: "hand.point.up.left.fill")
                             .foregroundStyle(Art.gold)
-                        Text(mission.kind.instruction)
+                        Text(adjusted.instruction)
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(Art.faded)
                             .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if ageMode == .junior || ageMode == .explorer {
+                        Button {
+                            narrator.stopSpeaking(at: .immediate)
+                            let utterance = AVSpeechUtterance(string: adjusted.brief + ". " + adjusted.instruction)
+                            utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+                            utterance.rate = 0.46
+                            narrator.speak(utterance)
+                        } label: {
+                            Label("READ CASE ALOUD", systemImage: "speaker.wave.2.fill")
+                                .font(.system(size: 12, weight: .black, design: .rounded))
+                                .foregroundStyle(Art.gold)
+                                .frame(minHeight: 44)
+                        }
+                        .buttonStyle(PressGameStyle())
                     }
                 }
             }
@@ -194,14 +222,22 @@ struct MissionPlayView: View {
                 DistrictIllustration(episode: mission.episode)
                 VStack(spacing: 52) {
                     HStack(spacing: 25) {
-                        objectButton(index: 0, symbol: "lock.doc.fill")
+                        if adjusted.visibleChoices.contains(0) {
+                            objectButton(index: 0, symbol: "lock.doc.fill")
+                        }
                         Spacer()
-                        objectButton(index: 1, symbol: "camera.metering.center.weighted")
+                        if adjusted.visibleChoices.contains(1) {
+                            objectButton(index: 1, symbol: "camera.metering.center.weighted")
+                        }
                     }
                     HStack(spacing: 25) {
-                        objectButton(index: 2, symbol: "shippingbox.fill")
+                        if adjusted.visibleChoices.contains(2) {
+                            objectButton(index: 2, symbol: "shippingbox.fill")
+                        }
                         Spacer()
-                        objectButton(index: 3, symbol: "magnifyingglass.circle.fill")
+                        if adjusted.visibleChoices.contains(3) {
+                            objectButton(index: 3, symbol: "magnifyingglass.circle.fill")
+                        }
                     }
                 }
                 .padding(.horizontal, 25)
@@ -210,7 +246,7 @@ struct MissionPlayView: View {
             .frame(height: 275)
             .clipShape(RoundedRectangle(cornerRadius: 19))
             .overlay(RoundedRectangle(cornerRadius: 19).stroke(Art.edge.opacity(0.7), lineWidth: 2))
-            Text("Select an object, then confirm your finding.")
+            Text(ageMode == .junior ? "Tap the matching clue, then press INSPECT." : "Select an object, then confirm your finding.")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(Art.faded)
             if let selectedAnswer {
@@ -259,7 +295,12 @@ struct MissionPlayView: View {
                     .font(.system(size: 15, weight: .black))
                     .foregroundStyle(Art.paper)
             }
-            ForEach(mission.choices.indices, id: \.self) { index in
+            if ageMode == .junior {
+                Text("Start with: \(mission.solution)")
+                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .foregroundStyle(Art.gold)
+            }
+            ForEach(adjusted.timelineChoices.indices, id: \.self) { index in
                 let chosenPosition = selectedSequence.firstIndex(of: index)
                 Button {
                     guard chosenPosition == nil else { return }
@@ -270,8 +311,8 @@ struct MissionPlayView: View {
                     HStack(spacing: 12) {
                         Image(systemName: "clock.fill")
                             .foregroundStyle(Art.gold)
-                        Text(mission.choices[index])
-                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                        Text(adjusted.timelineChoices[index])
+                            .font(.system(size: ageMode == .junior ? 17 : 15, weight: .bold, design: .rounded))
                             .foregroundStyle(Art.paper)
                         Spacer(minLength: 0)
                         if let chosenPosition {
@@ -297,7 +338,7 @@ struct MissionPlayView: View {
             }
             if selectedSequence.count == 4 {
                 GameButton(title: "VERIFY TIMELINE", icon: "checkmark.seal.fill") {
-                    check(selectedSequence == mission.correctSequence,
+                    check(selectedSequence == adjusted.timelineAnswer,
                           wrongText: "That order doesn't match the evidence.")
                 }
             }
@@ -311,6 +352,11 @@ struct MissionPlayView: View {
 
     private var keypadPuzzle: some View {
         VStack(spacing: 17) {
+            if ageMode == .investigator || ageMode == .expert {
+                Text(adjusted.instruction)
+                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .foregroundStyle(Art.gold)
+            }
             GameCard(accent: Art.gold) {
                 HStack {
                     Image(systemName: "lock.fill")
@@ -347,7 +393,7 @@ struct MissionPlayView: View {
                 if !typed.isEmpty { typed.removeLast() }
             } else if title == "GO" {
                 if typed.count == 3 {
-                    let valid = typed == mission.solution
+                    let valid = typed == adjusted.actualCode
                     if !valid { typed = "" }
                     check(valid, wrongText: "That combination didn't unlock it. Try the clue in the case brief.")
                 }
@@ -372,7 +418,7 @@ struct MissionPlayView: View {
     private var choicePuzzle: some View {
         VStack(alignment: .leading, spacing: 13) {
             GameKicker(text: mission.isFinale ? "FINAL ACCUSATION" : "CHOOSE YOUR ANSWER", color: Art.gold)
-            ForEach(mission.choices.indices, id: \.self) { index in
+            ForEach(adjusted.visibleChoices, id: \.self) { index in
                 Button {
                     GameEffects.shared.tap()
                     selectedAnswer = index
@@ -385,7 +431,7 @@ struct MissionPlayView: View {
                             .background(mission.isFinale ? Art.coral : Art.cyan)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                         Text(mission.choices[index])
-                            .font(.system(size: 16, weight: .heavy, design: .rounded))
+                            .font(.system(size: ageMode == .junior ? 18 : 16, weight: .heavy, design: .rounded))
                             .foregroundStyle(Art.paper)
                             .multilineTextAlignment(.leading)
                         Spacer(minLength: 0)
@@ -414,6 +460,11 @@ struct MissionPlayView: View {
     private var wordPuzzle: some View {
         VStack(alignment: .leading, spacing: 17) {
             GameKicker(text: "TAP THE LETTERS IN THE RIGHT ORDER", color: Art.gold)
+            if let first = adjusted.wordStartingLetter {
+                Text("This word begins with: \(first)")
+                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .foregroundStyle(Art.gold)
+            }
             GameCard(accent: Art.cyan) {
                 Text(usedLetterIndices.map { String(scrambled[$0]) }.joined().uppercased() +
                      String(repeating: " _", count: scrambled.count - usedLetterIndices.count))
@@ -478,8 +529,11 @@ struct MissionPlayView: View {
                     }
                 }
             }
+            if ageMode == .investigator || ageMode == .expert {
+                GameKicker(text: adjusted.instruction, color: Art.gold)
+            }
             GameButton(title: "Lock frequency", icon: "waveform.path") {
-                check(abs(frequency - mission.expectedFrequency) < 2.6,
+                check(abs(frequency - adjusted.frequency) < 2.6,
                       wrongText: "No clear signal at this frequency. Try the frequency mentioned in the case.")
             }
         }
@@ -494,7 +548,7 @@ struct MissionPlayView: View {
                     .font(.system(size: 13, weight: .black))
                     .foregroundStyle(Art.paper)
             }
-            ForEach(mission.choices.indices, id: \.self) { index in
+            ForEach(adjusted.visiblePairChoices, id: \.self) { index in
                 Button {
                     GameEffects.shared.tap()
                     if matchedItems.contains(index) {
@@ -571,10 +625,10 @@ struct MissionPlayView: View {
             GameCard(accent: Art.gold) {
                 VStack(alignment: .leading, spacing: 10) {
                     GameKicker(text: "REVIEW THE CASE", color: Art.gold)
-                    Text(mission.setup)
+                    Text(adjusted.brief)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(Art.paper)
-                    Text(mission.hint)
+                    Text(adjusted.clue)
                         .font(.system(size: 13))
                         .foregroundStyle(Art.faded)
                 }

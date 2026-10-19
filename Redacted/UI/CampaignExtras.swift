@@ -8,6 +8,7 @@ struct CampaignSettingsView: View {
     @AppStorage("redacted.fx.haptics") private var haptics = true
     @AppStorage("redacted.fx.motion") private var motion = true
     @AppStorage("redacted.fx.hints") private var hints = true
+    @AppStorage("redacted.age.mode") private var ageModeRaw = DetectiveAgeMode.investigator.rawValue
     @AppStorage("redacted.music.enabled") private var musicEnabled = true
     @AppStorage("redacted.music.menu.volume") private var menuVolume = 0.55
     @AppStorage("redacted.music.level.volume") private var levelVolume = 0.12
@@ -30,6 +31,50 @@ struct CampaignSettingsView: View {
                         Divider().overlay(Art.edge.opacity(0.30))
                         option("SHOW HINT BUTTON", detail: "Hints cost a ticket or 30 coins",
                                symbol: "lightbulb.fill", enabled: $hints)
+                    }
+                }
+                GameCard(accent: Art.cyan) {
+                    VStack(alignment: .leading, spacing: 13) {
+                        GameKicker(text: "DETECTIVE AGE & READING PROFILE", color: Art.cyan)
+                        Text("Choose the kind of mystery you want to play. This changes clues, question wording, answer choices, lock codes, and radio puzzles across all 100 cases.")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Art.paper)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        ForEach(DetectiveAgeMode.allCases) { mode in
+                            Button {
+                                GameEffects.shared.tap()
+                                ageModeRaw = mode.rawValue
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: ageModeRaw == mode.rawValue ? "checkmark.circle.fill" : "circle")
+                                        .font(.system(size: 24, weight: .bold))
+                                        .foregroundStyle(ageModeRaw == mode.rawValue ? Art.mint : Art.cyan)
+                                    VStack(alignment: .leading, spacing: 5) {
+                                        Text(mode.title)
+                                            .font(.system(size: 15, weight: .black, design: .rounded))
+                                            .foregroundStyle(Art.paper)
+                                        Text(mode.subtitle)
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundStyle(Art.faded)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                    }
+                                    Spacer(minLength: 0)
+                                }
+                                .padding(12)
+                                .background(ageModeRaw == mode.rawValue ? Art.blueLight : Art.blueDeep)
+                                .clipShape(RoundedRectangle(cornerRadius: 13))
+                                .overlay(RoundedRectangle(cornerRadius: 13)
+                                    .stroke(ageModeRaw == mode.rawValue ? Art.gold : Art.edge.opacity(0.5),
+                                            lineWidth: ageModeRaw == mode.rawValue ? 2 : 1))
+                                .contentShape(RoundedRectangle(cornerRadius: 13))
+                            }
+                            .buttonStyle(PressGameStyle())
+                        }
+                        Text("No birthday, identity or age verification is collected. You can change this anytime. Game progress stays saved.")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(Art.faded)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 GameCard(accent: Art.gold) {
@@ -68,7 +113,7 @@ struct CampaignSettingsView: View {
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(Art.paper)
                             .fixedSize(horizontal: false, vertical: true)
-                        Text("REDACTED 0.6 — single-player campaign")
+                        Text("REDACTED 0.7 — iPhone & iPad campaign")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(Art.faded)
                     }
@@ -107,7 +152,7 @@ struct CampaignSettingsView: View {
                         .font(.system(size: 15, weight: .black, design: .rounded))
                         .foregroundStyle(Art.paper)
                     Spacer()
-                    Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.6") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "7"))")
+                    Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.7") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "8"))")
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
                         .foregroundStyle(Art.faded)
                 }

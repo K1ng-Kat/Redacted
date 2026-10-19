@@ -8,6 +8,7 @@ struct StartupLoadingView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shimmer = false
+    @State private var smoothProgress: Double = 0.04
 
     var body: some View {
         GeometryReader { geometry in
@@ -34,9 +35,19 @@ struct StartupLoadingView: View {
         .ignoresSafeArea()
         .preferredColorScheme(.dark)
         .onAppear {
+            smoothProgress = max(0, min(1, progress))
             guard !reduceMotion else { return }
             withAnimation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true)) {
                 shimmer = true
+            }
+        }
+        .onChange(of: progress) { _, updated in
+            if reduceMotion {
+                smoothProgress = min(1, max(0, updated))
+            } else {
+                withAnimation(.timingCurve(0.25, 0.12, 0.25, 1, duration: 0.56)) {
+                    smoothProgress = min(1, max(0, updated))
+                }
             }
         }
     }
@@ -133,7 +144,7 @@ struct StartupLoadingView: View {
             HStack {
                 GameKicker(text: "INITIALIZING CASE FILES", color: Art.gold)
                 Spacer()
-                Text("\(Int(min(1, max(0, progress)) * 100))%")
+                Text("\(Int(smoothProgress * 100))%")
                     .font(.system(size: 17, weight: .black, design: .rounded))
                     .foregroundStyle(Art.paper)
                     .monospacedDigit()
@@ -146,7 +157,7 @@ struct StartupLoadingView: View {
                         .fill(LinearGradient(
                             colors: [Art.gold, Art.coral],
                             startPoint: .leading, endPoint: .trailing))
-                        .frame(width: geometry.size.width * min(1, max(0, progress)))
+                        .frame(width: geometry.size.width * smoothProgress)
                         .overlay(alignment: .top) {
                             Capsule().fill(Color.white.opacity(0.28))
                                 .frame(height: 3)
@@ -156,7 +167,7 @@ struct StartupLoadingView: View {
                 .overlay(Capsule().stroke(Art.edge, lineWidth: 2.5))
             }
             .frame(height: 23)
-            .animation(reduceMotion ? nil : .easeInOut(duration: 0.20), value: progress)
+            .accessibilityHidden(true)
 
             Text(stage.uppercased())
                 .font(.system(size: 11, weight: .bold, design: .monospaced))
@@ -171,6 +182,6 @@ struct StartupLoadingView: View {
         .frame(maxWidth: 580)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Loading game")
-        .accessibilityValue("\(Int(progress * 100)) percent, \(stage)")
+        .accessibilityValue("\(Int(smoothProgress * 100)) percent, \(stage)")
     }
 }

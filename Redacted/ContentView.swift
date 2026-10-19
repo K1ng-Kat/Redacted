@@ -122,27 +122,28 @@ struct ContentView: View {
         // The campaign catalog and current save are loaded before gameplay.
         _ = CampaignCatalog.levels.count
         _ = store.nextLevel
-        withAnimation(.easeInOut(duration: 0.25)) {
+        withAnimation(.easeInOut(duration: 0.56)) {
             startupProgress = 0.48
         }
         // Allow the player to see the first progress milestone.
-        try? await Task.sleep(for: .milliseconds(260))
+        try? await Task.sleep(for: .milliseconds(610))
 
         startupStep = "PREPARING AUDIO"
         GameMusicController.shared.prepare()
         _ = GameEffects.shared // Preload button and coin sounds.
-        withAnimation(.easeInOut(duration: 0.25)) {
+        withAnimation(.easeInOut(duration: 0.56)) {
             startupProgress = 0.82
         }
-        try? await Task.sleep(for: .milliseconds(260))
+        try? await Task.sleep(for: .milliseconds(610))
 
         startupStep = "WELCOME, DETECTIVE"
-        withAnimation(.easeInOut(duration: 0.25)) {
+        withAnimation(.easeInOut(duration: 0.56)) {
             startupProgress = 1
         }
         // A brief hold lets the completed progress bar be seen before transitioning.
-        try? await Task.sleep(for: .milliseconds(450))
-        withAnimation(.easeInOut(duration: 0.32)) {
+        try? await Task.sleep(for: .milliseconds(700))
+        guard !Task.isCancelled else { return }
+        withAnimation(.easeInOut(duration: 0.35)) {
             startupComplete = true
         }
     }

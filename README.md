@@ -273,3 +273,15 @@ QA: verify character anatomy and hat/eyewear alignment, the wardrobe's two-colum
 - Moves the chest badge inward onto the new lapel (194, 258).
 - No changes to owned/equipped cosmetics, rank requirements, coin/XP wallets, gameplay, or save formats.
 - QA: inspect character at 48, 78, 122 and 215 points with all four headwear options, eyewear options, and the different coat styles on iPhone and iPad.
+
+## Version 1.4 / Build 17 — Friends primary tab & online presence UX
+
+- The main app now has a consistent bottom navigation with **Home, Multiplayer, and Friends**. Friends is a primary tab, not a buried Home shortcut. Tab switches reset only navigation history; all case navigation, deep links, saves, and active multiplayer session state remain intact.
+- Online friends appear in the dedicated **ONLINE NOW** section above offline friends. Large green status, clear count, and a PLAY shortcut to the Multiplayer lobby make it easier to see who can play.
+- Friend requests are displayed above the list with a prominent ACCEPT control.
+- An at-a-glance header shows online and total friend counts; friend code entry lives in a focused **Add Friend** sheet. Sharing/copying your 8-character personal code remains available.
+- Automatic presence checks every 40 seconds **only while the Friends tab is visible**, plus swipe-to-refresh, a manual refresh control and refreshing again when foregrounded. Presence reports online for recent activity (105-second threshold).
+- A cloud fetch failure is shown as **STATUS UNAVAILABLE**, not falsely as OFFLINE.
+- All existing social IDs, accepted friends, friend requests, private CloudKit save data and multiplayer room codes are retained. No reset or wallet changes.
+- Playing together still requires the public CloudKit schema and entitlement setup described above; clicking PLAY opens the existing invite-based multiplayer lobby to create and share a room.
+- iPhone/iPad: check bottom-tab placement, safe-area spacing, friend-code sheet entry, large online/offline indicators, and return to case after navigating away from tabs.

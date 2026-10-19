@@ -7,10 +7,25 @@ struct DetectiveFriend: Codable, Identifiable, Equatable {
     let alias: String
 }
 
+enum FriendAvailability {
+    case online, offline, unavailable
+
+    var label: String {
+        switch self {
+        case .online: "ONLINE"
+        case .offline: "OFFLINE"
+        case .unavailable: "STATUS UNKNOWN"
+        }
+    }
+}
+
 struct FriendPresence: Identifiable {
     let id: String
     let alias: String
-    let online: Bool
+    let availability: FriendAvailability
+    let lastSeen: Date?
+
+    var online: Bool { availability == .online }
 }
 
 @MainActor
@@ -29,6 +44,9 @@ final class MultiplayerService: ObservableObject {
     @Published private(set) var onlineFriends: [FriendPresence] = []
     @Published private(set) var requests: [DetectiveFriend] = []
     @Published private(set) var myFriends: [DetectiveFriend] = []
+    @Published private(set) var isRefreshingFriends = false
+    @Published private(set) var lastFriendsRefresh: Date?
+    @Published private(set) var friendsNotice: String?
     @Published private(set) var socialEnabled = UserDefaults.standard.bool(forKey: "redacted.social.optin")
 
     private let db = CKContainer.default().publicCloudDatabase
@@ -281,29 +299,56 @@ final class MultiplayerService: ObservableObject {
     }
 
     func refreshFriends() async {
+        guard !isRefreshingFriends else { return }
         activate()
         startPresence()
         guard let store else { return }
+        isRefreshingFriends = true
+        defer { isRefreshingFriends = false }
         myFriends = store.progress.friendContacts
 
+        // Fetch each saved friend directly by code: no discoverability search.
+        // An iCloud failure means UNKNOWN, never falsely "offline".
         var fresh: [FriendPresence] = []
         for friend in myFriends {
             do {
                 let record = try await fetch("rd-player-" + friend.id)
-                let seen = record?["lastSeen"] as? Date ?? .distantPast
-                let online = Date().timeIntervalSince(seen) <= 105
-                fresh.append(FriendPresence(id: friend.id, alias: friend.alias, online: online))
+                let seen = record?["lastSeen"] as? Date
+                let online = seen.map { Date().timeIntervalSince($0) <= 105
+                                      && Date().timeIntervalSince($0) >= -30 } ?? false
+                fresh.append(FriendPresence(
+                    id: friend.id, alias: friend.alias,
+                    availability: online ? .online : .offline,
+                    lastSeen: seen
+                ))
             } catch {
-                fresh.append(FriendPresence(id: friend.id, alias: friend.alias, online: false))
+                fresh.append(FriendPresence(
+                    id: friend.id, alias: friend.alias,
+                    availability: .unavailable, lastSeen: nil
+                ))
             }
         }
-        onlineFriends = fresh
+
+        // Put online friends first, then offline, then unknown.
+        onlineFriends = fresh.sorted { a, b in
+            let priority: (FriendAvailability) -> Int = {
+                switch $0 {
+                case .online: 0
+                case .offline: 1
+                case .unavailable: 2
+                }
+            }
+            let left = priority(a.availability)
+            let right = priority(b.availability)
+            return left == right ? a.alias < b.alias : left < right
+        }
+        lastFriendsRefresh = Date()
 
         do {
             let predicate = NSPredicate(format: "recipient == %@", playerID)
             let query = CKQuery(recordType: "RDFriendRequest", predicate: predicate)
             let matches = try await db.records(matching: query, resultsLimit: 80)
-            let inbound = matches.matchResults.compactMap { _, result -> DetectiveFriend? in
+            requests = matches.matchResults.compactMap { _, result -> DetectiveFriend? in
                 guard case .success(let record) = result,
                       let id = record["sender"] as? String,
                       let alias = record["alias"] as? String,
@@ -311,14 +356,11 @@ final class MultiplayerService: ObservableObject {
                 else { return nil }
                 return DetectiveFriend(id: id, alias: alias)
             }
-            requests = inbound
         } catch {
-            // Public CloudKit queries need the recipient field indexed.
-            message = "Friend requests unavailable: \(error.localizedDescription)"
+            friendsNotice = "Friend requests couldn't refresh. Check iCloud and try again."
         }
 
-        // When a friend request was accepted, the recipient creates a known
-        // acceptance record that the sender can read without public searching.
+        // Accepted invitations are fetched by exact known record IDs.
         let outgoing = UserDefaults.standard.stringArray(forKey: "redacted.social.outgoing") ?? []
         for id in outgoing {
             if let accepted = try? await fetch("rd-accepted-" + id + "-" + playerID),
@@ -327,24 +369,27 @@ final class MultiplayerService: ObservableObject {
             }
         }
         myFriends = store.progress.friendContacts
+        // Newly accepted friends appear on the next refresh. Keep existing
+        // online statuses until their presence records are fetched.
     }
 
     func requestFriend(_ raw: String) async {
         activate()
         startPresence()
+        friendsNotice = nil
         let code = raw.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
         guard code.count == 8, code != playerID else {
-            message = "Enter another detective's 8-character friend code."
+            friendsNotice = "Enter another detective's 8-character friend code."
             return
         }
         do {
             guard let friend = try await fetch("rd-player-" + code),
                   let theirAlias = friend["alias"] as? String else {
-                message = "No detective found. Their app must have Friends enabled."
+                friendsNotice = "No detective found. Their app must have Friends enabled."
                 return
             }
             if store?.progress.friendContacts.contains(where: { $0.id == code }) == true {
-                message = "Already friends with \(theirAlias)."
+                friendsNotice = "Already friends with \(theirAlias)."
                 return
             }
             let id = "rd-friend-" + playerID + "-" + code
@@ -359,9 +404,9 @@ final class MultiplayerService: ObservableObject {
                 outgoing.append(code)
                 UserDefaults.standard.set(outgoing, forKey: "redacted.social.outgoing")
             }
-            message = "Friend request sent to \(theirAlias)."
+            friendsNotice = "Friend request sent to \(theirAlias)."
         } catch {
-            message = "Could not send friend request: \(error.localizedDescription)"
+            friendsNotice = "Could not send friend request: \(error.localizedDescription)"
         }
     }
 
@@ -376,9 +421,9 @@ final class MultiplayerService: ObservableObject {
             store.addFriend(request)
             requests.removeAll { $0.id == request.id }
             await refreshFriends()
-            message = "Added \(request.alias)."
+            friendsNotice = "Added \(request.alias)."
         } catch {
-            message = "Could not accept: \(error.localizedDescription)"
+            friendsNotice = "Could not accept: \(error.localizedDescription)"
         }
     }
 

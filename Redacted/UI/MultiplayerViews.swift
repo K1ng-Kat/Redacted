@@ -329,129 +329,477 @@ private struct MultiplayerRaceView: View {
     }
 }
 
+/// Friends is a primary app tab, so its list and presence information are
+/// immediately visible rather than hidden behind a second navigation screen.
 struct FriendsView: View {
     @ObservedObject var store: CampaignStore
-    let back: () -> Void
+    let openMultiplayer: () -> Void
     @ObservedObject private var service = MultiplayerService.shared
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var showingAddFriend = false
     @State private var newFriendCode = ""
+
+    private var online: [FriendPresence] {
+        service.onlineFriends.filter { $0.availability == .online }
+    }
+    private var offline: [FriendPresence] {
+        service.onlineFriends.filter { $0.availability == .offline }
+    }
+    private var unknown: [FriendPresence] {
+        service.onlineFriends.filter { $0.availability == .unavailable }
+    }
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 14) {
-                ScreenHeader(title: "FRIENDS", subtitle: "PRIVATE DETECTIVE NETWORK", back: back)
+            VStack(alignment: .leading, spacing: 16) {
+                header
+                overview
 
-                GameCard(accent: Art.gold) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        GameKicker(text: "YOUR DETECTIVE FRIEND CODE", color: Art.gold)
-                        Text(service.playerID)
-                            .font(.system(size: 35, weight: .black, design: .monospaced))
-                            .tracking(1.5)
-                            .foregroundStyle(Art.paper)
-                            .textSelection(.enabled)
-                        Text(service.alias)
-                            .font(.system(size: 13, weight: .heavy))
-                            .foregroundStyle(Art.cyan)
-                        Button {
-                            UIPasteboard.general.string = service.playerID
-                            GameEffects.shared.tap()
-                        } label: {
-                            Label("COPY FRIEND CODE", systemImage: "doc.on.doc")
-                                .font(.system(size: 13, weight: .black, design: .rounded))
-                                .foregroundStyle(Art.gold)
-                                .frame(minHeight: 44)
-                        }
-                        Text("No public username search or messaging. Only people you share your code with can request to add you.")
-                            .font(.system(size: 12))
-                            .foregroundStyle(Art.faded)
-                    }
-                }
-
-                GameCard(accent: Art.cyan) {
-                    VStack(alignment: .leading, spacing: 11) {
-                        GameKicker(text: "ADD A DETECTIVE", color: Art.cyan)
-                        TextField("8-CHARACTER FRIEND CODE", text: $newFriendCode)
-                            .textInputAutocapitalization(.characters)
-                            .autocorrectionDisabled()
-                            .font(.system(size: 18, weight: .black, design: .monospaced))
-                            .foregroundStyle(Art.paper)
-                            .padding(12)
-                            .background(Art.ink)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                        GameButton(title: "SEND FRIEND REQUEST", icon: "person.crop.circle.badge.plus",
-                                   inactive: newFriendCode.count != 8) {
-                            Task { await service.requestFriend(newFriendCode) }
-                        }
-                    }
-                }
                 if !service.requests.isEmpty {
-                    GameKicker(text: "FRIEND REQUESTS", color: Art.gold)
-                    ForEach(service.requests) { friend in
-                        GameCard(accent: Art.gold) {
-                            HStack {
-                                Text(friend.alias)
-                                    .font(.system(size: 15, weight: .black))
-                                    .foregroundStyle(Art.paper)
-                                Spacer()
-                                Button("ACCEPT") {
-                                    Task { await service.acceptFriend(friend) }
-                                }
-                                .font(.system(size: 13, weight: .black))
-                                .foregroundStyle(Art.mint)
-                                .frame(minHeight: 44)
-                            }
-                        }
+                    pendingRequests
+                }
+
+                if store.progress.friendContacts.isEmpty {
+                    emptyFriends
+                } else {
+                    friendsSection(
+                        title: "ONLINE NOW", count: online.count,
+                        friends: online, accent: Art.mint
+                    )
+                    if !offline.isEmpty {
+                        friendsSection(
+                            title: "OFFLINE", count: offline.count,
+                            friends: offline, accent: Art.faded
+                        )
+                    }
+                    if !unknown.isEmpty {
+                        friendsSection(
+                            title: "STATUS UNAVAILABLE", count: unknown.count,
+                            friends: unknown, accent: Art.gold
+                        )
                     }
                 }
-                GameKicker(text: "YOUR FRIENDS · \(store.progress.friendContacts.count)",
-                           color: Art.cyan)
-                if service.onlineFriends.isEmpty {
-                    GameCard {
-                        Text("No added friends yet. Share your code to connect.")
-                            .font(.system(size: 13))
-                            .foregroundStyle(Art.faded)
+                inviteCard
+                if let notice = service.friendsNotice {
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: "info.circle.fill")
+                            .foregroundStyle(Art.gold)
+                        Text(notice)
+                            .foregroundStyle(Art.paper)
+                            .font(.system(size: 12, weight: .semibold))
+                            .fixedSize(horizontal: false, vertical: true)
                     }
+                    .padding(13)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Art.blueDeep)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
-                ForEach(service.onlineFriends) { friend in
-                    GameCard(accent: friend.online ? Art.mint : Art.edge) {
-                        HStack(spacing: 13) {
-                            Image(systemName: "person.crop.circle.fill")
-                                .font(.system(size: 34))
-                                .foregroundStyle(Art.cyan)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(friend.alias)
-                                    .font(.system(size: 15, weight: .black))
-                                    .foregroundStyle(Art.paper)
-                                HStack(spacing: 5) {
-                                    Circle()
-                                        .fill(friend.online ? Art.mint : Art.faded)
-                                        .frame(width: 9, height: 9)
-                                    Text(friend.online ? "ONLINE" : "OFFLINE")
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundStyle(friend.online ? Art.mint : Art.faded)
-                                }
-                            }
-                            Spacer()
-                        }
-                    }
-                }
-                Text(service.message)
-                    .font(.system(size: 12))
+                Text("Online status is based on recent app activity. It updates while Friends is open and when you pull down to refresh.")
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(Art.faded)
-                GameButton(title: "REFRESH FRIENDS", icon: "arrow.clockwise",
-                           color: Art.blueLight, bottom: Art.blueDeep) {
-                    Task { await service.refreshFriends() }
-                }
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .frame(maxWidth: 550)
-            .padding(18)
-            .padding(.bottom, 36)
+            .frame(maxWidth: 560)
+            .padding(.horizontal, 17)
+            .padding(.top, 16)
+            .padding(.bottom, 28)
             .frame(maxWidth: .infinity)
         }
         .background(GameBackdrop())
+        .refreshable { await service.refreshFriends() }
+        .sheet(isPresented: $showingAddFriend) {
+            addFriendSheet
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
         .task {
             service.attach(store)
             await service.refreshFriends()
+            // Automatic refresh stops when this tab disappears; no background
+            // timer and no repeated fetches for a hidden page.
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(for: .seconds(40))
+                } catch {
+                    break
+                }
+                guard !Task.isCancelled else { break }
+                await service.refreshFriends()
+            }
         }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                Task { await service.refreshFriends() }
+            }
+        }
+    }
+
+    private var header: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                GameTitle(text: "FRIENDS", size: 30)
+                GameKicker(text: "YOUR DETECTIVE NETWORK", color: Art.cyan)
+            }
+            Spacer(minLength: 0)
+            Button {
+                GameEffects.shared.tap()
+                Task { await service.refreshFriends() }
+            } label: {
+                Group {
+                    if service.isRefreshingFriends {
+                        ProgressView().tint(Art.paper)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 19, weight: .black))
+                    }
+                }
+                .foregroundStyle(Art.paper)
+                .frame(width: 47, height: 47)
+                .background(Art.blueDeep)
+                .clipShape(RoundedRectangle(cornerRadius: 13))
+                .overlay(RoundedRectangle(cornerRadius: 13)
+                    .stroke(Art.edge.opacity(0.65), lineWidth: 1.2))
+            }
+            .disabled(service.isRefreshingFriends)
+            .accessibilityLabel("Refresh online friends and requests")
+            Button {
+                GameEffects.shared.tap()
+                showingAddFriend = true
+            } label: {
+                Image(systemName: "person.badge.plus")
+                    .font(.system(size: 19, weight: .black))
+                    .foregroundStyle(Art.ink)
+                    .frame(width: 47, height: 47)
+                    .background(Art.gold)
+                    .clipShape(RoundedRectangle(cornerRadius: 13))
+            }
+            .accessibilityLabel("Add a friend")
+        }
+    }
+
+    private var overview: some View {
+        GameCard(accent: online.isEmpty ? Art.cyan : Art.mint) {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(Art.mint.opacity(0.14))
+                        .frame(width: 56, height: 56)
+                    Image(systemName: "person.2.fill")
+                        .font(.system(size: 26, weight: .bold))
+                        .foregroundStyle(Art.mint)
+                }
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("\(online.count) ONLINE NOW")
+                        .font(.system(size: 20, weight: .black, design: .rounded))
+                        .foregroundStyle(Art.paper)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+                    Text("\(store.progress.friendContacts.count) friends total")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Art.faded)
+                }
+                Spacer(minLength: 0)
+                if !service.requests.isEmpty {
+                    Text("\(service.requests.count) NEW")
+                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .foregroundStyle(Art.ink)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 7)
+                        .background(Art.gold)
+                        .clipShape(Capsule())
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if let checked = service.lastFriendsRefresh {
+                Text("Updated \(checked.formatted(date: .omitted, time: .shortened))  ·  Pull down to refresh")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Art.faded)
+            } else if service.isRefreshingFriends {
+                Text("Checking who's online…")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Art.faded)
+            }
+        }
+    }
+
+    private var pendingRequests: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            sectionTitle("FRIEND REQUESTS", count: service.requests.count, color: Art.gold)
+            ForEach(service.requests) { friend in
+                GameCard(accent: Art.gold) {
+                    HStack(spacing: 11) {
+                        Image(systemName: "person.crop.circle.badge.plus")
+                            .font(.system(size: 26))
+                            .foregroundStyle(Art.gold)
+                            .frame(width: 36, height: 40)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(friend.alias)
+                                .font(.system(size: 15, weight: .black, design: .rounded))
+                                .foregroundStyle(Art.paper)
+                            Text("Wants to be friends")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Art.faded)
+                        }
+                        Spacer(minLength: 2)
+                        Button {
+                            GameEffects.shared.tap()
+                            Task { await service.acceptFriend(friend) }
+                        } label: {
+                            Text("ACCEPT")
+                                .font(.system(size: 12, weight: .black, design: .rounded))
+                                .foregroundStyle(Art.ink)
+                                .padding(.horizontal, 13)
+                                .frame(height: 44)
+                                .background(Art.gold)
+                                .clipShape(RoundedRectangle(cornerRadius: 11))
+                        }
+                        .buttonStyle(PressGameStyle())
+                    }
+                }
+            }
+        }
+    }
+
+    private func sectionTitle(_ name: String, count: Int, color: Color) -> some View {
+        HStack {
+            GameKicker(text: name, color: color)
+            Spacer()
+            Text("\(count)")
+                .font(.system(size: 12, weight: .black, design: .rounded))
+                .foregroundStyle(color)
+        }
+        .padding(.horizontal, 2)
+    }
+
+    private func friendsSection(title: String, count: Int,
+                                friends: [FriendPresence], accent: Color) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            sectionTitle(title, count: count, color: accent)
+            if friends.isEmpty {
+                GameCard {
+                    HStack(spacing: 11) {
+                        Image(systemName: "moon.stars.fill")
+                            .font(.system(size: 22))
+                            .foregroundStyle(Art.cyan)
+                        Text("No friends online right now. Check back soon or invite someone to play.")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Art.paper)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            } else {
+                ForEach(friends) { friend in
+                    friendRow(friend)
+                }
+            }
+        }
+    }
+
+    private func friendRow(_ friend: FriendPresence) -> some View {
+        let isOnline = friend.availability == .online
+        let tone = isOnline ? Art.mint :
+                   friend.availability == .unavailable ? Art.gold : Art.faded
+        return HStack(spacing: 12) {
+            ZStack(alignment: .bottomTrailing) {
+                Circle()
+                    .fill(Art.blueLight)
+                    .frame(width: 52, height: 52)
+                    .overlay {
+                        Image(systemName: "person.fill")
+                            .font(.system(size: 26, weight: .semibold))
+                            .foregroundStyle(Art.paper)
+                    }
+                Circle()
+                    .fill(tone)
+                    .frame(width: 15, height: 15)
+                    .overlay(Circle().stroke(Art.blueDeep, lineWidth: 3))
+                    .offset(x: 1, y: 1)
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                Text(friend.alias)
+                    .font(.system(size: 16, weight: .black, design: .rounded))
+                    .foregroundStyle(Art.paper)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                HStack(spacing: 6) {
+                    Image(systemName: isOnline ? "circle.fill" :
+                          friend.availability == .unavailable ? "questionmark.circle.fill" : "moon.fill")
+                        .font(.system(size: 9, weight: .black))
+                    Text(friend.availability.label)
+                        .font(.system(size: 11, weight: .black, design: .rounded))
+                }
+                .foregroundStyle(tone)
+            }
+            Spacer(minLength: 1)
+            if isOnline {
+                Button {
+                    GameEffects.shared.tap()
+                    openMultiplayer()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "gamecontroller.fill")
+                        Text("PLAY")
+                    }
+                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .foregroundStyle(Art.ink)
+                    .padding(.horizontal, 10)
+                    .frame(height: 42)
+                    .background(Art.gold)
+                    .clipShape(RoundedRectangle(cornerRadius: 11))
+                }
+                .buttonStyle(PressGameStyle())
+                .accessibilityLabel("Open multiplayer to create a room for \(friend.alias)")
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(isOnline ? Art.blueLight.opacity(0.53) : Art.blueDeep)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16)
+            .stroke(isOnline ? Art.mint.opacity(0.8) : Art.edge.opacity(0.48),
+                    lineWidth: isOnline ? 2 : 1))
+        .accessibilityElement(children: .contain)
+    }
+
+    private var emptyFriends: some View {
+        GameCard(accent: Art.cyan) {
+            VStack(spacing: 12) {
+                Image(systemName: "person.2.badge.gearshape.fill")
+                    .font(.system(size: 42, weight: .semibold))
+                    .foregroundStyle(Art.cyan)
+                Text("YOUR DETECTIVE TEAM STARTS HERE")
+                    .font(.system(size: 17, weight: .black, design: .rounded))
+                    .foregroundStyle(Art.paper)
+                    .multilineTextAlignment(.center)
+                Text("Share your friend code or add another detective to see when they're online.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Art.faded)
+                    .multilineTextAlignment(.center)
+                GameButton(title: "ADD YOUR FIRST FRIEND",
+                           icon: "person.badge.plus") {
+                    showingAddFriend = true
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    private var inviteCard: some View {
+        GameCard(accent: Art.cyan) {
+            VStack(alignment: .leading, spacing: 11) {
+                GameKicker(text: "INVITE FRIENDS", color: Art.cyan)
+                Text("YOUR PERSONAL FRIEND CODE")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(Art.faded)
+                HStack(spacing: 10) {
+                    Text(service.playerID)
+                        .font(.system(size: 24, weight: .black, design: .monospaced))
+                        .foregroundStyle(Art.paper)
+                        .tracking(0.8)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.74)
+                        .textSelection(.enabled)
+                    Spacer(minLength: 0)
+                    Button {
+                        UIPasteboard.general.string = service.playerID
+                        GameEffects.shared.success()
+                    } label: {
+                        Label("COPY", systemImage: "doc.on.doc")
+                            .font(.system(size: 11, weight: .black, design: .rounded))
+                            .foregroundStyle(Art.ink)
+                            .padding(.horizontal, 11)
+                            .frame(height: 42)
+                            .background(Art.gold)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                    .buttonStyle(PressGameStyle())
+                }
+                HStack(spacing: 11) {
+                    ShareLink(item: "Add me as a friend on REDACTED! My detective friend code is \(service.playerID).") {
+                        Label("SHARE CODE", systemImage: "square.and.arrow.up")
+                            .font(.system(size: 12, weight: .black, design: .rounded))
+                            .foregroundStyle(Art.cyan)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .background(Art.blueDeep)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                    Button {
+                        showingAddFriend = true
+                    } label: {
+                        Label("ADD FRIEND", systemImage: "person.badge.plus")
+                            .font(.system(size: 12, weight: .black, design: .rounded))
+                            .foregroundStyle(Art.paper)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .background(Art.blueLight)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                    .buttonStyle(PressGameStyle())
+                }
+            }
+        }
+    }
+
+    private var addFriendSheet: some View {
+        ZStack {
+            GameBackdrop()
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 5) {
+                        GameTitle(text: "ADD FRIEND", size: 25)
+                        GameKicker(text: "INVITE BY DETECTIVE CODE", color: Art.cyan)
+                    }
+                    Spacer()
+                    Button("DONE") { showingAddFriend = false }
+                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .foregroundStyle(Art.cyan)
+                        .frame(minWidth: 55, minHeight: 44)
+                }
+                Text("Ask your friend for their eight-character code from the Friends tab.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Art.paper)
+                    .fixedSize(horizontal: false, vertical: true)
+                TextField("8-CHARACTER CODE", text: $newFriendCode)
+                    .textInputAutocapitalization(.characters)
+                    .autocorrectionDisabled()
+                    .textContentType(.oneTimeCode)
+                    .font(.system(size: 20, weight: .black, design: .monospaced))
+                    .foregroundStyle(Art.paper)
+                    .padding(14)
+                    .background(Art.blueDeep)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(RoundedRectangle(cornerRadius: 12)
+                        .stroke(Art.edge, lineWidth: 1))
+                    .onChange(of: newFriendCode) { _, value in
+                        newFriendCode = String(value.uppercased()
+                            .filter { $0.isASCII && ($0.isLetter || $0.isNumber) }
+                            .prefix(8))
+                    }
+                    .submitLabel(.go)
+                    .onSubmit { sendFriendRequest() }
+                GameButton(title: "SEND FRIEND REQUEST",
+                           icon: "person.crop.circle.badge.plus",
+                           inactive: newFriendCode.count != 8) {
+                    sendFriendRequest()
+                }
+                if let notice = service.friendsNotice {
+                    Text(notice)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Art.faded)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: 500)
+            .padding(20)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private func sendFriendRequest() {
+        guard newFriendCode.count == 8 else { return }
+        GameEffects.shared.tap()
+        Task { await service.requestFriend(newFriendCode) }
     }
 }
 

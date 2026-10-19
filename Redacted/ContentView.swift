@@ -613,7 +613,7 @@ struct CampaignHomeView: View {
         HStack {
             GameKicker(text: "SOLO CAMPAIGN · OFFLINE")
             Spacer()
-            GameKicker(text: "VERSION 1.0", color: Art.faded)
+            GameKicker(text: "VERSION \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.4")", color: Art.faded)
         }
     }
 }

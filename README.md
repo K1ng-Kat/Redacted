@@ -208,7 +208,7 @@ The game opts in using a **source Info.plist at the repository root** (`Redacted
 
 ### Detective customization and shop
 - My Detective and Shop are accessible from HQ. The existing rank-based six identity portraits remain.
-- Four independently equipped cosmetic slots: **headwear, eyewear, badge and outfit**. 15 items have rank thresholds from 1 to 30, with different icon/tint treatments on the detective portrait.
+- Four independently equipped cosmetic slots: **headwear, eyewear, badge and outfit**. 15 items have rank thresholds from 1 to 20, with different icon/tint treatments on the detective portrait. All rank thresholds are achievable within the 100-level campaign.
 - Players buy **snippets with coins**, save them in their wallet, then spend snippets on eligible permanent cosmetic unlocks. Current packs: 1 for 55 coins, 5 for 250, 12 for 540.
 - Alternatively, unlock an eligible cosmetic instantly with **crystals** at item-specific costs of 2–10. Crystals never bypass the rank requirement, just the snippet collection requirement.
 - Ownership, snippets and equipped cosmetics are persisted in the existing CampaignProgress and private iCloud save. Wallet spending is transactional locally, not server-authoritative.
@@ -233,3 +233,6 @@ The Xcode simulator CI checks **compilation only**. Online matches / presence **
 - On two signed iOS devices with CloudKit configured, create room, enter code, QR-scan, verify both see same mystery and first valid completion wins; repeat after network interruption and app background/resume.
 - Invite friends by shareable friend code, accept, refresh; check online status stops showing after heartbeat expires, with no private Apple IDs displayed.
 - Test iPadOS 17 scanner and iOS 18+ QR deep link. Test 1,000 generated case indices for uniqueness and accessible answers. Check Store privacy disclosure and child-facing social feature compliance.
+
+### Account portability
+The player's anonymous 8-character detective friend code and accepted friend list are also fields of the campaign save. When the *same* account's private iCloud save is restored, the code and list can follow to the next device. Do not play or make new friends before initial iCloud restoration completes; CloudKit private sync and social rooms must be provisioned first. Using multiplayer on two devices concurrently under one friend identity is not supported.

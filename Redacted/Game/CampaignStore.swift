@@ -20,11 +20,17 @@ struct CampaignProgress: Codable {
     var ownedCosmetics: Set<String> = []
     var equippedCosmetics: [String: String] = [:]
     var friendContacts: [DetectiveFriend] = []
+    var socialID: String = CampaignProgress.newSocialID()
+
+    static func newSocialID() -> String {
+        let alphabet = Array("ABCDEFGHJKLMNPQRSTUVWXYZ23456789")
+        return String((0..<8).compactMap { _ in alphabet.randomElement() })
+    }
 
     enum CodingKeys: String, CodingKey {
         case bestStars, lastLevel, tutorialComplete, totalAttempts,
              firstLaunchDate, xp, coins, crystals, crystalDistricts, hintTickets, hintsBought,
-             snippets, ownedCosmetics, equippedCosmetics, friendContacts
+             snippets, ownedCosmetics, equippedCosmetics, friendContacts, socialID
     }
 
     init() {}
@@ -56,6 +62,9 @@ struct CampaignProgress: Codable {
         ownedCosmetics = try box.decodeIfPresent(Set<String>.self, forKey: .ownedCosmetics) ?? []
         equippedCosmetics = try box.decodeIfPresent([String: String].self, forKey: .equippedCosmetics) ?? [:]
         friendContacts = try box.decodeIfPresent([DetectiveFriend].self, forKey: .friendContacts) ?? []
+        socialID = try box.decodeIfPresent(String.self, forKey: .socialID)
+            ?? UserDefaults.standard.string(forKey: "redacted.social.code")
+            ?? Self.newSocialID()
     }
 }
 
@@ -239,6 +248,10 @@ final class CampaignStore: ObservableObject {
     func equipCosmetic(_ cosmetic: DetectiveCosmetic) {
         guard progress.ownedCosmetics.contains(cosmetic.id) else { return }
         progress.equippedCosmetics[cosmetic.slot.rawValue] = cosmetic.id
+    }
+
+    func persistSocialIdentity() {
+        save()
     }
 
     func addFriend(_ friend: DetectiveFriend) {

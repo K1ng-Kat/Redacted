@@ -40,14 +40,11 @@ final class MultiplayerService: ObservableObject {
     private var myResultCreated = false
 
     var playerID: String {
-        let defaults = UserDefaults.standard
-        if let value = defaults.string(forKey: "redacted.social.code"), value.count == 8 {
-            return value
+        if let id = store?.progress.socialID, id.count == 8 {
+            return id
         }
-        let alphabet = Array("ABCDEFGHJKLMNPQRSTUVWXYZ23456789")
-        let code = String((0..<8).compactMap { _ in alphabet.randomElement() })
-        defaults.set(code, forKey: "redacted.social.code")
-        return code
+        // Only used until a campaign store is attached.
+        return UserDefaults.standard.string(forKey: "redacted.social.code") ?? "UNLINKED"
     }
 
     var alias: String { "AGENT-" + playerID.suffix(4) }
@@ -63,6 +60,7 @@ final class MultiplayerService: ObservableObject {
         guard !socialEnabled else { return }
         socialEnabled = true
         UserDefaults.standard.set(true, forKey: "redacted.social.optin")
+        store?.persistSocialIdentity()
     }
 
     func startPresence() {

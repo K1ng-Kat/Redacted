@@ -265,3 +265,11 @@ The player's anonymous 8-character detective friend code and accepted friend lis
 - All existing XP and coin data remains separate and unchanged; this is a visual-only overhaul without a save migration.
 
 QA: verify character anatomy and hat/eyewear alignment, the wardrobe's two-column balances, full-width two-column Profile stats, and correct original coin icon on real iPhone and iPad.
+
+### Build 16 — Detective character proportion correction
+
+- Corrects the oversized coat relative to the detective's head. Enlarges the head and *all attached headwear/eyewear together* from 0.82×0.84 to 0.88×0.90, preserving all attachment points.
+- Narrows the shoulder silhouette, vest, shirt opening and both lapels together rather than adjusting the coat outline alone. Sleeve seams and the Ghost/Royal coat details move inward with the new body geometry.
+- Moves the chest badge inward onto the new lapel (194, 258).
+- No changes to owned/equipped cosmetics, rank requirements, coin/XP wallets, gameplay, or save formats.
+- QA: inspect character at 48, 78, 122 and 215 points with all four headwear options, eyewear options, and the different coat styles on iPhone and iPad.

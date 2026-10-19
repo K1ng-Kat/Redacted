@@ -144,46 +144,45 @@ struct DetectiveAvatarArt: View {
         }
 
         // Coat and shoulders BEFORE head so the neckline aligns perfectly.
-        paint(&g, polygon([7,300, 12,254, 34,214, 103,194, 150,210,
-                           197,194, 266,214, 288,254, 293,300]),
+        paint(&g, polygon([24,300, 30,262, 54,232, 110,212, 150,222,
+                           190,212, 246,232, 270,262, 276,300]),
               baseCoat, border: outline, width: 7)
-        paint(&g, polygon([105,204, 150,220, 194,204, 179,298, 120,298]),
+        paint(&g, polygon([114,214, 150,228, 186,214, 173,298, 127,298]),
               Color(red: 0.19, green: 0.27, blue: 0.39), border: outline, width: 4)
-        paint(&g, polygon([133,205, 150,226, 167,205, 159,297, 142,297]),
+        paint(&g, polygon([137,214, 150,231, 163,214, 157,297, 143,297]),
               Color(red: 0.93, green: 0.91, blue: 0.84))
         paint(&g, polygon([146,230, 154,230, 160,277, 150,289, 141,277]),
               outfit == "coat_royal" ? trim : Color(red: 0.38, green: 0.70, blue: 0.82),
               border: outline, width: 2)
         // Notched lapels and central seam are physical garment components.
-        paint(&g, polygon([105,204, 139,229, 124,261, 144,298, 72,298,
-                           65,237, 97,228]),
+        paint(&g, polygon([113,214, 137,233, 126,260, 142,298, 87,298,
+                           82,245, 104,232]),
               baseCoat.opacity(0.90), border: outline, width: 3.5)
-        paint(&g, polygon([195,204, 161,229, 176,261, 156,298, 228,298,
-                           235,237, 203,228]),
+        paint(&g, polygon([187,214, 163,233, 174,260, 158,298, 213,298,
+                           218,245, 196,232]),
               baseCoat.opacity(0.90), border: outline, width: 3.5)
-        line(&g, [105,205, 130,231, 116,251], trim.opacity(0.95), width: 4)
-        line(&g, [195,205, 170,231, 184,251], trim.opacity(0.95), width: 4)
+        line(&g, [114,214, 132,234, 122,251], trim.opacity(0.95), width: 4)
+        line(&g, [186,214, 168,234, 178,251], trim.opacity(0.95), width: 4)
         line(&g, [150,285, 150,299], outline, width: 3)
         paint(&g, circle(162,274,7,7), trim)
         // Sleeve blocks follow shoulder contour.
-        line(&g, [46,233, 39,292], outline.opacity(0.48), width: 4)
-        line(&g, [253,233, 261,292], outline.opacity(0.48), width: 4)
+        line(&g, [65,241, 61,292], outline.opacity(0.48), width: 4)
+        line(&g, [235,241, 239,292], outline.opacity(0.48), width: 4)
         if outfit == "coat_ghost" {
-            line(&g, [70,277,106,277], trim, width: 5)
-            line(&g, [195,277,232,277], trim, width: 5)
+            line(&g, [88,277,116,277], trim, width: 5)
+            line(&g, [184,277,212,277], trim, width: 5)
         } else if outfit == "coat_royal" {
-            line(&g, [58,286,105,286], trim, width: 4)
-            line(&g, [195,286,242,286], trim, width: 4)
+            line(&g, [72,286,111,286], trim, width: 4)
+            line(&g, [189,286,228,286], trim, width: 4)
             paint(&g, circle(149,248,5,5), trim)
         }
 
-        // Scale the full face/neck/eyes/hair/glasses/hat as ONE anatomical unit.
-        // This makes shoulders visually broader without detaching cosmetics.
-        // The anchor keeps the chin aligned with the coat collar.
+        // Head and all eyewear/headwear share a single transform. Keep the
+        // chin anchored at the narrowed collar so accessories cannot drift.
         var headG = g
-        headG.translateBy(x: 150, y: 174)
-        headG.scaleBy(x: 0.82, y: 0.84)
-        headG.translateBy(x: -150, y: -174)
+        headG.translateBy(x: 150, y: 172)
+        headG.scaleBy(x: 0.88, y: 0.90)
+        headG.translateBy(x: -150, y: -172)
         // Neck and ears.
         paint(&headG, rect(131,165,38,53,13), skinShade, border: outline, width: 3)
         paint(&headG, circle(91,125,23,31), skinColor, border: outline)
@@ -253,8 +252,8 @@ struct DetectiveAvatarArt: View {
         }
 
         // BADGE: physically located on the right lapel.
-        let badgeX: CGFloat = 206
-        let badgeY: CGFloat = 256
+        let badgeX: CGFloat = 194
+        let badgeY: CGFloat = 258
         switch loadout[.badge] {
         case "badge_bronze":
             paint(&g, polygon([badgeX,badgeY-17, badgeX+12,badgeY-9,

@@ -70,6 +70,10 @@ jobs:
               old_plist = plistlib.loads(show("Redacted-Info.plist"))
               local_plist = dict(old_plist)
               local_plist["ITSAppUsesNonExemptEncryption"] = False
+              # Reproduce the exact live failure: Xcode removes the launch
+              # storyboard plist key locally while GitHub adds QR permission.
+              local_plist.pop("UILaunchStoryboardName", None)
+              local_plist["LSSupportsGameMode"] = False
               remote_plist = (root / "Redacted-Info.plist").read_bytes()
               (temp / "plist-base").write_bytes(plistlib.dumps(old_plist))
               (temp / "plist-local").write_bytes(plistlib.dumps(local_plist))
@@ -85,9 +89,10 @@ jobs:
               ], check=True)
               merged = plistlib.loads((temp / "plist-result").read_bytes())
               assert merged["ITSAppUsesNonExemptEncryption"] is False
+              assert merged["UILaunchStoryboardName"] == "LaunchScreen"
               assert merged["NSCameraUsageDescription"]
-              assert merged["LSSupportsGameMode"]
+              assert merged["LSSupportsGameMode"] is True
               assert any("redacted-detective" in url["CFBundleURLSchemes"]
                          for url in merged["CFBundleURLTypes"])
-              print("PASS: local signing and plist fields retained; current GitHub game config retained.")
+              print("PASS: local signing/privacy preserved, deleted launch key restored, QR and Game Mode retained.")
           PY

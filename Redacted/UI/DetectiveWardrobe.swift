@@ -53,8 +53,8 @@ enum CosmeticCatalog {
         .init(id: "badge_gold", name: "Gold Agency Crest", slot: .badge, symbol: "rosette", requiredRank: 15, snippetPrice: 15, crystalPrice: 6, tint: Art.gold),
         .init(id: "coat_ghost", name: "Ghost Agent Suit", slot: .coat, symbol: "person.fill", requiredRank: 17, snippetPrice: 17, crystalPrice: 7, tint: Art.paper),
         .init(id: "hat_director", name: "Director's Cap", slot: .headwear, symbol: "crown.fill", requiredRank: 20, snippetPrice: 20, crystalPrice: 8, tint: Art.gold),
-        .init(id: "badge_director", name: "Director's Insignia", slot: .badge, symbol: "crown.fill", requiredRank: 25, snippetPrice: 24, crystalPrice: 9, tint: Art.gold),
-        .init(id: "coat_royal", name: "Royal Operative", slot: .coat, symbol: "sparkles", requiredRank: 30, snippetPrice: 30, crystalPrice: 10, tint: Art.cyan)
+        .init(id: "badge_director", name: "Director's Insignia", slot: .badge, symbol: "crown.fill", requiredRank: 19, snippetPrice: 24, crystalPrice: 9, tint: Art.gold),
+        .init(id: "coat_royal", name: "Royal Operative", slot: .coat, symbol: "sparkles", requiredRank: 20, snippetPrice: 30, crystalPrice: 10, tint: Art.cyan)
     ]
     static func item(_ id: String?) -> DetectiveCosmetic? { all.first { $0.id == id } }
 }

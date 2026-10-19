@@ -11,25 +11,33 @@ struct StartupLoadingView: View {
 
     var body: some View {
         GeometryReader { geometry in
+            // Fit the SAME design on iPhone SE-sized screens, regular iPhones,
+            // and iPad landscape without clipping the loading controls.
+            let height = geometry.size.height
+            let scale = min(CGFloat(1), max(CGFloat(0.58), (height - 270) / 540))
+            let small = height < 740
             ZStack {
                 GameBackdrop()
 
-                // Dramatic dossier art: vault door, floating case card, fingerprint
-                // and a scanner reticle, all vector-based and bundled in code.
                 VStack(spacing: 0) {
                     topEmblem
-                    Spacer(minLength: 18)
+                        .frame(maxWidth: 460)
+                    Spacer(minLength: small ? 5 : 13)
                     hero
                         .frame(maxWidth: 460)
-                    Spacer(minLength: 32)
+                        .scaleEffect(scale)
+                        .frame(height: 440 * scale)
+                        .accessibilityElement(children: .combine)
+                    Spacer(minLength: small ? 5 : 12)
                     bottomLoader
+                        .frame(maxWidth: 580)
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.horizontal, 25)
-                .padding(.top, max(24, geometry.safeAreaInsets.top + 12))
-                .padding(.bottom, max(25, geometry.safeAreaInsets.bottom + 14))
+                .padding(.horizontal, geometry.size.width < 360 ? 15 : 22)
+                .padding(.top, max(18, geometry.safeAreaInsets.top + 8))
+                .padding(.bottom, max(15, geometry.safeAreaInsets.bottom + 8))
             }
-            .frame(width: geometry.size.width, height: geometry.size.height)
+            .frame(width: geometry.size.width, height: height)
         }
         .ignoresSafeArea()
         .preferredColorScheme(.dark)

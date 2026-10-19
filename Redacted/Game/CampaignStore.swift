@@ -12,12 +12,14 @@ struct CampaignProgress: Codable {
     var firstLaunchDate = Date()
     var xp = 0
     var coins = 50
+    var crystals = 0
+    var crystalDistricts: Set<Int> = []
     var hintTickets = 2
     var hintsBought = 0
 
     enum CodingKeys: String, CodingKey {
         case bestStars, lastLevel, tutorialComplete, totalAttempts,
-             firstLaunchDate, xp, coins, hintTickets, hintsBought
+             firstLaunchDate, xp, coins, crystals, crystalDistricts, hintTickets, hintsBought
     }
 
     init() {}
@@ -31,6 +33,18 @@ struct CampaignProgress: Codable {
         firstLaunchDate = try box.decodeIfPresent(Date.self, forKey: .firstLaunchDate) ?? Date()
         xp = try box.decodeIfPresent(Int.self, forKey: .xp) ?? 0
         coins = try box.decodeIfPresent(Int.self, forKey: .coins) ?? 50
+        crystals = max(0, try box.decodeIfPresent(Int.self, forKey: .crystals) ?? 0)
+        crystalDistricts = try box.decodeIfPresent(Set<Int>.self, forKey: .crystalDistricts) ?? []
+        // Migrate already-passed districts once without repeating the reward.
+        for district in 0..<10 where !crystalDistricts.contains(district) {
+            let stages = (district * 10 + 1)...(district * 10 + 10)
+            let cleared = stages.allSatisfy { (bestStars[$0] ?? 0) > 0 }
+            let perfect = stages.filter { (bestStars[$0] ?? 0) == 3 }.count
+            if cleared && perfect >= 7 {
+                crystalDistricts.insert(district)
+                crystals += 1
+            }
+        }
         hintTickets = try box.decodeIfPresent(Int.self, forKey: .hintTickets) ?? 2
         hintsBought = try box.decodeIfPresent(Int.self, forKey: .hintsBought) ?? 0
     }
@@ -41,6 +55,7 @@ struct CasePayout {
     let earnedXP: Int
     let earnedCoins: Int
     let earnedTickets: Int
+    let earnedCrystals: Int
     let levelsGained: Int
     let newRank: Int
     let firstClear: Bool
@@ -96,7 +111,7 @@ enum RankRewards {
 @MainActor
 final class CampaignStore: ObservableObject {
     private static let saveKey = "redacted.campaign.v1"
-    static let hintPrice = 30
+    static let hintPrice = 2
 
     @Published private(set) var progress: CampaignProgress {
         didSet { save() }
@@ -114,6 +129,7 @@ final class CampaignStore: ObservableObject {
     var levelsCompleted: Int { progress.bestStars.count }
     var totalStars: Int { progress.bestStars.values.reduce(0, +) }
     var coins: Int { progress.coins }
+    var crystals: Int { progress.crystals }
     var hintTickets: Int { progress.hintTickets }
     var accountXP: Int { progress.xp }
     var accountLevel: Int { RankRewards.rank(for: progress.xp) }
@@ -188,8 +204,8 @@ final class CampaignStore: ObservableObject {
             progress.hintTickets -= 1
             return true
         }
-        guard progress.coins >= Self.hintPrice else { return false }
-        progress.coins -= Self.hintPrice
+        guard progress.crystals >= Self.hintPrice else { return false }
+        progress.crystals -= Self.hintPrice
         progress.hintsBought += 1
         return true
     }
@@ -213,17 +229,31 @@ final class CampaignStore: ObservableObject {
         progress.xp += xp
         progress.coins += coins
 
+        // One non-repeatable crystal when ALL district unlock requirements are met.
+        // It may happen on a replay of an earlier level, not only level 10.
+        var earnedCrystals = 0
+        let district = (level - 1) / 10
+        if !progress.crystalDistricts.contains(district) {
+            let range = (district * 10 + 1)...(district * 10 + 10)
+            if range.allSatisfy({ (progress.bestStars[$0] ?? 0) > 0 }) &&
+               range.filter({ (progress.bestStars[$0] ?? 0) == 3 }).count >= 7 {
+                progress.crystalDistricts.insert(district)
+                progress.crystals += 1
+                earnedCrystals = 1
+            }
+        }
+
         let newRank = accountLevel
         let levelsGained = max(0, newRank - oldRank)
         let bonusCoins = levelsGained * 60
-        let bonusTickets = levelsGained
+        let bonusTickets = 0
         if levelsGained > 0 {
             progress.coins += bonusCoins
-            progress.hintTickets += bonusTickets
         }
         return CasePayout(
             stars: stars, earnedXP: xp,
             earnedCoins: coins + bonusCoins, earnedTickets: bonusTickets,
+            earnedCrystals: earnedCrystals,
             levelsGained: levelsGained, newRank: newRank, firstClear: isFirstClear
         )
     }
@@ -231,6 +261,15 @@ final class CampaignStore: ObservableObject {
     func episodeCompleted(_ episode: CampaignEpisode) -> Int {
         (episode.startLevel...episode.endLevel).filter { stars(for: $0) > 0 }.count
     }
+
+    /// A cloud restore replaces the local snapshot without creating a new payout.
+    func restoreCloudProgress(_ restored: CampaignProgress) {
+        isApplyingCloudSave = true
+        progress = restored
+        isApplyingCloudSave = false
+    }
+
+    private var isApplyingCloudSave = false
 
     func resetProgress() {
         progress = CampaignProgress()
@@ -240,6 +279,10 @@ final class CampaignStore: ObservableObject {
     private func save() {
         guard let data = try? JSONEncoder().encode(progress) else { return }
         UserDefaults.standard.set(data, forKey: Self.saveKey)
+        if !isApplyingCloudSave {
+            UserDefaults.standard.set(Date(), forKey: "redacted.save.modified")
+            CloudSaveManager.shared.scheduleUpload(progress: progress)
+        }
     }
 }
 

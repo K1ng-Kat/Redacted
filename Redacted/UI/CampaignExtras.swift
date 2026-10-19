@@ -1,8 +1,10 @@
 import SwiftUI
+import AuthenticationServices
 
 struct CampaignSettingsView: View {
     @ObservedObject var store: CampaignStore
     let back: () -> Void
+    @ObservedObject private var cloud = CloudSaveManager.shared
 
     @AppStorage("redacted.fx.sound") private var sound = true
     @AppStorage("redacted.fx.haptics") private var haptics = true
@@ -29,7 +31,7 @@ struct CampaignSettingsView: View {
                         option("ANIMATIONS", detail: "Reduce button motion when disabled",
                                symbol: "sparkles", enabled: $motion)
                         Divider().overlay(Art.edge.opacity(0.30))
-                        option("SHOW HINT BUTTON", detail: "Hints cost a ticket or 30 coins",
+                        option("SHOW HINT BUTTON", detail: "2 free hints; then 2 crystals each",
                                symbol: "lightbulb.fill", enabled: $hints)
                     }
                 }
@@ -106,14 +108,90 @@ struct CampaignSettingsView: View {
                                       value: $levelVolume, maximum: 0.45)
                     }
                 }
+                GameCard(accent: Art.cyan) {
+                    VStack(alignment: .leading, spacing: 13) {
+                        GameKicker(text: "ACCOUNT & CLOUD SAVE", color: Art.cyan)
+                        HStack(spacing: 12) {
+                            Image(systemName: cloud.signedIn ? "checkmark.icloud.fill" : "icloud")
+                                .font(.system(size: 27, weight: .bold))
+                                .foregroundStyle(cloud.signedIn ? Art.mint : Art.cyan)
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(cloud.signedIn ? "APPLE ACCOUNT CONNECTED" : "SIGN IN TO SAVE")
+                                    .font(.system(size: 15, weight: .black, design: .rounded))
+                                    .foregroundStyle(Art.paper)
+                                Text(cloud.status)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(Art.faded)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        Text("Sign in with Apple to enable private iCloud backup of your progress, crystals, stars, detectives and settings. To restore on another device, sign in there with the same Apple and iCloud account.")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Art.paper)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if cloud.signedIn {
+                            HStack(spacing: 9) {
+                                GameButton(title: cloud.syncing ? "SYNCING…" : "SYNC NOW",
+                                           icon: "arrow.triangle.2.circlepath",
+                                           color: Art.blueLight, bottom: Art.blueDeep,
+                                           inactive: cloud.syncing) {
+                                    Task { await cloud.syncNow() }
+                                }
+                            }
+                            if let date = cloud.lastSynced {
+                                Text("Last successful sync: \(date.formatted(date: .abbreviated, time: .shortened))")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(Art.mint)
+                            }
+                            Button("SIGN OUT (KEEP LOCAL SAVE)") { cloud.signOut() }
+                                .font(.system(size: 12, weight: .black, design: .rounded))
+                                .foregroundStyle(Art.gold)
+                                .frame(minHeight: 44)
+                                .buttonStyle(PressGameStyle())
+                        } else {
+                            SignInWithAppleButton(.signIn, onRequest: { request in
+                                request.requestedScopes = []
+                            }, onCompletion: { result in
+                                cloud.handleSignIn(result)
+                            })
+                            .signInWithAppleButtonStyle(.white)
+                            .frame(height: 48)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+                        Text("Cloud sync needs iCloud enabled for REDACTED. A sign-in alone does not mean a backup has completed.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Art.faded)
+                    }
+                }
+                GameCard(accent: Art.gold) {
+                    VStack(alignment: .leading, spacing: 11) {
+                        GameKicker(text: "CRYSTALS & HINTS", color: Art.gold)
+                        HStack(spacing: 13) {
+                            CrystalIcon(size: 53)
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text("\(store.crystals) CRYSTALS")
+                                    .font(.system(size: 22, weight: .black, design: .rounded))
+                                    .foregroundStyle(Art.paper)
+                                Text("\(store.hintTickets) free hints remaining")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(Art.faded)
+                            }
+                        }
+                        Text("Pass all 10 levels and earn at least 7 perfect 3-star ratings in a district to earn 1 crystal. Hints cost 2 crystals after your 2 starting free hints are used.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Art.faded)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
                 GameCard {
                     VStack(alignment: .leading, spacing: 11) {
                         GameKicker(text: "PRIVACY AND SAVES", color: Art.cyan)
-                        Text("Your account level, coins, stars and solved levels are saved locally on this device. No online account or multiplayer connection is required.")
+                        Text("Progress is always saved locally. Optional iCloud backup uses your private Apple iCloud account when available; it is not a custom REDACTED server.")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(Art.paper)
                             .fixedSize(horizontal: false, vertical: true)
-                        Text("REDACTED 0.9 — iPhone & iPad campaign")
+                        Text("REDACTED 1.0 — iPhone & iPad campaign")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(Art.faded)
                     }
@@ -131,6 +209,9 @@ struct CampaignSettingsView: View {
             .frame(maxWidth: .infinity)
         }
         .background(GameBackdrop())
+        .onChange(of: "\(sound)|\(haptics)|\(motion)|\(hints)|\(ageModeRaw)|\(musicEnabled)|\(menuVolume)|\(levelVolume)") { _, _ in
+            cloud.settingsChanged()
+        }
         .confirmationDialog("Delete your 100-level campaign progress?",
                             isPresented: $confirmingReset, titleVisibility: .visible) {
             Button("Erase levels, coins, XP and rewards", role: .destructive) {
@@ -139,7 +220,7 @@ struct CampaignSettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This is permanent. It erases all earned currency, account levels, stars, and unlocks on this device.")
+            Text("This resets your local levels, crystals, coins, free hints and rank. If cloud sync is enabled, the reset may also sync to iCloud.")
         }
     }
 
@@ -152,7 +233,7 @@ struct CampaignSettingsView: View {
                         .font(.system(size: 15, weight: .black, design: .rounded))
                         .foregroundStyle(Art.paper)
                     Spacer()
-                    Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.9") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "10"))")
+                    Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "11"))")
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
                         .foregroundStyle(Art.faded)
                 }
@@ -327,20 +408,20 @@ struct CampaignStatsView: View {
 
                 rankHero
                 HStack(spacing: 9) {
-                    StatChip(icon: "circle.hexagongrid.fill", value: "\(store.coins)", label: "COINS")
+                    StatChip(icon: "crystal", value: "\(store.crystals)", label: "CRYSTALS")
                     Spacer(minLength: 1)
-                    StatChip(icon: "lightbulb.fill", value: "\(store.hintTickets)", label: "HINTS", tint: Art.cyan)
+                    StatChip(icon: "lightbulb.fill", value: "\(store.hintTickets)", label: "FREE HINTS", tint: Art.cyan)
                     Spacer(minLength: 1)
                     StatChip(icon: "star.fill", value: "\(store.totalStars)", label: "STARS", tint: Art.gold)
                 }
                 GameCard {
                     VStack(alignment: .leading, spacing: 10) {
                         GameKicker(text: "HOW REWARDS WORK", color: Art.gold)
-                        Text("Each solved case awards XP, coins and stars. Every detective rank gives 60 coins and one free hint. Higher ranks take more XP and unlock new characters.")
+                        Text("Each solved case awards XP, coins and stars. Every detective rank gives 60 coins. Higher ranks take more XP and unlock new characters.")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(Art.paper)
                             .fixedSize(horizontal: false, vertical: true)
-                        Text("Each new district requires 10 completed cases and at least 7 perfect 3-star results. Replays keep your best star rating and only award currency for improvements.")
+                        Text("A district pass requires 10 clears and at least 7 perfect results; each earns 1 crystal, once. You begin with 2 free hints; later hints cost 2 crystals.")
                             .font(.system(size: 12))
                             .foregroundStyle(Art.faded)
                             .fixedSize(horizontal: false, vertical: true)
@@ -358,6 +439,9 @@ struct CampaignStatsView: View {
             .frame(maxWidth: .infinity)
         }
         .background(GameBackdrop())
+        .onChange(of: selectedTheme) { _, _ in
+            CloudSaveManager.shared.settingsChanged()
+        }
     }
 
     private var rankHero: some View {

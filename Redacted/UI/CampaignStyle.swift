@@ -246,6 +246,8 @@ struct StatChip: View {
         HStack(spacing: 8) {
             if icon == "circle.hexagongrid.fill" {
                 CoinIcon(size: 24)
+            } else if icon == "crystal" {
+                CrystalIcon(size: 26)
             } else {
                 Image(systemName: icon)
                     .font(.system(size: 17, weight: .black))

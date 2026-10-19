@@ -28,6 +28,7 @@ struct MissionPlayView: View {
     @State private var mistakes = 0
     @State private var hintUsed = false
     @State private var hintVisible = false
+    @State private var confirmingHint = false
     @State private var feedback: String?
     @State private var payout: CasePayout?
     @State private var coaching = false
@@ -84,6 +85,21 @@ struct MissionPlayView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .confirmationDialog("Reveal a detective hint?", isPresented: $confirmingHint,
+                            titleVisibility: .visible) {
+            Button(store.hintTickets > 0 ? "Use a free hint" : "Spend 2 crystals") {
+                if store.redeemHint() {
+                    hintVisible = true
+                    hintUsed = true
+                    GameEffects.shared.success()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(store.hintTickets > 0
+                 ? "You have \(store.hintTickets) free hint tickets left. Hints reduce the star rating."
+                 : "This will deduct 2 of your \(store.crystals) crystals. Hints reduce the star rating.")
+        }
         .onDisappear { narrator.stopSpeaking(at: .immediate) }
         .onAppear {
             coaching = (mission.id == 1 && !store.progress.tutorialComplete) ||
@@ -142,7 +158,7 @@ struct MissionPlayView: View {
 
             }
             Spacer()
-            StatChip(icon: "circle.hexagongrid.fill", value: "\(store.coins)", label: "COINS")
+            StatChip(icon: "crystal", value: "\(store.crystals)", label: "CRYSTALS")
         }
     }
 
@@ -586,16 +602,12 @@ struct MissionPlayView: View {
         VStack(alignment: .leading, spacing: 12) {
             if hintsEnabled && !hintVisible {
                 GameButton(
-                    title: store.hintTickets > 0 ? "USE FREE HINT (\(store.hintTickets))" :
-                        "BUY HINT · \(CampaignStore.hintPrice) COINS",
+                    title: store.hintTickets > 0 ? "FREE HINT · \(store.hintTickets) LEFT" :
+                        "USE HINT · \(CampaignStore.hintPrice) CRYSTALS",
                     icon: "lightbulb.fill", color: Art.blueLight, bottom: Art.blueDeep,
-                    inactive: store.hintTickets == 0 && store.coins < CampaignStore.hintPrice
+                    inactive: store.hintTickets == 0 && store.crystals < CampaignStore.hintPrice
                 ) {
-                    if store.redeemHint() {
-                        hintVisible = true
-                        hintUsed = true
-                        GameEffects.shared.success()
-                    }
+                    confirmingHint = true
                 }
             }
             HStack(alignment: .top, spacing: 10) {
@@ -684,12 +696,26 @@ struct MissionPlayView: View {
                 }
                 rewardTile(icon: "bolt.circle.fill", text: "+\(payout.earnedXP)", label: "XP", color: Art.cyan)
             }
+            if payout.earnedCrystals > 0 {
+                GameCard(accent: Art.cyan) {
+                    HStack(spacing: 13) {
+                        CrystalIcon(size: 50)
+                        VStack(alignment: .leading, spacing: 4) {
+                            GameKicker(text: "DISTRICT PASS REWARD", color: Art.cyan)
+                            Text("+\(payout.earnedCrystals) CRYSTAL")
+                                .font(.system(size: 23, weight: .black, design: .rounded))
+                                .foregroundStyle(Art.paper)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                }
+            }
             if payout.levelsGained > 0 {
                 GameCard(accent: Art.mint) {
                     VStack(alignment: .leading, spacing: 9) {
                         GameKicker(text: "DETECTIVE LEVEL UP!", color: Art.mint)
                         GameTitle(text: "LEVEL \(payout.newRank) REACHED", size: 24)
-                        Text("+60 bonus coins and +1 free hint per rank gained are included in your rewards.")
+                        Text("+60 bonus coins per account rank gained are included in your rewards.")
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(Art.paper)
                             .fixedSize(horizontal: false, vertical: true)

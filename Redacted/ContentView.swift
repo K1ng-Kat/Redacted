@@ -60,7 +60,10 @@ struct ContentView: View {
                 }
             }
         }
-        .task { await prepareStartup() }
+        .task {
+            await prepareStartup()
+            CloudSaveManager.shared.attach(store)
+        }
         .onChange(of: route) { _, _ in syncMusic() }
         .onChange(of: startupComplete) { _, _ in syncMusic() }
         .onChange(of: musicEnabled) { _, _ in syncMusic() }
@@ -401,10 +404,18 @@ struct CampaignHomeView: View {
                         }
                         Spacer()
                         VStack(alignment: .trailing, spacing: 4) {
-                            CoinIcon(size: 22)
-                            Text("\(store.coins) COINS")
-                                .font(.system(size: 12, weight: .black, design: .rounded))
-                                .foregroundStyle(Art.paper)
+                            HStack(spacing: 5) {
+                                CoinIcon(size: 19)
+                                Text("\(store.coins)")
+                                    .font(.system(size: 12, weight: .black, design: .rounded))
+                                    .foregroundStyle(Art.paper)
+                            }
+                            HStack(spacing: 5) {
+                                CrystalIcon(size: 20)
+                                Text("\(store.crystals)")
+                                    .font(.system(size: 12, weight: .black, design: .rounded))
+                                    .foregroundStyle(Art.paper)
+                            }
                         }
                     }
                     GeometryReader { proxy in
@@ -549,7 +560,7 @@ struct CampaignHomeView: View {
         HStack {
             GameKicker(text: "SOLO CAMPAIGN · OFFLINE")
             Spacer()
-            GameKicker(text: "VERSION 0.9", color: Art.faded)
+            GameKicker(text: "VERSION 1.0", color: Art.faded)
         }
     }
 }

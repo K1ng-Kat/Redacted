@@ -159,3 +159,31 @@ Verify icon on device, music transitions, taps, victory coin ticks, edge back, f
 ### Native Game Mode metadata packaging
 
 The game opts in using a **source Info.plist at the repository root** (`Redacted-Info.plist`), referenced by both Xcode target configurations and merged with generated keys. Apple documents that an invented `INFOPLIST_KEY_...` build setting is not sufficient to add a key to the generated Info.plist. Explicit source properties `LSSupportsGameMode = true` and `UILaunchStoryboardName = LaunchScreen` are required. The CI workflow checks both values in the compiled `Redacted.app/Info.plist`.
+
+## Version 1.0 / Build 11 — Crystals, Apple sign-in, and adaptive startup
+
+### Currency and hints
+- Players begin with **2 free hint tickets**, separate from spendable currency. New games begin with 0 crystals.
+- Afterwards, each hint requires **2 crystals**, with a confirmation dialog. Currency purchases are not offered.
+- Each district pays **one crystal once** after all ten stages are cleared and at least seven have a 3-star rating. The district is tracked as claimed, so replays cannot farm crystals. Existing saves automatically claim previously earned district crystals during migration.
+- Coins, XP, rank rewards and 100 authored cases remain; rank increases grant coins, no longer extra hint tickets.
+- The crystal design is an original **asymmetrical seven-facet lavender prism** rendered in SwiftUI; it is not the uploaded symmetrical reference emblem.
+
+### Optional cross-device backup
+- Settings → **Account & Cloud Save** has native **Sign in with Apple**, sign-out, sync status and Sync Now.
+- Campaign, best stars, all balances, district claims, detective unlocks and selected preferences are stored in the user's **private CloudKit database**, keyed to the device's iCloud account. A newer timestamped save replaces the older one; scarce currency is **never added together** across devices. Concurrent offline play may require resolving which recent save to keep.
+- Sign in with Apple authenticates the player. **Private CloudKit sync also requires the same iCloud account**, a working network, and iCloud access on both devices. Signing in with a different iCloud account does not merge your progress.
+- The existing local save continues to work offline. An actual cloud sync is only confirmed after the app reports a successful operation, not merely successful Apple sign-in.
+- Sign-out keeps the local save. Resetting a synced save can overwrite the cloud backup on the next sync.
+- New project entitlements: Sign in with Apple and CloudKit with proposed container `iCloud.com.UtilityFreak.Redacted`. The developer must register/enable this container and both capabilities under the App ID `com.UtilityFreak.Redacted` on Apple Developer and ensure Xcode automatic signing provisions them. The GitHub simulator build only validates compilation; **device cloud syncing needs live provisioning and an iCloud account**.
+
+### Startup layout
+- Adapts the fingerprint dossier and loading meter to available vertical space on compact iPhones, larger iPhones and iPad landscape. The bar and explanatory text remain inside the screen instead of being pushed below the bottom safe area.
+- The previously synchronized bar/percentage and Game Mode settings remain.
+
+### Verification
+1. Build on iPhone and an iPad 6; check compact startup has fully visible artwork and progress labels.
+2. Claim 7 three-star clears and all 10 levels in a district: verify exactly one crystal, even after replay.
+3. Spend the two starting hint tickets, then verify 2 crystals per new hint and the confirmation prompt.
+4. Enable the two Apple developer capabilities and CloudKit container, install signed builds on two devices using the same Apple/iCloud account; sign in on each and verify actual backed-up/recovered progress, equipped detective, age profile and spent crystals.
+5. Test offline and conflict behavior with separate device progress; newest timestamp wins, so avoid making progress offline on both devices until a merge strategy is introduced.

@@ -155,3 +155,7 @@ Verify icon on device, music transitions, taps, victory coin ticks, edge back, f
 3. Launch from How To Play → level → back returns the guide screen.
 4. Inspect Game Mode system banner on supported real iOS 18+ device. The user can turn off Game Mode per app in Control Center, so presence of the banner cannot be guaranteed.
 5. Run automated iOS Simulator build and inspect built Info.plist. Verify on physical iPhone and iPad before release.
+
+### Native Game Mode metadata packaging
+
+The game opts in using a **source Info.plist at the repository root** (`Redacted-Info.plist`), referenced by both Xcode target configurations and merged with generated keys. Apple documents that an invented `INFOPLIST_KEY_...` build setting is not sufficient to add a key to the generated Info.plist. Explicit source properties `LSSupportsGameMode = true` and `UILaunchStoryboardName = LaunchScreen` are required. The CI workflow checks both values in the compiled `Redacted.app/Info.plist`.

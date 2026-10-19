@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/validate-apple-build.yml"
+      - "Redacted/**/*.swift"
+      - "Redacted/*.swift"
+      - "Redacted.xcodeproj/project.pbxproj"
   workflow_dispatch:
 
 permissions:

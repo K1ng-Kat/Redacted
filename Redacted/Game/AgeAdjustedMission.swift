@@ -93,29 +93,29 @@ struct AgeAdjustedMission {
         switch mode {
         case .junior:
             switch mission.kind {
-            case .findClue: "Tap the object that looks like an important clue."
-            case .timeline: "Tap what happened first, then next, until all four are in order."
-            case .keypad: "Look at the number in the story. Enter its last 3 digits."
-            case .contradiction: "Which fact shows someone is not telling the truth?"
-            case .anomaly: "Tap the item that doesn't match the others."
-            case .escapeRoute: "Find the secret way someone could leave."
-            case .anagram: "Tap the letters to make the hidden word."
-            case .signal: "Move the radio dial to the number in the story."
-            case .connect: "Pick TWO clues that go together."
-            case .verdict: "Who do you think did it? Use what you learned."
+            case .findClue: return "Tap the object that looks like an important clue."
+            case .timeline: return "Tap what happened first, then next, until all four are in order."
+            case .keypad: return "Look at the number in the story. Enter its last 3 digits."
+            case .contradiction: return "Which fact shows someone is not telling the truth?"
+            case .anomaly: return "Tap the item that doesn't match the others."
+            case .escapeRoute: return "Find the secret way someone could leave."
+            case .anagram: return "Tap the letters to make the hidden word."
+            case .signal: return "Move the radio dial to the number in the story."
+            case .connect: return "Pick TWO clues that go together."
+            case .verdict: return "Who do you think did it? Use what you learned."
             }
         case .explorer:
             return mission.kind.instruction
         case .investigator:
             switch mission.kind {
-            case .keypad: "Read the final three digits, then enter them BACKWARDS."
-            case .signal: "Tune 10 MHz ABOVE the logged value (wrap past 100 back to 0)."
+            case .keypad: return "Read the final three digits, then enter them BACKWARDS."
+            case .signal: return "Tune 10 MHz ABOVE the logged value (wrap past 100 back to 0)."
             default: return mission.kind.instruction + " Use the strongest evidence."
             }
         case .expert:
             switch mission.kind {
-            case .keypad: "Take the last three digits; MOVE THE LAST DIGIT TO THE FRONT."
-            case .signal: "Tune to the MIRROR frequency: 100 minus the logged number."
+            case .keypad: return "Take the last three digits; MOVE THE LAST DIGIT TO THE FRONT."
+            case .signal: return "Tune to the MIRROR frequency: 100 minus the logged number."
             default: return mission.kind.instruction + " Eliminate the plausible false leads."
             }
         }

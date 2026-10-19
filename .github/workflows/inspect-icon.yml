@@ -1,0 +1,39 @@
+name: Inspect App Icon Border
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-icon.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up PIL
+        run: python3 -m pip install --quiet pillow
+      - name: Report dimensions, outer rim, and thumbnail
+        shell: python
+        run: |
+          import base64
+          import io
+          from PIL import Image
+          path = "Redacted/Assets.xcassets/AppIcon.appiconset/Redacted Files App Icon (1024).png"
+          image = Image.open(path).convert("RGBA")
+          print(f"ICON_DIMS:{image.width}x{image.height}", flush=True)
+          print(f"ICON_CORNERS:{[image.getpixel(p) for p in [(0,0),(image.width-1,0),(0,image.height-1),(image.width-1,image.height-1)]]}", flush=True)
+          for d in (0, 3, 8, 16, 24, 32, 48, 64, 96):
+              w,h=image.size
+              samples=[image.getpixel((d,y)) for y in range(d,h-d,7)] + [image.getpixel((w-1-d,y)) for y in range(d,h-d,7)] + [image.getpixel((x,d)) for x in range(d,w-d,7)] + [image.getpixel((x,h-1-d)) for x in range(d,w-d,7)]
+              white=sum(1 for r,g,b,a in samples if min(r,g,b)>225 and max(r,g,b)-min(r,g,b)<28 and a>180)
+              dark=sum(1 for r,g,b,a in samples if max(r,g,b)<85 and a>180)
+              clear=sum(1 for r,g,b,a in samples if a<70)
+              print(f"ICON_EDGE_AT_{d}:white={white/len(samples):.3f} dark={dark/len(samples):.3f} clear={clear/len(samples):.3f}", flush=True)
+          image.thumbnail((320,320))
+          canvas = Image.new("RGB", image.size, (25,25,25))
+          canvas.paste(image, mask=image.getchannel("A"))
+          out=io.BytesIO()
+          canvas.save(out,format="JPEG",quality=65,optimize=True)
+          print("ICON_PREVIEW_BASE64:"+base64.b64encode(out.getvalue()).decode(),flush=True)

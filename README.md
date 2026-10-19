@@ -255,3 +255,13 @@ The player's anonymous 8-character detective friend code and accepted friend lis
 4. Spend snippets or crystals on a cosmetic: confirm the item becomes permanently owned and auto-equipped without changes to XP/rank.
 5. Equip/unequip previously owned items, reopen the app, and verify appearance and balances persist; verify the new skin/hair fields survive a private iCloud restoration on another signed device.
 6. Check existing 1.1 save migration (no skin/hair keys) defaults to Peach/Classic, with all existing cosmetic IDs still valid.
+
+## Version 1.3 / Build 15 — Proportions, wardrobe spacing and consistent currency cards
+
+- Rebalances the character illustration by scaling the **entire head, ears, hair, eyes, glasses and hats together** to 82% width / 84% height around the neck/collar, and broadening the coat shoulders. All items keep exactly the same permanent IDs, ownership, rank requirements, prices, and anchor positions relative to the head.
+- A reusable `GameCurrencyChip` standardizes icon footprint (30pt), padding, typography and 61pt card height. Coins always use REDACTED's custom `CoinIcon`, crystals use `CrystalIcon`, and XP/snippets/stars/hints use consistently sized symbols.
+- Detective Profile: fixed two-column/three-row grid with XP, coins, crystals, snippets, free hints, and stars. Eliminates the uneven three-chip row and spacing hacks.
+- Style Lab: fixed two-column currency grid, 2×2 category picker with normal-size icons and touch targets, 215pt preview, and tighter spacing. Small displays no longer squash four balance boxes into a single row.
+- All existing XP and coin data remains separate and unchanged; this is a visual-only overhaul without a save migration.
+
+QA: verify character anatomy and hat/eyewear alignment, the wardrobe's two-column balances, full-width two-column Profile stats, and correct original coin icon on real iPhone and iPad.

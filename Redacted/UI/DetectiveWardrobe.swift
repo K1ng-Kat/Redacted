@@ -130,7 +130,7 @@ struct DetectiveWardrobeView: View {
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 17) {
+            VStack(alignment: .leading, spacing: 14) {
                 ScreenHeader(title: "STYLE LAB", subtitle: "BUILD YOUR DETECTIVE", back: back)
                 playerPreview
                 appearanceSection
@@ -197,15 +197,16 @@ struct DetectiveWardrobeView: View {
                         .background(Art.gold)
                         .clipShape(Capsule())
                 }
-                DetectiveCharacter(store: store, size: 252, previewCosmetic: selectedItem)
+                DetectiveCharacter(store: store, size: 215, previewCosmetic: selectedItem)
                     .frame(maxWidth: .infinity)
                     .accessibilityHint("Preview includes the selected item before buying or equipping it")
                 HStack(spacing: 7) {
                     Image(systemName: "eye.fill")
                         .foregroundStyle(Art.cyan)
-                    Text("LIVE TRY-ON  •  SELECT AN ITEM BELOW")
+                        .frame(width: 20, height: 20)
+                    Text("LIVE TRY-ON · SELECT AN ITEM BELOW")
                         .foregroundStyle(Art.faded)
-                        .font(.system(size: 11, weight: .heavy, design: .monospaced))
+                        .font(.system(size: 10, weight: .heavy, design: .monospaced))
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
                 }
@@ -267,49 +268,21 @@ struct DetectiveWardrobeView: View {
         }
     }
 
+    // One two-column grid uses the same icon, padding and text dimensions as
+    // the Detective Profile. No tiny crystal box or placeholder coin symbol.
     private var currencyStrip: some View {
-        HStack(spacing: 7) {
-            balance(icon: "bolt.fill", amount: "\(store.accountXP)", label: "XP", color: Art.mint)
-            balance(icon: "circle.hexagongrid.fill", amount: "\(store.coins)", label: "COINS", color: Art.gold)
-            balance(icon: "square.stack.3d.up.fill", amount: "\(store.snippets)", label: "SNIPPETS", color: Art.cyan)
-            HStack(spacing: 3) {
-                CrystalIcon(size: 17)
-                Text("\(store.crystals)")
-                    .font(.system(size: 12, weight: .black, design: .rounded))
-                    .foregroundStyle(Art.paper)
-            }
-            .padding(.horizontal, 8)
-            .frame(height: 43)
-            .background(Art.blueDeep)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .accessibilityLabel("\(store.crystals) crystals")
+        LazyVGrid(columns: columns, spacing: 9) {
+            GameCurrencyChip(kind: .xp, amount: store.accountXP)
+            GameCurrencyChip(kind: .coins, amount: store.coins)
+            GameCurrencyChip(kind: .snippets, amount: store.snippets)
+            GameCurrencyChip(kind: .crystals, amount: store.crystals)
         }
-        .accessibilityElement(children: .contain)
-    }
-
-    private func balance(icon: String, amount: String, label: String, color: Color) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: icon)
-                .foregroundStyle(color)
-                .font(.system(size: 11, weight: .bold))
-            VStack(alignment: .leading, spacing: 1) {
-                Text(amount)
-                    .font(.system(size: 12, weight: .black, design: .rounded))
-                    .foregroundStyle(Art.paper)
-                Text(label)
-                    .font(.system(size: 8, weight: .black, design: .rounded))
-                    .foregroundStyle(Art.faded)
-            }
-        }
-        .frame(maxWidth: .infinity, minHeight: 43)
-        .background(Art.blueDeep)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
     private var categoryPicker: some View {
         VStack(alignment: .leading, spacing: 10) {
-            GameKicker(text: "EQUIPMENT  ·  \(eligibleCount) AVAILABLE", color: Art.gold)
-            HStack(spacing: 6) {
+            GameKicker(text: "EQUIPMENT · \(eligibleCount) AVAILABLE", color: Art.gold)
+            LazyVGrid(columns: columns, spacing: 9) {
                 ForEach(CosmeticSlot.allCases) { option in
                     Button {
                         withAnimation(.easeInOut(duration: 0.18)) {
@@ -319,22 +292,28 @@ struct DetectiveWardrobeView: View {
                         }
                         GameEffects.shared.tap()
                     } label: {
-                        VStack(spacing: 5) {
+                        HStack(spacing: 10) {
                             Image(systemName: option.symbol)
-                                .font(.system(size: 18, weight: .bold))
+                                .symbolRenderingMode(.hierarchical)
+                                .font(.system(size: 20, weight: .bold))
+                                .frame(width: 29, height: 29, alignment: .center)
                             Text(option.label)
-                                .font(.system(size: 9, weight: .black, design: .rounded))
+                                .font(.system(size: 12, weight: .black, design: .rounded))
                                 .lineLimit(1)
-                                .minimumScaleFactor(0.85)
+                                .minimumScaleFactor(0.75)
+                            Spacer(minLength: 0)
                         }
                         .foregroundStyle(slot == option ? Art.ink : Art.paper)
-                        .frame(maxWidth: .infinity, minHeight: 60)
+                        .padding(.horizontal, 12)
+                        .frame(maxWidth: .infinity, minHeight: 57, alignment: .leading)
                         .background(slot == option ? Art.gold : Art.blueDeep)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .overlay(RoundedRectangle(cornerRadius: 12)
-                            .stroke(slot == option ? Art.gold : Art.edge, lineWidth: 1))
+                            .stroke(slot == option ? Art.gold : Art.edge, lineWidth: 1.1))
                     }
                     .buttonStyle(PressGameStyle())
+                    .accessibilityLabel(option.label)
+                    .accessibilityAddTraits(slot == option ? .isSelected : [])
                 }
             }
         }

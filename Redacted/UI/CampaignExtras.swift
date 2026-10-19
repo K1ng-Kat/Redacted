@@ -474,18 +474,17 @@ struct CampaignStatsView: View {
 
                 rankHero
                 GameButton(title: "CUSTOMIZE CHARACTER", icon: "paintbrush.fill", action: customize)
-                HStack(spacing: 9) {
-                    StatChip(icon: "bolt.fill", value: "\(store.accountXP)", label: "TOTAL XP", tint: Art.mint)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    StatChip(icon: "circle.hexagongrid.fill", value: "\(store.coins)", label: "COINS")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                HStack(spacing: 9) {
-                    StatChip(icon: "crystal", value: "\(store.crystals)", label: "CRYSTALS")
-                    Spacer(minLength: 1)
-                    StatChip(icon: "lightbulb.fill", value: "\(store.hintTickets)", label: "FREE HINTS", tint: Art.cyan)
-                    Spacer(minLength: 1)
-                    StatChip(icon: "star.fill", value: "\(store.totalStars)", label: "STARS", tint: Art.gold)
+                // 2×3 grid: same currency artwork and aligned icon slots as Style Lab.
+                LazyVGrid(columns: [
+                    GridItem(.flexible(), spacing: 10),
+                    GridItem(.flexible(), spacing: 10)
+                ], spacing: 10) {
+                    GameCurrencyChip(kind: .xp, amount: store.accountXP)
+                    GameCurrencyChip(kind: .coins, amount: store.coins)
+                    GameCurrencyChip(kind: .crystals, amount: store.crystals)
+                    GameCurrencyChip(kind: .snippets, amount: store.snippets)
+                    GameCurrencyChip(kind: .hints, amount: store.hintTickets)
+                    GameCurrencyChip(kind: .stars, amount: store.totalStars)
                 }
                 GameCard {
                     VStack(alignment: .leading, spacing: 10) {

@@ -236,6 +236,85 @@ struct StarStrip: View {
     }
 }
 
+/// A single currency visual used in both Detective Profile and Style Lab.
+/// Every card has the same height, icon footprint, padding and typography.
+enum GameCurrencyKind {
+    case xp, coins, snippets, crystals, hints, stars
+
+    var title: String {
+        switch self {
+        case .xp: "TOTAL XP"
+        case .coins: "COINS"
+        case .snippets: "SNIPPETS"
+        case .crystals: "CRYSTALS"
+        case .hints: "FREE HINTS"
+        case .stars: "STARS"
+        }
+    }
+}
+
+struct GameCurrencyChip: View {
+    let kind: GameCurrencyKind
+    let amount: Int
+
+    var body: some View {
+        HStack(spacing: 10) {
+            iconView
+                .frame(width: 30, height: 30, alignment: .center)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(amount.formatted())
+                    .font(.system(size: 17, weight: .black, design: .rounded))
+                    .foregroundStyle(Art.paper)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
+                    .monospacedDigit()
+                Text(kind.title)
+                    .font(.system(size: 10, weight: .black, design: .rounded))
+                    .foregroundStyle(Art.faded)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 11)
+        .frame(maxWidth: .infinity, minHeight: 61, maxHeight: 61,
+               alignment: .leading)
+        .background(Art.blueDeep)
+        .clipShape(RoundedRectangle(cornerRadius: 13))
+        .overlay(RoundedRectangle(cornerRadius: 13)
+            .stroke(Art.edge.opacity(0.55), lineWidth: 1.2))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(amount) \(kind.title.lowercased())")
+    }
+
+    @ViewBuilder
+    private var iconView: some View {
+        switch kind {
+        case .xp:
+            Image(systemName: "bolt.fill")
+                .font(.system(size: 23, weight: .heavy))
+                .foregroundStyle(Art.mint)
+        case .coins:
+            CoinIcon(size: 28)
+        case .snippets:
+            Image(systemName: "square.stack.3d.up.fill")
+                .font(.system(size: 23, weight: .heavy))
+                .foregroundStyle(Art.cyan)
+        case .crystals:
+            CrystalIcon(size: 27)
+        case .hints:
+            Image(systemName: "lightbulb.fill")
+                .font(.system(size: 23, weight: .heavy))
+                .foregroundStyle(Art.cyan)
+        case .stars:
+            Image(systemName: "star.fill")
+                .font(.system(size: 23, weight: .heavy))
+                .foregroundStyle(Art.gold)
+        }
+    }
+}
+
 struct StatChip: View {
     let icon: String
     let value: String
@@ -244,24 +323,35 @@ struct StatChip: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            if icon == "circle.hexagongrid.fill" {
-                CoinIcon(size: 24)
-            } else if icon == "crystal" {
-                CrystalIcon(size: 26)
-            } else {
-                Image(systemName: icon)
-                    .font(.system(size: 17, weight: .black))
-                    .foregroundStyle(tint)
+            // A fixed icon slot prevents varying symbol/coin sizes from
+            // moving labels around when HUD content changes.
+            Group {
+                if icon == "circle.hexagongrid.fill" {
+                    CoinIcon(size: 25)
+                } else if icon == "crystal" {
+                    CrystalIcon(size: 25)
+                } else {
+                    Image(systemName: icon)
+                        .font(.system(size: 19, weight: .black))
+                        .foregroundStyle(tint)
+                }
             }
+            .frame(width: 28, height: 28)
             VStack(alignment: .leading, spacing: 1) {
                 Text(value)
                     .font(.system(size: 16, weight: .black, design: .rounded))
                     .foregroundStyle(Art.paper)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.68)
                 Text(label.uppercased())
                     .font(.system(size: 9, weight: .heavy, design: .monospaced))
                     .foregroundStyle(Art.faded)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
             }
+            Spacer(minLength: 0)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 11)
         .padding(.vertical, 9)
         .background(Art.blueDeep)

@@ -108,7 +108,6 @@ struct DetectiveAvatarArt: View {
 
     private func draw(in g: inout GraphicsContext) {
         let outline = Color(red: 0.055, green: 0.09, blue: 0.16)
-        let ink = Color(red: 0.09, green: 0.15, blue: 0.25)
         let highlight = accent
         let skinColor = skin.color
         let skinShade = skinColor.opacity(0.85)
@@ -145,8 +144,8 @@ struct DetectiveAvatarArt: View {
         }
 
         // Coat and shoulders BEFORE head so the neckline aligns perfectly.
-        paint(&g, polygon([14,300, 19,260, 45,223, 106,202, 150,214,
-                           194,202, 255,223, 281,260, 286,300]),
+        paint(&g, polygon([7,300, 12,254, 34,214, 103,194, 150,210,
+                           197,194, 266,214, 288,254, 293,300]),
               baseCoat, border: outline, width: 7)
         paint(&g, polygon([105,204, 150,220, 194,204, 179,298, 120,298]),
               Color(red: 0.19, green: 0.27, blue: 0.39), border: outline, width: 4)
@@ -178,49 +177,56 @@ struct DetectiveAvatarArt: View {
             paint(&g, circle(149,248,5,5), trim)
         }
 
+        // Scale the full face/neck/eyes/hair/glasses/hat as ONE anatomical unit.
+        // This makes shoulders visually broader without detaching cosmetics.
+        // The anchor keeps the chin aligned with the coat collar.
+        var headG = g
+        headG.translateBy(x: 150, y: 174)
+        headG.scaleBy(x: 0.82, y: 0.84)
+        headG.translateBy(x: -150, y: -174)
         // Neck and ears.
-        paint(&g, rect(131,165,38,53,13), skinShade, border: outline, width: 3)
-        paint(&g, circle(91,125,23,31), skinColor, border: outline)
-        paint(&g, circle(186,125,23,31), skinColor, border: outline)
+        paint(&headG, rect(131,165,38,53,13), skinShade, border: outline, width: 3)
+        paint(&headG, circle(91,125,23,31), skinColor, border: outline)
+        paint(&headG, circle(186,125,23,31), skinColor, border: outline)
 
         // Face uses one shared head geometry across all cosmetic styles.
-        paint(&g, circle(99,65,102,127), skinColor, border: outline, width: 5)
-        paint(&g, circle(108,149,17,8), Color.white.opacity(0.07))
-        paint(&g, circle(175,149,17,8), Color.white.opacity(0.07))
-        line(&g, [145,133, 140,157, 149,161], outline.opacity(0.55), width: 2.2)
-        line(&g, [137,177, 150,181, 164,176], outline.opacity(0.76), width: 2.8)
+        paint(&headG, circle(99,65,102,127), skinColor, border: outline, width: 5)
+        paint(&headG, circle(108,149,17,8), Color.white.opacity(0.07))
+        paint(&headG, circle(175,149,17,8), Color.white.opacity(0.07))
+        line(&headG, [145,133, 140,157, 149,161], outline.opacity(0.55), width: 2.2)
+        line(&headG, [137,177, 150,181, 164,176], outline.opacity(0.76), width: 2.8)
 
         // Eyes / brows drawn at a stable baseline.
-        line(&g, [119,121, 139,118], outline, width: 4)
-        line(&g, [163,118, 182,121], outline, width: 4)
-        paint(&g, circle(125,132,7,8), outline)
-        paint(&g, circle(170,132,7,8), outline)
-        paint(&g, circle(128,133,2.5,2.5), Color.white)
-        paint(&g, circle(173,133,2.5,2.5), Color.white)
+        line(&headG, [119,121, 139,118], outline, width: 4)
+        line(&headG, [163,118, 182,121], outline, width: 4)
+        paint(&headG, circle(125,132,7,8), outline)
+        paint(&headG, circle(170,132,7,8), outline)
+        paint(&headG, circle(128,133,2.5,2.5), Color.white)
+        paint(&headG, circle(173,133,2.5,2.5), Color.white)
 
         // Hair is drawn relative to the skull, NOT the outer view.
         let hairDark = Color(red: 0.13, green: 0.11, blue: 0.17)
         switch hair {
         case .classic:
-            paint(&g, polygon([98,115, 96,89, 108,64, 135,52, 170,53,
+            paint(&headG, polygon([98,115, 96,89, 108,64, 135,52, 170,53,
                                197,74, 205,111, 188,96, 165,78, 144,88,
                                120,82, 110,106]),
                   hairDark, border: outline, width: 3)
         case .textured:
-            paint(&g, polygon([96,115, 91,84, 103,78, 100,59, 122,67,
+            paint(&headG, polygon([96,115, 91,84, 103,78, 100,59, 122,67,
                                135,47, 151,63, 168,44, 180,62, 198,58,
                                203,80, 196,112, 184,91, 165,102, 153,86,
                                132,105, 115,91, 109,116]),
                   hairDark, border: outline, width: 3)
-            line(&g, [119,80,130,73,140,78], highlight.opacity(0.28), width: 3)
+            line(&headG, [119,80,130,73,140,78], highlight.opacity(0.28), width: 3)
         case .swept:
-            paint(&g, polygon([96,109, 91,83, 113,59, 150,50, 197,72,
+            paint(&headG, polygon([96,109, 91,83, 113,59, 150,50, 197,72,
                                205,110, 186,105, 176,94, 149,92, 125,103,
                                108,122]),
                   hairDark, border: outline, width: 3)
-            line(&g, [110,87, 158,66, 187,80], highlight.opacity(0.18), width: 3)
+            line(&headG, [110,87, 158,66, 187,80], highlight.opacity(0.18), width: 3)
         case .cropped:
-            paint(&g, polygon([96,106, 98,79, 117,61, 149,56, 181,61,
+            paint(&headG, polygon([96,106, 98,79, 117,61, 149,56, 181,61,
                                203,80, 204,107, 187,94, 165,87,
                                134,88, 110,99]),
                   hairDark, border: outline, width: 3)
@@ -229,20 +235,20 @@ struct DetectiveAvatarArt: View {
         // EYEWEAR: anchored directly to x=115–185, y=137, at the eyes.
         switch loadout[.eyewear] {
         case "glasses_round":
-            g.stroke(circle(110,120,38,36), with: .color(outline), lineWidth: 5)
-            g.stroke(circle(152,120,38,36), with: .color(outline), lineWidth: 5)
-            line(&g, [148,135,153,135], outline, width: 4)
-            line(&g, [110,131,101,129], outline, width: 4)
-            line(&g, [190,131,199,129], outline, width: 4)
+            headG.stroke(circle(110,120,38,36), with: .color(outline), lineWidth: 5)
+            headG.stroke(circle(152,120,38,36), with: .color(outline), lineWidth: 5)
+            line(&headG, [148,135,153,135], outline, width: 4)
+            line(&headG, [110,131,101,129], outline, width: 4)
+            line(&headG, [190,131,199,129], outline, width: 4)
         case "glasses_visor":
-            paint(&g, polygon([106,121, 193,121, 191,150, 150,154, 110,150]),
+            paint(&headG, polygon([106,121, 193,121, 191,150, 150,154, 110,150]),
                   Color(red: 0.12, green: 0.39, blue: 0.48), border: outline, width: 4)
-            line(&g, [115,128, 185,128], Color(red: 0.60, green: 0.97, blue: 0.97), width: 3)
+            line(&headG, [115,128, 185,128], Color(red: 0.60, green: 0.97, blue: 0.97), width: 3)
         case "glasses_night":
-            paint(&g, rect(107,120,85,35,11),
+            paint(&headG, rect(107,120,85,35,11),
                   Color(red: 0.08, green: 0.13, blue: 0.20), border: highlight, width: 4)
-            line(&g, [115,126,138,126], Color(red: 0.46, green: 0.98, blue: 0.76), width: 3)
-            line(&g, [162,126,184,126], Color(red: 0.46, green: 0.98, blue: 0.76), width: 3)
+            line(&headG, [115,126,138,126], Color(red: 0.46, green: 0.98, blue: 0.76), width: 3)
+            line(&headG, [162,126,184,126], Color(red: 0.46, green: 0.98, blue: 0.76), width: 3)
         default: break
         }
 
@@ -277,30 +283,30 @@ struct DetectiveAvatarArt: View {
         // y ~= 72, and never float above the character.
         switch loadout[.headwear] {
         case "hat_cap":
-            paint(&g, polygon([97,89, 100,71, 120,58, 165,55, 193,68, 200,90]),
+            paint(&headG, polygon([97,89, 100,71, 120,58, 165,55, 193,68, 200,90]),
                   Color(red: 0.18, green: 0.45, blue: 0.59), border: outline, width: 4)
-            paint(&g, polygon([101,90, 201,89, 213,98, 168,102, 105,99]),
+            paint(&headG, polygon([101,90, 201,89, 213,98, 168,102, 105,99]),
                   Color(red: 0.11, green: 0.31, blue: 0.43), border: outline, width: 3)
-            line(&g, [142,70,165,70], trim, width: 3)
+            line(&headG, [142,70,165,70], trim, width: 3)
         case "hat_beret":
-            paint(&g, circle(94,53,112,42),
+            paint(&headG, circle(94,53,112,42),
                   Color(red: 0.58, green: 0.16, blue: 0.26), border: outline, width: 4)
-            paint(&g, rect(106,83,92,12,5),
+            paint(&headG, rect(106,83,92,12,5),
                   Color(red: 0.32, green: 0.11, blue: 0.22), border: outline, width: 2)
-            line(&g, [148,52,154,42], outline, width: 4)
+            line(&headG, [148,52,154,42], outline, width: 4)
         case "hat_fedora":
-            paint(&g, polygon([106,87, 111,48, 138,36, 180,43, 189,87]),
+            paint(&headG, polygon([106,87, 111,48, 138,36, 180,43, 189,87]),
                   Color(red: 0.10, green: 0.13, blue: 0.20), border: outline, width: 4)
-            paint(&g, rect(103,74,88,12,3),
+            paint(&headG, rect(103,74,88,12,3),
                   Color(red: 0.64, green: 0.48, blue: 0.25))
-            paint(&g, polygon([77,87, 221,87, 201,101, 103,101]),
+            paint(&headG, polygon([77,87, 221,87, 201,101, 103,101]),
                   Color(red: 0.12, green: 0.16, blue: 0.24), border: outline, width: 3)
         case "hat_director":
-            paint(&g, polygon([95,89, 100,53, 112,42, 135,54, 151,36,
+            paint(&headG, polygon([95,89, 100,53, 112,42, 135,54, 151,36,
                                169,54, 187,42, 201,54, 205,90]),
                   Color(red: 0.17, green: 0.23, blue: 0.38), border: outline, width: 4)
-            paint(&g, rect(98,81,105,14,6), Color(red: 0.94, green: 0.75, blue: 0.37))
-            paint(&g, star(cx: 151, cy: 64, radius: 12), Color.white)
+            paint(&headG, rect(98,81,105,14,6), Color(red: 0.94, green: 0.75, blue: 0.37))
+            paint(&headG, star(cx: 151, cy: 64, radius: 12), Color.white)
         default: break
         }
 

@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var store = CampaignStore()
     @State private var route: Route = .home
+    @State private var navigationHistory: [Route] = []
     @State private var activeLevel = 1
     @State private var startupComplete = false
     @AppStorage("redacted.setup.complete") private var setupComplete = false
@@ -78,8 +79,8 @@ struct ContentView: View {
     private var swipeNavigation: some View {
         GeometryReader { proxy in
             ZStack(alignment: .leading) {
-                if backDrag > 0 {
-                    backDestination
+                if backDrag > 0, let previous = navigationHistory.last {
+                    screen(for: previous)
                         .offset(x: -min(34, max(0, proxy.size.width - backDrag) * 0.06))
                         .allowsHitTesting(false)
                 }
@@ -94,7 +95,7 @@ struct ContentView: View {
             .overlay(alignment: .leading) {
                 // Only this narrow bezel strip receives the gesture. Nothing
                 // competes with scrolling, keypad buttons, or radio sliders.
-                if route != .home && !backCompleting {
+                if !navigationHistory.isEmpty && !backCompleting {
                     Color.clear
                         .frame(width: 22)
                         .frame(maxHeight: .infinity)
@@ -132,22 +133,6 @@ struct ContentView: View {
         }
     }
 
-    @ViewBuilder
-    private var backDestination: some View {
-        if route == .play {
-            LevelSelectView(store: store, launch: launch, back: { show(.home) })
-        } else {
-            CampaignHomeView(
-                store: store,
-                play: { launch(store.nextLevel) },
-                levels: { show(.levels) },
-                settings: { show(.settings) },
-                guide: { show(.guide) },
-                stats: { show(.stats) }
-            )
-        }
-    }
-
     private func completeEdgeBack(width: CGFloat) {
         guard !backCompleting else { return }
         backCompleting = true
@@ -158,9 +143,8 @@ struct ContentView: View {
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(175))
             if route == oldRoute {
-                // The destination was already visible while dragging.
-                route = oldRoute == .play ? .levels : .home
-                syncMusic()
+                // The actual previous screen was already visible while dragging.
+                popScreen(animated: false)
             }
             backDrag = 0
             backCompleting = false
@@ -169,73 +153,85 @@ struct ContentView: View {
 
     @ViewBuilder
     private var mainGame: some View {
-        switch route {
-            case .home:
-                CampaignHomeView(
+        screen(for: route)
+    }
+
+    @ViewBuilder
+    private func screen(for destination: Route) -> some View {
+        switch destination {
+        case .home:
+            CampaignHomeView(
+                store: store,
+                play: {
+                    if store.stars(for: store.nextLevel) > 0 {
+                        show(.levels)
+                    } else {
+                        launch(store.nextLevel)
+                    }
+                },
+                levels: { show(.levels) },
+                settings: { show(.settings) },
+                guide: { show(.guide) },
+                stats: { show(.stats) }
+            )
+        case .levels:
+            LevelSelectView(store: store, launch: launch, back: { popScreen() })
+        case .play:
+            if let mission = CampaignCatalog.mission(activeLevel) {
+                MissionPlayView(
                     store: store,
-                    play: {
-                        if store.stars(for: store.nextLevel) > 0 {
-                            show(.levels)
-                        } else {
-                            launch(store.nextLevel)
-                        }
-                    },
-                    levels: { show(.levels) },
-                    settings: { show(.settings) },
-                    guide: { show(.guide) },
-                    stats: { show(.stats) }
-                )
-            case .levels:
-                LevelSelectView(store: store, launch: launch, back: { show(.home) })
-            case .play:
-                if let mission = CampaignCatalog.mission(activeLevel) {
-                    MissionPlayView(store: store, mission: mission,
-                                    back: { show(.levels) }, next: {
+                    mission: mission,
+                    back: { popScreen() },
+                    next: {
                         if activeLevel < 100 {
                             launch(activeLevel + 1)
                         } else {
-                            show(.home)
+                            popScreen()
                         }
-                    })
-                    .id(activeLevel)
-                }
-            case .settings:
-                CampaignSettingsView(store: store, back: { show(.home) })
-            case .guide:
-                CampaignGuideView(back: { show(.home) }, begin: { launch(store.nextLevel) })
-            case .stats:
-                CampaignStatsView(store: store, back: { show(.home) })
+                    }
+                )
+                .id(activeLevel)
+            }
+        case .settings:
+            CampaignSettingsView(store: store, back: { popScreen() })
+        case .guide:
+            CampaignGuideView(back: { popScreen() }, begin: { launch(store.nextLevel) })
+        case .stats:
+            CampaignStatsView(store: store, back: { popScreen() })
         }
     }
 
     @MainActor
     private func prepareStartup() async {
         guard !startupComplete else { return }
+        // Show the authored loading UI before the first preparation update.
+        // Prevents the screen being swapped before its first rendered frame.
+        try? await Task.sleep(for: .milliseconds(160))
+        guard !Task.isCancelled else { return }
 
         startupStep = "VERIFYING CASE FILES"
         // The campaign catalog and current save are loaded before gameplay.
         _ = CampaignCatalog.levels.count
         _ = store.nextLevel
-        withAnimation(.easeInOut(duration: 0.56)) {
+        withAnimation(.linear(duration: 1.05)) {
             startupProgress = 0.48
         }
-        // Allow the player to see the first progress milestone.
-        try? await Task.sleep(for: .milliseconds(610))
+        try? await Task.sleep(for: .milliseconds(1050))
 
         startupStep = "PREPARING AUDIO"
         GameMusicController.shared.prepare()
         _ = GameEffects.shared // Preload button and coin sounds.
-        withAnimation(.easeInOut(duration: 0.56)) {
+        withAnimation(.linear(duration: 1.05)) {
             startupProgress = 0.82
         }
-        try? await Task.sleep(for: .milliseconds(610))
+        try? await Task.sleep(for: .milliseconds(1050))
 
         startupStep = "WELCOME, DETECTIVE"
-        withAnimation(.easeInOut(duration: 0.56)) {
+        withAnimation(.linear(duration: 1.05)) {
             startupProgress = 1
         }
-        // A brief hold lets the completed progress bar be seen before transitioning.
-        try? await Task.sleep(for: .milliseconds(700))
+        // Let the same animatable fraction reach 100% before the fade.
+        try? await Task.sleep(for: .milliseconds(1190))
         guard !Task.isCancelled else { return }
         withAnimation(.easeInOut(duration: 0.35)) {
             startupComplete = true
@@ -252,7 +248,8 @@ struct ContentView: View {
         )
     }
 
-    private func show(_ next: Route) {
+    private func setRoute(_ next: Route, animated: Bool = true) {
+        guard next != route else { return }
         if startupComplete && scenePhase == .active {
             GameMusicController.shared.update(
                 scene: next == .play ? .level : .menu,
@@ -261,15 +258,38 @@ struct ContentView: View {
                 levelVolume: levelVolume
             )
         }
-        withAnimation(.easeOut(duration: 0.14)) { route = next }
+        if animated {
+            withAnimation(.easeOut(duration: 0.14)) { route = next }
+        } else {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) { route = next }
+        }
+    }
+
+    private func show(_ next: Route) {
+        guard next != route else { return }
+        navigationHistory.append(route)
+        setRoute(next)
+    }
+
+    private func popScreen(animated: Bool = true) {
+        guard let previous = navigationHistory.popLast() else { return }
+        setRoute(previous, animated: animated)
     }
 
     private func launch(_ level: Int) {
         guard store.isUnlocked(level) else { return }
         store.recordStarted(level)
         activeLevel = level
-        show(.play)
+        // "Next level" replaces the current gameplay screen, keeping
+        // the last real menu as the back destination.
+        if route != .play {
+            navigationHistory.append(route)
+        }
+        setRoute(.play)
     }
+
 }
 
 struct CampaignHomeView: View {
@@ -529,7 +549,7 @@ struct CampaignHomeView: View {
         HStack {
             GameKicker(text: "SOLO CAMPAIGN · OFFLINE")
             Spacer()
-            GameKicker(text: "VERSION 0.8", color: Art.faded)
+            GameKicker(text: "VERSION 0.9", color: Art.faded)
         }
     }
 }

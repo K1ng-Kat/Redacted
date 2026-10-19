@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="23500" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES">
+    <device id="retina6_12" orientation="portrait" appearance="dark"/>
+    <dependencies>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="23500"/>
+        <capability name="Safe area layout guides" minToolsVersion="9.0"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <scenes>
+        <scene sceneID="RED-LAUNCH-SCENE">
+            <objects>
+                <viewController id="RED-LAUNCH-VC" sceneMemberID="viewController">
+                    <view key="view" contentMode="scaleToFill" id="RED-LAUNCH-VIEW">
+                        <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
+                        <subviews>
+                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="REDACTED" textAlignment="center" lineBreakMode="tailTruncation" adjustsFontSizeToFit="YES" translatesAutoresizingMaskIntoConstraints="NO" id="RED-LAUNCH-TITLE">
+                                <rect key="frame" x="46.5" y="370" width="300" height="42"/>
+                                <constraints>
+                                    <constraint firstAttribute="width" constant="300" id="RED-TITLE-WIDTH"/>
+                                </constraints>
+                                <fontDescription key="fontDescription" type="boldSystem" pointSize="33"/>
+                                <color key="textColor" red="1.0" green="0.98" blue="0.89" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                            </label>
+                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="DETECTIVE AGENCY" textAlignment="center" lineBreakMode="tailTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="RED-LAUNCH-SUBTITLE">
+                                <rect key="frame" x="79.5" y="424" width="234" height="20"/>
+                                <fontDescription key="fontDescription" type="boldSystem" pointSize="13"/>
+                                <color key="textColor" red="0.37" green="0.89" blue="0.97" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                            </label>
+                        </subviews>
+                        <viewLayoutGuide key="safeArea" id="RED-LAUNCH-SAFE"/>
+                        <color key="backgroundColor" red="0.035" green="0.055" blue="0.12" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <constraints>
+                            <constraint firstItem="RED-LAUNCH-TITLE" firstAttribute="centerX" secondItem="RED-LAUNCH-VIEW" secondAttribute="centerX" id="RED-CENTER-TITLE-X"/>
+                            <constraint firstItem="RED-LAUNCH-TITLE" firstAttribute="centerY" secondItem="RED-LAUNCH-VIEW" secondAttribute="centerY" constant="-42" id="RED-CENTER-TITLE-Y"/>
+                            <constraint firstItem="RED-LAUNCH-SUBTITLE" firstAttribute="centerX" secondItem="RED-LAUNCH-TITLE" secondAttribute="centerX" id="RED-CENTER-SUBTITLE-X"/>
+                            <constraint firstItem="RED-LAUNCH-SUBTITLE" firstAttribute="top" secondItem="RED-LAUNCH-TITLE" secondAttribute="bottom" constant="12" id="RED-TITLE-SUBTITLE-SPACING"/>
+                        </constraints>
+                    </view>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="RED-LAUNCH-FIRST" userLabel="First Responder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="0.0" y="0.0"/>
+        </scene>
+    </scenes>
+</document>

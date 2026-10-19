@@ -34,3 +34,12 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/RedactedDerived" \
             CODE_SIGNING_ALLOWED=NO \
             build 2>&1 | tee "$RUNNER_TEMP/redacted-build.log"
+
+      - name: Check Game Mode support and native launch screen
+        run: |
+          APP="$RUNNER_TEMP/RedactedDerived/Build/Products/Debug-iphonesimulator/Redacted.app"
+          /usr/libexec/PlistBuddy -c "Print :LSSupportsGameMode" "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c "Print :UILaunchStoryboardName" "$APP/Info.plist"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :LSSupportsGameMode' "$APP/Info.plist")" = "true" ||
+            test "$(/usr/libexec/PlistBuddy -c 'Print :LSSupportsGameMode' "$APP/Info.plist")" = "1"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :UILaunchStoryboardName' "$APP/Info.plist")" = "LaunchScreen"

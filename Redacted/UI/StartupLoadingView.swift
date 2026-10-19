@@ -8,7 +8,6 @@ struct StartupLoadingView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shimmer = false
-    @State private var smoothProgress: Double = 0.04
 
     var body: some View {
         GeometryReader { geometry in
@@ -35,19 +34,9 @@ struct StartupLoadingView: View {
         .ignoresSafeArea()
         .preferredColorScheme(.dark)
         .onAppear {
-            smoothProgress = max(0, min(1, progress))
             guard !reduceMotion else { return }
             withAnimation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true)) {
                 shimmer = true
-            }
-        }
-        .onChange(of: progress) { _, updated in
-            if reduceMotion {
-                smoothProgress = min(1, max(0, updated))
-            } else {
-                withAnimation(.timingCurve(0.25, 0.12, 0.25, 1, duration: 0.56)) {
-                    smoothProgress = min(1, max(0, updated))
-                }
             }
         }
     }
@@ -141,33 +130,11 @@ struct StartupLoadingView: View {
 
     private var bottomLoader: some View {
         VStack(spacing: 16) {
-            HStack {
-                GameKicker(text: "INITIALIZING CASE FILES", color: Art.gold)
-                Spacer()
-                Text("\(Int(smoothProgress * 100))%")
-                    .font(.system(size: 17, weight: .black, design: .rounded))
-                    .foregroundStyle(Art.paper)
-                    .monospacedDigit()
-            }
-            GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Art.ink)
-                    Capsule()
-                        .fill(LinearGradient(
-                            colors: [Art.gold, Art.coral],
-                            startPoint: .leading, endPoint: .trailing))
-                        .frame(width: geometry.size.width * smoothProgress)
-                        .overlay(alignment: .top) {
-                            Capsule().fill(Color.white.opacity(0.28))
-                                .frame(height: 3)
-                                .padding(.top, 3)
-                        }
-                }
-                .overlay(Capsule().stroke(Art.edge, lineWidth: 2.5))
-            }
-            .frame(height: 23)
-            .accessibilityHidden(true)
+            // One Animatable number drives BOTH the percentage and the fill.
+            // SwiftUI interpolates it on every rendered frame; they cannot
+            // independently jump between the loading milestones anymore.
+            AnimatedLoadingMeter(progress: progress, reduceMotion: reduceMotion)
+                .animation(reduceMotion ? nil : .linear(duration: 1.05), value: progress)
 
             Text(stage.uppercased())
                 .font(.system(size: 11, weight: .bold, design: .monospaced))
@@ -182,6 +149,53 @@ struct StartupLoadingView: View {
         .frame(maxWidth: 580)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Loading game")
-        .accessibilityValue("\(Int(smoothProgress * 100)) percent, \(stage)")
+        .accessibilityValue("\(Int(progress * 100)) percent, \(stage)")
+    }
+}
+
+/// Animatable conformance delivers the intermediate fraction on each frame;
+/// Text is derived from that same fraction as the filled width.
+private struct AnimatedLoadingMeter: View, Animatable {
+    var progress: Double
+    let reduceMotion: Bool
+
+    var animatableData: Double {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    private var fraction: Double {
+        min(1, max(0, progress))
+    }
+
+    var body: some View {
+        VStack(spacing: 16) {
+            HStack {
+                GameKicker(text: "INITIALIZING CASE FILES", color: Art.gold)
+                Spacer()
+                Text("\(Int((fraction * 100).rounded(.down)))%")
+                    .font(.system(size: 17, weight: .black, design: .rounded))
+                    .foregroundStyle(Art.paper)
+                    .monospacedDigit()
+            }
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Art.ink)
+                    Capsule()
+                        .fill(LinearGradient(
+                            colors: [Art.gold, Art.coral],
+                            startPoint: .leading, endPoint: .trailing))
+                        .frame(width: max(0, geometry.size.width * fraction))
+                        .overlay(alignment: .top) {
+                            Capsule().fill(Color.white.opacity(0.28))
+                                .frame(height: 3)
+                                .padding(.top, 3)
+                        }
+                }
+                .overlay(Capsule().stroke(Art.edge, lineWidth: 2.5))
+            }
+            .frame(height: 23)
+            .accessibilityHidden(true)
+        }
     }
 }

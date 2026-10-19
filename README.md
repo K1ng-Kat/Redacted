@@ -137,3 +137,21 @@ Verify icon on device, music transitions, taps, victory coin ticks, edge back, f
 3. Test first launch and age setup, inspect original icon without a white edge, and verify persistent difficulty but NO stored numeric age.
 4. Test interactive swipe from the extreme left edge on iPhone and iPad, and test dragging the radio slider and scrolling normally.
 5. Compile and playtest on iPad 6 with iPadOS 17 and iPhone with iOS 18 or later.
+
+
+## Version 0.9 / Build 10 — Accurate back history, continuous loading, native Game Mode
+
+- Screen navigation keeps a short in-memory history stack. Entering directly from Home and swiping/button back returns Home; entering from the Level Map returns to the map. "Next Level" replaces the current level while retaining the original return destination.
+- Back swipe's interactive underlay now renders the real previous screen in the navigation history (not a hardcoded Level Map).
+- Adds a dark native LaunchScreen storyboard matching REDACTED's branding and dark startup background instead of relying on a generic generated system launch screen. This reduces the visual flash on cold launch. The OS may still use a prior snapshot on warm resume; the app cannot fully control that.
+- Loading animation: the percentage and bar are rendered by one Animatable View using the exact same interpolated fraction. The UI displays before first progress updates, then smoothly advances through genuine catalog/save and audio readiness checkpoints to 100% before revealing Home. No independent jumpy percentage state.
+- Opts into Apple's real iOS/iPadOS Game Mode using the Info.plist key LSSupportsGameMode = YES. The **system**, not the app, controls when its banner appears and whether the user has disabled Game Mode. Requires iOS 18 or iPadOS 18+; the iPad 6 running iPadOS 17 still plays without Game Mode.
+- The build validation workflow verifies the built Info.plist includes the Game Mode and launch storyboard keys.
+
+### QA
+
+1. Cold launch on iPhone: native dark launch screen → continuous REDACTED loading bar with count matching fill → menu; no normal Home UI before loading.
+2. Launch from Home → level → edge swipe and back button must return Home. Launch from Map → level → back must return Map, including after Next Level.
+3. Launch from How To Play → level → back returns the guide screen.
+4. Inspect Game Mode system banner on supported real iOS 18+ device. The user can turn off Game Mode per app in Control Center, so presence of the banner cannot be guaranteed.
+5. Run automated iOS Simulator build and inspect built Info.plist. Verify on physical iPhone and iPad before release.

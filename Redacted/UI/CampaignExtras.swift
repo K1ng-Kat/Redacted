@@ -113,7 +113,7 @@ struct CampaignSettingsView: View {
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(Art.paper)
                             .fixedSize(horizontal: false, vertical: true)
-                        Text("REDACTED 0.8 — iPhone & iPad campaign")
+                        Text("REDACTED 0.9 — iPhone & iPad campaign")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(Art.faded)
                     }
@@ -152,7 +152,7 @@ struct CampaignSettingsView: View {
                         .font(.system(size: 15, weight: .black, design: .rounded))
                         .foregroundStyle(Art.paper)
                     Spacer()
-                    Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.8") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "9"))")
+                    Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.9") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "10"))")
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
                         .foregroundStyle(Art.faded)
                 }

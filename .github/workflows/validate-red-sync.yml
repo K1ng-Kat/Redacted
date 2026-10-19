@@ -1,0 +1,93 @@
+name: Validate red-sync recovery
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - Scripts/red-sync
+      - Scripts/resolve_xcode_project.py
+      - .github/workflows/validate-red-sync.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  safe-metadata-merge:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check red-sync shell syntax
+        run: bash -n Scripts/red-sync
+
+      - name: Simulate the exact October 18 two-file conflict
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import pathlib
+          import plistlib
+          import subprocess
+          import sys
+          import tempfile
+
+          root = pathlib.Path.cwd()
+          base_commit = "7058a031a4264ada48e14f213c09a3355d56abe7"
+          def show(path):
+              return subprocess.check_output(["git", "show", f"{base_commit}:{path}"])
+
+          with tempfile.TemporaryDirectory() as dirname:
+              temp = pathlib.Path(dirname)
+              old_project = show("Redacted.xcodeproj/project.pbxproj")
+              new_project = (root / "Redacted.xcodeproj/project.pbxproj").read_bytes()
+              # Xcode locally changes signing; GitHub independently increments the version.
+              local_project = old_project.replace(
+                  b"CODE_SIGN_STYLE = Automatic;",
+                  b"CODE_SIGN_STYLE = Manual;"
+              )
+              for name, data in (
+                  ("pbx-base", old_project),
+                  ("pbx-local", local_project),
+                  ("pbx-remote", new_project),
+              ):
+                  (temp / name).write_bytes(data)
+
+              subprocess.run([
+                  sys.executable, str(root / "Scripts/resolve_xcode_project.py"),
+                  str(temp / "pbx-base"), str(temp / "pbx-local"),
+                  str(temp / "pbx-remote"), str(temp / "pbx-result")
+              ], check=True)
+
+              project = (temp / "pbx-result").read_bytes()
+              assert project.count(b"CODE_SIGN_STYLE = Manual;") == 2
+              assert project.count(b"CURRENT_PROJECT_VERSION = 13;") == 2
+              assert project.count(b"MARKETING_VERSION = 1.1;") == 2
+
+              old_plist = plistlib.loads(show("Redacted-Info.plist"))
+              local_plist = dict(old_plist)
+              local_plist["ITSAppUsesNonExemptEncryption"] = False
+              remote_plist = (root / "Redacted-Info.plist").read_bytes()
+              (temp / "plist-base").write_bytes(plistlib.dumps(old_plist))
+              (temp / "plist-local").write_bytes(plistlib.dumps(local_plist))
+              (temp / "plist-remote").write_bytes(remote_plist)
+
+              script = (root / "Scripts/red-sync").read_text()
+              source = script.split("<<'PYTHON_PLIST_MERGE'\n", 1)[1].split(
+                  "\nPYTHON_PLIST_MERGE", 1)[0]
+              subprocess.run([
+                  sys.executable, "-c", source,
+                  str(temp / "plist-base"), str(temp / "plist-local"),
+                  str(temp / "plist-remote"), str(temp / "plist-result")
+              ], check=True)
+              merged = plistlib.loads((temp / "plist-result").read_bytes())
+              assert merged["ITSAppUsesNonExemptEncryption"] is False
+              assert merged["NSCameraUsageDescription"]
+              assert merged["LSSupportsGameMode"]
+              assert any("redacted-detective" in url["CFBundleURLSchemes"]
+                         for url in merged["CFBundleURLTypes"])
+              print("PASS: local signing and plist fields retained; current GitHub game config retained.")
+          PY

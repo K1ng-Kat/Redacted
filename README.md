@@ -187,3 +187,52 @@ The game opts in using a **source Info.plist at the repository root** (`Redacted
 3. Spend the two starting hint tickets, then verify 2 crystals per new hint and the confirmation prompt.
 4. Enable the two Apple developer capabilities and CloudKit container, install signed builds on two devices using the same Apple/iCloud account; sign in on each and verify actual backed-up/recovered progress, equipped detective, age profile and spent crystals.
 5. Test offline and conflict behavior with separate device progress; newest timestamp wins, so avoid making progress offline on both devices until a merge strategy is introduced.
+
+## Build 12 — Home screen and startup layout polish
+
+- Organized all three Home navigation controls (Help, Settings, Detective Profile) as same-sized 44-point touch targets in one horizontal row next to the game logo.
+- Moved Profile out of the separate Stars/Solved stats row, leaving two consistently aligned progress chips underneath the header.
+- Disabled elastic pull/overscroll on **Home only** using a scoped UIKit scroll-view marker. Normal vertical scrolling remains enabled, and other screens' scrolling remains unchanged.
+- Fixed startup foreground safe-area overlap (clock/dynamic island) by **removing** the foreground's `ignoresSafeArea()`. The background still extends edge-to-edge.
+- Rescaled the startup dossier to a maximum of 84% of its previous size and calculated a smaller size for compact iPhones. Top logo, central artwork, animated meter and copyright now use safe-area-aware vertical layout.
+- Settings now displays one small Age & Difficulty summary card. **Edit** opens all age-mode choices in a modal; Cancel dismisses without changing the profile, and **Save Difficulty** commits the change to local preferences/cloud sync.
+- Keeps all 100 case levels, hint/free-ticket rules, currency progression, native startup bar animation, and the existing Apple/iCloud account section intact.
+
+### Device QA
+- Check iPhone Home header at normal and large text sizes; Help, Settings and Profile should be aligned and all tappable.
+- Pull the Home screen downward from the top: no rubber-band/stretch. Scroll upward through the campaign: content should scroll normally.
+- Cold-launch iPhone with notch or Dynamic Island: no REDACTED title under the time, and entire dossier plus bottom loading meter visible.
+- Settings age: tap Edit, change option, Cancel (old remains); Edit again and Save (new profile persists).
+
+## Version 1.1 / Build 13 — Custom detective, snippet cosmetics, 2-player racing, Friends
+
+### Detective customization and shop
+- My Detective and Shop are accessible from HQ. The existing rank-based six identity portraits remain.
+- Four independently equipped cosmetic slots: **headwear, eyewear, badge and outfit**. 15 items have rank thresholds from 1 to 20, with different icon/tint treatments on the detective portrait. All rank thresholds are achievable within the 100-level campaign.
+- Players buy **snippets with coins**, save them in their wallet, then spend snippets on eligible permanent cosmetic unlocks. Current packs: 1 for 55 coins, 5 for 250, 12 for 540.
+- Alternatively, unlock an eligible cosmetic instantly with **crystals** at item-specific costs of 2–10. Crystals never bypass the rank requirement, just the snippet collection requirement.
+- Ownership, snippets and equipped cosmetics are persisted in the existing CampaignProgress and private iCloud save. Wallet spending is transactional locally, not server-authoritative.
+
+### Multiplayer and friends
+- Two-player **invite-only** room; host makes a 6-character room code, shares a QR code or iOS link `redacted-detective://join/CODE`. Opening the link in the installed app navigates to the room and starts matching. A second player can type the code or use the in-app camera scanner (also works on iPad 6).
+- A separate catalog generates **exactly 1,000 deterministic case combinations**: 20 settings × 10 missing objects × 5 methods, with three common clue steps. The same random seed is sent to both players. The match does **not** affect campaign level progression or personal stars.
+- Each detective races to solve evidence selection, evidence code and suspect access. Incorrect guesses receive a three-second penalty. The first submitted correct finish as ordered by CloudKit record creation time is the winner.
+- **Friends**: anonymous 8-character shareable friend codes, request/accept flow, friend list, and an ONLINE indicator based on a recent opt-in heartbeat. No player-entered public names, search, messaging, proximity tracking, or chat.
+- Social features use CloudKit **public database records** rather than a custom server. Room, invitation, friend request, and presence metadata is potentially readable by other app users; only pseudonymous random codes and short generated labels are placed there.
+- Existing private CloudKit account save is separate. Social presence starts only after visiting Friends or Multiplayer.
+
+### Online setup required before functional release
+The Xcode simulator CI checks **compilation only**. Online matches / presence **cannot work** without activating iCloud/CloudKit for `iCloud.com.UtilityFreak.Redacted` in Apple Developer, then setting up and deploying the **public CloudKit schema** and correct creator/public read permissions. Data types are: `RDRoom`, `RDJoin`, `RDFinish`, `RDPlayer`, `RDFriendRequest`, `RDFriendAccepted`. Fields use the string names in `MultiplayerService.swift`. Add a **query index** to `RDFriendRequest.recipient` for receiving requests. Grant public read and authenticated create; updates are performed by each record's owner.
+- No custom backend has been provisioned. Cross-device multiplayer/friend flows remain **unverified** until tested on at least two real iCloud-enabled signed Apple devices using production CloudKit schema.
+- This CloudKit public-record MVP is not tournament-grade: final answer validation happens on clients, and host controls room creation. For a public competitive launch, implement server-verified solve steps, anti-cheat, moderation/rate limiting, account/device identity, push/liveness handling, and secure prize distribution.
+- No player-to-player currency staking or wagers. The game has no contact discovery, chat, or public lobby.
+- The custom URL scheme works only after the app is installed. For links that install the game and then automatically resume a room, an associated-domain Universal Link backend and deferred deep linking would be needed; those are **not implemented**.
+
+### Test cases
+- Buy snippet pack, close/reopen app, verify balance; unlock cosmetics at eligible ranks via snippets and via crystals, equip/unequip, verify iCloud snapshot includes them.
+- On two signed iOS devices with CloudKit configured, create room, enter code, QR-scan, verify both see same mystery and first valid completion wins; repeat after network interruption and app background/resume.
+- Invite friends by shareable friend code, accept, refresh; check online status stops showing after heartbeat expires, with no private Apple IDs displayed.
+- Test iPadOS 17 scanner and iOS 18+ QR deep link. Test 1,000 generated case indices for uniqueness and accessible answers. Check Store privacy disclosure and child-facing social feature compliance.
+
+### Account portability
+The player's anonymous 8-character detective friend code and accepted friend list are also fields of the campaign save. When the *same* account's private iCloud save is restored, the code and list can follow to the next device. Do not play or make new friends before initial iCloud restoration completes; CloudKit private sync and social rooms must be provisioned first. Using multiplayer on two devices concurrently under one friend identity is not supported.

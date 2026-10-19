@@ -16,10 +16,21 @@ struct CampaignProgress: Codable {
     var crystalDistricts: Set<Int> = []
     var hintTickets = 2
     var hintsBought = 0
+    var snippets = 0
+    var ownedCosmetics: Set<String> = []
+    var equippedCosmetics: [String: String] = [:]
+    var friendContacts: [DetectiveFriend] = []
+    var socialID: String = CampaignProgress.newSocialID()
+
+    static func newSocialID() -> String {
+        let alphabet = Array("ABCDEFGHJKLMNPQRSTUVWXYZ23456789")
+        return String((0..<8).compactMap { _ in alphabet.randomElement() })
+    }
 
     enum CodingKeys: String, CodingKey {
         case bestStars, lastLevel, tutorialComplete, totalAttempts,
-             firstLaunchDate, xp, coins, crystals, crystalDistricts, hintTickets, hintsBought
+             firstLaunchDate, xp, coins, crystals, crystalDistricts, hintTickets, hintsBought,
+             snippets, ownedCosmetics, equippedCosmetics, friendContacts, socialID
     }
 
     init() {}
@@ -47,6 +58,13 @@ struct CampaignProgress: Codable {
         }
         hintTickets = try box.decodeIfPresent(Int.self, forKey: .hintTickets) ?? 2
         hintsBought = try box.decodeIfPresent(Int.self, forKey: .hintsBought) ?? 0
+        snippets = max(0, try box.decodeIfPresent(Int.self, forKey: .snippets) ?? 0)
+        ownedCosmetics = try box.decodeIfPresent(Set<String>.self, forKey: .ownedCosmetics) ?? []
+        equippedCosmetics = try box.decodeIfPresent([String: String].self, forKey: .equippedCosmetics) ?? [:]
+        friendContacts = try box.decodeIfPresent([DetectiveFriend].self, forKey: .friendContacts) ?? []
+        socialID = try box.decodeIfPresent(String.self, forKey: .socialID)
+            ?? UserDefaults.standard.string(forKey: "redacted.social.code")
+            ?? Self.newSocialID()
     }
 }
 
@@ -131,6 +149,9 @@ final class CampaignStore: ObservableObject {
     var coins: Int { progress.coins }
     var crystals: Int { progress.crystals }
     var hintTickets: Int { progress.hintTickets }
+    var snippets: Int { progress.snippets }
+    var ownedCosmetics: Set<String> { progress.ownedCosmetics }
+    func equippedCosmetic(in slot: CosmeticSlot) -> String? { progress.equippedCosmetics[slot.rawValue] }
     var accountXP: Int { progress.xp }
     var accountLevel: Int { RankRewards.rank(for: progress.xp) }
     var rankTitle: String { RankRewards.title(for: accountLevel) }
@@ -197,6 +218,53 @@ final class CampaignStore: ObservableObject {
 
     func tutorialSeen() {
         progress.tutorialComplete = true
+    }
+
+
+    @discardableResult
+    func buySnippets(pack: SnippetPack) -> Bool {
+        guard progress.coins >= pack.coins else { return false }
+        progress.coins -= pack.coins
+        progress.snippets += pack.count
+        return true
+    }
+
+    @discardableResult
+    func unlockCosmetic(_ cosmetic: DetectiveCosmetic, crystals: Bool) -> Bool {
+        guard accountLevel >= cosmetic.requiredRank,
+              !progress.ownedCosmetics.contains(cosmetic.id) else { return false }
+        if crystals {
+            guard progress.crystals >= cosmetic.crystalPrice else { return false }
+            progress.crystals -= cosmetic.crystalPrice
+        } else {
+            guard progress.snippets >= cosmetic.snippetPrice else { return false }
+            progress.snippets -= cosmetic.snippetPrice
+        }
+        progress.ownedCosmetics.insert(cosmetic.id)
+        progress.equippedCosmetics[cosmetic.slot.rawValue] = cosmetic.id
+        return true
+    }
+
+    func equipCosmetic(_ cosmetic: DetectiveCosmetic) {
+        guard progress.ownedCosmetics.contains(cosmetic.id) else { return }
+        progress.equippedCosmetics[cosmetic.slot.rawValue] = cosmetic.id
+    }
+
+    func persistSocialIdentity() {
+        save()
+    }
+
+    func addFriend(_ friend: DetectiveFriend) {
+        guard !progress.friendContacts.contains(where: { $0.id == friend.id }) else { return }
+        progress.friendContacts.append(friend)
+    }
+
+    func removeFriend(_ code: String) {
+        progress.friendContacts.removeAll { $0.id == code }
+    }
+
+    func unequipCosmetic(slot: CosmeticSlot) {
+        progress.equippedCosmetics.removeValue(forKey: slot.rawValue)
     }
 
     func redeemHint() -> Bool {

@@ -11,35 +11,40 @@ struct StartupLoadingView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            // Fit the SAME design on iPhone SE-sized screens, regular iPhones,
-            // and iPad landscape without clipping the loading controls.
-            let height = geometry.size.height
-            let scale = min(CGFloat(1), max(CGFloat(0.58), (height - 270) / 540))
-            let small = height < 740
+            // GeometryReader respects the real safe area. Do NOT ignore it:
+            // the old layout placed the REDACTED title under the iPhone clock.
+            let available = geometry.size.height
+            let artworkScale = min(CGFloat(0.84),
+                                   max(CGFloat(0.55), (available - 195) / 495))
             ZStack {
                 GameBackdrop()
 
                 VStack(spacing: 0) {
                     topEmblem
-                        .frame(maxWidth: 460)
-                    Spacer(minLength: small ? 5 : 13)
+                        .frame(maxWidth: 440)
+
+                    Spacer(minLength: 6)
+
                     hero
-                        .frame(maxWidth: 460)
-                        .scaleEffect(scale)
-                        .frame(height: 440 * scale)
-                        .accessibilityElement(children: .combine)
-                    Spacer(minLength: small ? 5 : 12)
+                        .frame(maxWidth: 420)
+                        .scaleEffect(artworkScale)
+                        .frame(height: 440 * artworkScale)
+                        .frame(maxWidth: .infinity)
+
+                    Spacer(minLength: 8)
+
                     bottomLoader
-                        .frame(maxWidth: 580)
+                        .frame(maxWidth: 480)
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, geometry.size.width < 360 ? 15 : 22)
-                .padding(.top, max(18, geometry.safeAreaInsets.top + 8))
-                .padding(.bottom, max(15, geometry.safeAreaInsets.bottom + 8))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.horizontal, geometry.size.width < 375 ? 16 : 22)
+                .padding(.top, 12)
+                .padding(.bottom, 14)
             }
-            .frame(width: geometry.size.width, height: height)
+            .frame(width: geometry.size.width, height: available)
         }
-        .ignoresSafeArea()
+        // Only GameBackdrop extends behind the notch and home indicator.
+        // Foreground content is kept within safe bounds on every iPhone.
         .preferredColorScheme(.dark)
         .onAppear {
             guard !reduceMotion else { return }
@@ -54,20 +59,20 @@ struct StartupLoadingView: View {
             Image(systemName: "eye.fill")
                 .font(.system(size: 23, weight: .black))
                 .foregroundStyle(Art.paper)
-                .frame(width: 48, height: 48)
+                .frame(width: 43, height: 43)
                 .background(Art.coral)
                 .clipShape(RoundedRectangle(cornerRadius: 13))
                 .rotationEffect(.degrees(-5))
             VStack(alignment: .leading, spacing: 3) {
                 Text("REDACTED")
-                    .font(.system(size: 25, weight: .black, design: .rounded))
+                    .font(.system(size: 23, weight: .black, design: .rounded))
                     .tracking(-0.7)
                     .foregroundStyle(Art.paper)
                 GameKicker(text: "DETECTIVE AGENCY", color: Art.cyan)
             }
             Spacer()
             Image(systemName: "lock.shield.fill")
-                .font(.system(size: 21))
+                .font(.system(size: 19))
                 .foregroundStyle(Art.gold)
         }
     }
@@ -151,8 +156,13 @@ struct StartupLoadingView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
 
-            GameKicker(text: "© REDACTED · INVESTIGATIONS DIVISION", color: Art.faded)
-                .padding(.top, 4)
+            Text("© REDACTED · INVESTIGATIONS DIVISION")
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .tracking(0.65)
+                .foregroundStyle(Art.faded)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .padding(.top, 2)
         }
         .frame(maxWidth: 580)
         .accessibilityElement(children: .combine)

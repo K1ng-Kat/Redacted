@@ -5,6 +5,7 @@ struct ContentView: View {
     @State private var route: Route = .home
     @State private var navigationHistory: [Route] = []
     @State private var activeLevel = 1
+    @State private var pendingInvite: String?
     @State private var startupComplete = false
     @AppStorage("redacted.setup.complete") private var setupComplete = false
     @AppStorage("redacted.age.mode") private var ageModeRaw = DetectiveAgeMode.investigator.rawValue
@@ -19,7 +20,7 @@ struct ContentView: View {
     @AppStorage("redacted.music.level.volume") private var levelVolume = 0.12
 
     private enum Route: Equatable {
-        case home, levels, play, settings, guide, stats
+        case home, levels, play, settings, guide, stats, wardrobe, multiplayer, friends
     }
 
     var body: some View {
@@ -36,6 +37,7 @@ struct ContentView: View {
                         ageModeRaw = mode.rawValue
                         setupComplete = true
                         GameEffects.shared.success()
+                        openPendingInvite()
                     }
                     .transition(.opacity)
                 }
@@ -63,17 +65,33 @@ struct ContentView: View {
         .task {
             await prepareStartup()
             CloudSaveManager.shared.attach(store)
+            MultiplayerService.shared.attach(store)
+            openPendingInvite()
+        }
+        .onOpenURL { url in
+            guard url.scheme == "redacted-detective",
+                  url.host == "join",
+                  let code = url.pathComponents.last,
+                  code.count == 6 else { return }
+            pendingInvite = code
+            openPendingInvite()
         }
         .onChange(of: route) { _, _ in syncMusic() }
-        .onChange(of: startupComplete) { _, _ in syncMusic() }
+        .onChange(of: startupComplete) { _, _ in
+            syncMusic()
+            openPendingInvite()
+        }
+        .onChange(of: setupComplete) { _, _ in openPendingInvite() }
         .onChange(of: musicEnabled) { _, _ in syncMusic() }
         .onChange(of: menuVolume) { _, _ in syncMusic() }
         .onChange(of: levelVolume) { _, _ in syncMusic() }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
                 syncMusic()
+                MultiplayerService.shared.startPresence()
             } else {
                 GameMusicController.shared.pause()
+                MultiplayerService.shared.stopPresence()
             }
         }
     }
@@ -175,7 +193,10 @@ struct ContentView: View {
                 levels: { show(.levels) },
                 settings: { show(.settings) },
                 guide: { show(.guide) },
-                stats: { show(.stats) }
+                stats: { show(.stats) },
+                wardrobe: { show(.wardrobe) },
+                multiplayer: { show(.multiplayer) },
+                friends: { show(.friends) }
             )
         case .levels:
             LevelSelectView(store: store, launch: launch, back: { popScreen() })
@@ -200,7 +221,14 @@ struct ContentView: View {
         case .guide:
             CampaignGuideView(back: { popScreen() }, begin: { launch(store.nextLevel) })
         case .stats:
-            CampaignStatsView(store: store, back: { popScreen() })
+            CampaignStatsView(store: store, back: { popScreen() },
+                              customize: { show(.wardrobe) })
+        case .wardrobe:
+            DetectiveWardrobeView(store: store, back: { popScreen() })
+        case .multiplayer:
+            MultiplayerLobbyView(store: store, back: { popScreen() })
+        case .friends:
+            FriendsView(store: store, back: { popScreen() })
         }
     }
 
@@ -244,7 +272,7 @@ struct ContentView: View {
     private func syncMusic() {
         guard startupComplete && scenePhase == .active else { return }
         GameMusicController.shared.update(
-            scene: route == .play ? .level : .menu,
+            scene: route == .play || route == .multiplayer ? .level : .menu,
             enabled: musicEnabled,
             menuVolume: menuVolume,
             levelVolume: levelVolume
@@ -255,7 +283,7 @@ struct ContentView: View {
         guard next != route else { return }
         if startupComplete && scenePhase == .active {
             GameMusicController.shared.update(
-                scene: next == .play ? .level : .menu,
+                scene: next == .play || next == .multiplayer ? .level : .menu,
                 enabled: musicEnabled,
                 menuVolume: menuVolume,
                 levelVolume: levelVolume
@@ -281,6 +309,14 @@ struct ContentView: View {
         setRoute(previous, animated: animated)
     }
 
+    private func openPendingInvite() {
+        guard startupComplete, setupComplete, let code = pendingInvite else { return }
+        pendingInvite = nil
+        if route != .multiplayer { show(.multiplayer) }
+        MultiplayerService.shared.attach(store)
+        Task { await MultiplayerService.shared.joinRoom(code) }
+    }
+
     private func launch(_ level: Int) {
         guard store.isUnlocked(level) else { return }
         store.recordStarted(level)
@@ -302,6 +338,9 @@ struct CampaignHomeView: View {
     let settings: () -> Void
     let guide: () -> Void
     let stats: () -> Void
+    let wardrobe: () -> Void
+    let multiplayer: () -> Void
+    let friends: () -> Void
 
     private var episode: CampaignEpisode {
         CampaignCatalog.episodes[(store.nextLevel - 1) / 10]
@@ -322,31 +361,50 @@ struct CampaignHomeView: View {
             .padding(.top, 9)
             .padding(.bottom, 25)
             .frame(maxWidth: .infinity)
+            .background {
+                HomeScrollBounceLock().frame(width: 0, height: 0)
+            }
         }
         .background(GameBackdrop())
     }
 
     private var topBar: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             ZStack {
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: 11)
                     .fill(Art.coral)
-                    .frame(width: 46, height: 46)
-                    .rotationEffect(.degrees(-6))
+                    .frame(width: 40, height: 40)
+                    .rotationEffect(.degrees(-5))
                 Image(systemName: "eye.fill")
-                    .font(.system(size: 25, weight: .black))
+                    .font(.system(size: 23, weight: .black))
                     .foregroundStyle(.white)
             }
+            .accessibilityHidden(true)
+
             VStack(alignment: .leading, spacing: 1) {
                 Text("REDACTED")
-                    .font(.system(size: 21, weight: .black, design: .rounded))
+                    .font(.system(size: 19, weight: .black, design: .rounded))
                     .foregroundStyle(Art.paper)
-                GameKicker(text: "DETECTIVE AGENCY", color: Art.cyan)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.74)
+                Text("DETECTIVE AGENCY")
+                    .font(.system(size: 9, weight: .black, design: .monospaced))
+                    .tracking(0.2)
+                    .foregroundStyle(Art.cyan)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
             }
-            Spacer()
-            smallTopButton("questionmark.circle.fill", name: "How to play", action: guide)
-            smallTopButton("gearshape.fill", name: "Settings", action: settings)
+            .layoutPriority(1)
+
+            Spacer(minLength: 2)
+
+            HStack(spacing: 6) {
+                smallTopButton("questionmark.circle.fill", name: "How to play", action: guide)
+                smallTopButton("gearshape.fill", name: "Settings", action: settings)
+                smallTopButton("person.crop.circle.fill", name: "Detective profile", action: stats)
+            }
         }
+        .frame(minHeight: 45)
     }
 
     private func smallTopButton(_ symbol: String, name: String, action: @escaping () -> Void) -> some View {
@@ -355,13 +413,14 @@ struct CampaignHomeView: View {
             action()
         } label: {
             Image(systemName: symbol)
-                .font(.system(size: 21, weight: .black))
+                .font(.system(size: 18, weight: .black))
                 .foregroundStyle(Art.paper)
-                .frame(width: 44, height: 44)
+                .frame(width: 41, height: 44)
                 .background(Art.blueDeep)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .overlay(RoundedRectangle(cornerRadius: 12)
                     .stroke(Art.edge.opacity(0.65), lineWidth: 1.5))
+                .contentShape(RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(PressGameStyle())
         .accessibilityLabel(name)
@@ -369,26 +428,12 @@ struct CampaignHomeView: View {
 
     private var identity: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
+            HStack(spacing: 9) {
                 StatChip(icon: "star.fill", value: "\(store.totalStars)", label: "STARS")
-                Spacer(minLength: 4)
-                StatChip(icon: "checkmark.seal.fill", value: "\(store.levelsCompleted)/100", label: "SOLVED", tint: Art.mint)
-                Spacer(minLength: 4)
-                Button {
-                    GameEffects.shared.tap()
-                    stats()
-                } label: {
-                    Image(systemName: "chart.bar.xaxis")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundStyle(Art.cyan)
-                        .frame(width: 45, height: 46)
-                        .background(Art.blueDeep)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .overlay(RoundedRectangle(cornerRadius: 12)
-                            .stroke(Art.edge.opacity(0.65), lineWidth: 1))
-                }
-                .buttonStyle(PressGameStyle())
-                .accessibilityLabel("Detective statistics")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                StatChip(icon: "checkmark.seal.fill", value: "\(store.levelsCompleted)/100",
+                         label: "SOLVED", tint: Art.mint)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             GameCard(accent: Art.gold) {
                 VStack(spacing: 11) {
@@ -495,9 +540,19 @@ struct CampaignHomeView: View {
     }
 
     private var actions: some View {
-        HStack(spacing: 10) {
-            quickAction(icon: "square.grid.3x3.fill", title: "LEVELS", detail: "Choose a case", color: Art.cyan, action: levels)
-            quickAction(icon: "rosette", title: "RANK", detail: "Your progress", color: Art.gold, action: stats)
+        VStack(spacing: 10) {
+            HStack(spacing: 10) {
+                quickAction(icon: "square.grid.3x3.fill", title: "LEVELS", detail: "Choose a case", color: Art.cyan, action: levels)
+                quickAction(icon: "rosette", title: "RANK", detail: "Your progress", color: Art.gold, action: stats)
+            }
+            HStack(spacing: 10) {
+                quickAction(icon: "person.crop.square.fill", title: "DETECTIVE", detail: "Customize", color: Art.gold, action: wardrobe)
+                quickAction(icon: "person.2.fill", title: "MULTIPLAYER", detail: "Race a friend", color: Art.mint, action: multiplayer)
+            }
+            HStack(spacing: 10) {
+                quickAction(icon: "person.2.fill", title: "FRIENDS", detail: "Online network", color: Art.cyan, action: friends)
+                quickAction(icon: "bag.fill", title: "SHOP", detail: "Buy snippets", color: Art.gold, action: wardrobe)
+            }
         }
     }
 

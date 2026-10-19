@@ -15,7 +15,7 @@ struct CampaignSettingsView: View {
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 16) {
                 ScreenHeader(title: "SETTINGS", subtitle: "YOUR EXPERIENCE", back: back)
                 GameCard {
                     VStack(spacing: 19) {
@@ -68,7 +68,7 @@ struct CampaignSettingsView: View {
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(Art.paper)
                             .fixedSize(horizontal: false, vertical: true)
-                        Text("REDACTED 0.4 — single-player campaign")
+                        Text("REDACTED 0.6 — single-player campaign")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(Art.faded)
                     }
@@ -107,7 +107,7 @@ struct CampaignSettingsView: View {
                         .font(.system(size: 15, weight: .black, design: .rounded))
                         .foregroundStyle(Art.paper)
                     Spacer()
-                    Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.4") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "6"))")
+                    Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.6") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "7"))")
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
                         .foregroundStyle(Art.faded)
                 }
@@ -217,20 +217,20 @@ struct CampaignGuideView: View {
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 19) {
+            VStack(alignment: .leading, spacing: 16) {
                 ScreenHeader(title: "HOW TO PLAY", subtitle: "LEARN IN 30 SECONDS", back: back)
                 instruction("1", "READ THE CASE", "Each level starts with a tiny mystery and one clear objective.",
                             symbol: "doc.text.magnifyingglass", color: Art.cyan)
                 instruction("2", "TAP, THINK, SOLVE", "Look for hidden objects, arrange events, decode words and solve puzzles using evidence.",
                             symbol: "hand.point.up.left.fill", color: Art.gold)
-                instruction("3", "EARN YOUR STARS", "Make fewer mistakes and use fewer hints to finish with up to three stars.",
+                instruction("3", "EARN YOUR STARS", "A wrong answer ends the attempt. Finish without mistakes or hints to earn 3 stars.",
                             symbol: "star.fill", color: Art.mint)
-                instruction("4", "LEVEL UP", "New cases award coins and XP. Rise through detective ranks to unlock rewards and new visual themes.",
+                instruction("4", "LEVEL UP", "New cases award coins and XP. Later detective identities require more XP and come with new looks.",
                             symbol: "rosette", color: Art.coral)
                 GameCard(accent: Art.gold) {
                     VStack(alignment: .leading, spacing: 9) {
                         GameKicker(text: "HINT ECONOMY", color: Art.gold)
-                        Text("You start with 50 coins and 2 free hints. Every new rank gives extra coins and another hint. After your tickets run out, hints cost 30 coins.")
+                        Text("You start with 50 coins and 2 free hints. Each new rank gives coins and another hint. Hints cost 30 coins after tickets run out, and reduce your star rating.")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(Art.paper)
                     }
@@ -276,7 +276,7 @@ struct CampaignStatsView: View {
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 16) {
                 ScreenHeader(title: "DETECTIVE PROFILE",
                              subtitle: "LEVELS · COINS · REWARDS", back: back)
 
@@ -291,17 +291,17 @@ struct CampaignStatsView: View {
                 GameCard {
                     VStack(alignment: .leading, spacing: 10) {
                         GameKicker(text: "HOW REWARDS WORK", color: Art.gold)
-                        Text("New cases: XP, coins and stars. Finish every 10th case for a district bonus. Every detective account level awards 60 coins and one free hint.")
+                        Text("Each solved case awards XP, coins and stars. Every detective rank gives 60 coins and one free hint. Higher ranks take more XP and unlock new characters.")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(Art.paper)
                             .fixedSize(horizontal: false, vertical: true)
-                        Text("Replaying a solved level only pays extra rewards when you improve your best star rating. There are no purchases or paid loot boxes.")
+                        Text("Each new district requires 10 completed cases and at least 7 perfect 3-star results. Replays keep your best star rating and only award currency for improvements.")
                             .font(.system(size: 12))
                             .foregroundStyle(Art.faded)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                GameTitle(text: "RANK UNLOCKS", size: 25)
+                GameTitle(text: "YOUR DETECTIVES", size: 25)
                 ForEach(RankRewards.cosmetics.indices, id: \.self) { index in
                     rewardRow(RankRewards.cosmetics[index])
                 }
@@ -319,20 +319,16 @@ struct CampaignStatsView: View {
         GameCard(accent: Art.gold) {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 17) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 19)
-                            .fill(Art.gold)
-                            .frame(width: 78, height: 78)
-                        Image(systemName: "star.shield.fill")
-                            .font(.system(size: 42, weight: .black))
-                            .foregroundStyle(Art.ink)
-                    }
+                    DetectivePortrait(theme: selectedTheme, size: 78)
                     VStack(alignment: .leading, spacing: 6) {
                         GameKicker(text: "DETECTIVE ACCOUNT", color: Art.cyan)
                         GameTitle(text: "LEVEL \(store.accountLevel)", size: 29)
                         Text(store.rankTitle)
                             .font(.system(size: 13, weight: .heavy))
                             .foregroundStyle(Art.gold)
+                        Text(DetectiveIdentity.names[DetectiveIdentity.index(for: selectedTheme)])
+                            .font(.system(size: 10, weight: .black, design: .rounded))
+                            .foregroundStyle(Art.cyan)
                     }
                 }
                 GeometryReader { proxy in
@@ -358,12 +354,16 @@ struct CampaignStatsView: View {
 
         return GameCard(accent: unlocked ? Art.mint : Art.edge) {
             HStack(spacing: 13) {
-                Image(systemName: unlocked ? "paintpalette.fill" : "lock.fill")
-                    .font(.system(size: 23, weight: .bold))
-                    .foregroundStyle(unlocked ? Art.gold : Art.faded)
-                    .frame(width: 49, height: 49)
-                    .background(Art.ink)
-                    .clipShape(RoundedRectangle(cornerRadius: 13))
+                ZStack {
+                    DetectivePortrait(theme: reward.color, size: 57)
+                        .opacity(unlocked ? 1 : 0.38)
+                    if !unlocked {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 21, weight: .black))
+                            .foregroundStyle(Art.gold)
+                            .shadow(color: Art.ink, radius: 7)
+                    }
+                }
                 VStack(alignment: .leading, spacing: 6) {
                     Text(reward.title.uppercased())
                         .font(.system(size: 15, weight: .black, design: .rounded))
@@ -371,6 +371,9 @@ struct CampaignStatsView: View {
                     GameKicker(text: "ACCOUNT LVL \(reward.level)" +
                                (unlocked ? " · UNLOCKED" : " · LOCKED"),
                                color: unlocked ? Art.mint : Art.faded)
+                    Text(DetectiveIdentity.names[DetectiveIdentity.index(for: reward.color)])
+                        .font(.system(size: 10, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Art.faded)
                 }
                 Spacer(minLength: 3)
                 if unlocked {
@@ -381,8 +384,7 @@ struct CampaignStatsView: View {
                         Text(equipped ? "ACTIVE" : "EQUIP")
                             .font(.system(size: 11, weight: .black, design: .rounded))
                             .foregroundStyle(Art.ink)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 10)
+                            .frame(minWidth: 56, minHeight: 42)
                             .background(equipped ? Art.mint : Art.gold)
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                     }

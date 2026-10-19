@@ -7,6 +7,8 @@ struct MissionPlayView: View {
     let next: () -> Void
 
     @AppStorage("redacted.fx.hints") private var hintsEnabled = true
+    @AppStorage("redacted.profile.theme") private var equippedTheme = "midnight"
+    @AppStorage("redacted.tutorial.lastDistrict") private var lastCoachedDistrict = 0
     @State private var selectedSequence: [Int] = []
     @State private var typed = ""
     @State private var usedLetterIndices: [Int] = []
@@ -17,7 +19,11 @@ struct MissionPlayView: View {
     @State private var hintVisible = false
     @State private var feedback: String?
     @State private var payout: CasePayout?
-    @State private var showHowToPlay = false
+    @State private var coaching = false
+    @State private var selectedAnswer: Int?
+    @State private var attemptFailed = false
+    @State private var newIdentityTheme: String?
+    @State private var newIdentityTitle = ""
 
     private var scrambled: [Character] { Array(mission.solution.reversed()) }
 
@@ -25,10 +31,12 @@ struct MissionPlayView: View {
         ZStack {
             GameBackdrop()
             ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 15) {
                     header
                     if let payout {
                         victory(payout)
+                    } else if attemptFailed {
+                        failedPanel
                     } else {
                         missionIntro
                         if let feedback {
@@ -58,22 +66,43 @@ struct MissionPlayView: View {
                     }
                 }
                 .frame(maxWidth: 600)
-                .padding(.horizontal, 18)
-                .padding(.top, 12)
-                .padding(.bottom, 36)
+                .padding(.horizontal, 17)
+                .padding(.top, 10)
+                .padding(.bottom, 26)
                 .frame(maxWidth: .infinity)
             }
         }
         .preferredColorScheme(.dark)
         .onAppear {
-            if mission.id == 1 && !store.progress.tutorialComplete {
-                showHowToPlay = true
-            }
+            coaching = (mission.id == 1 && !store.progress.tutorialComplete) ||
+                       (mission.id % 10 == 1 && mission.episode + 1 > lastCoachedDistrict)
         }
-        .alert("WELCOME TO REDACTED", isPresented: $showHowToPlay) {
-            Button("LET'S PLAY") { store.tutorialSeen() }
-        } message: {
-            Text("Solve one mystery per level. Follow the instruction above the puzzle, tap to interact, and earn coins and XP when you win. You can always use a hint or go back to the level map.")
+        .overlay {
+            if coaching {
+                GameCoachOverlay(
+                    title: mission.id == 1 ? "WELCOME, DETECTIVE!" : "NEW DISTRICT!",
+                    detail: "Read the case brief before choosing. An incorrect answer ends this attempt. Aim for 3 stars!",
+                    button: "START INVESTIGATION",
+                    symbol: "magnifyingglass",
+                    portraitTheme: nil
+                ) {
+                    store.tutorialSeen()
+                    lastCoachedDistrict = max(lastCoachedDistrict, mission.episode + 1)
+                    coaching = false
+                }
+            } else if let newIdentityTheme {
+                GameCoachOverlay(
+                    title: "DETECTIVE UNLOCKED!",
+                    detail: "\(newIdentityTitle) is available. Equip your new detective identity now.",
+                    button: "EQUIP DETECTIVE",
+                    symbol: "person.crop.square.fill",
+                    portraitTheme: newIdentityTheme
+                ) {
+                    equippedTheme = newIdentityTheme
+                    GameEffects.shared.success()
+                    self.newIdentityTheme = nil
+                }
+            }
         }
     }
 
@@ -105,7 +134,7 @@ struct MissionPlayView: View {
     }
 
     private var missionIntro: some View {
-        VStack(alignment: .leading, spacing: 13) {
+        VStack(alignment: .leading, spacing: 11) {
             ZStack(alignment: .bottomLeading) {
                 DistrictIllustration(episode: mission.episode)
                 LinearGradient(colors: [.clear, Art.ink.opacity(0.9)],
@@ -116,7 +145,7 @@ struct MissionPlayView: View {
                 }
                 .padding(19)
             }
-            .frame(height: 178)
+            .frame(height: 156)
             .clipShape(RoundedRectangle(cornerRadius: 19))
             GameCard(accent: Art.cyan) {
                 VStack(alignment: .leading, spacing: 9) {
@@ -178,19 +207,24 @@ struct MissionPlayView: View {
                 .padding(.horizontal, 25)
                 .padding(.vertical, 40)
             }
-            .frame(height: 330)
+            .frame(height: 275)
             .clipShape(RoundedRectangle(cornerRadius: 19))
             .overlay(RoundedRectangle(cornerRadius: 19).stroke(Art.edge.opacity(0.7), lineWidth: 2))
-            Text("Tap a glowing object to inspect it.")
+            Text("Select an object, then confirm your finding.")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(Art.faded)
+            if let selectedAnswer {
+                GameButton(title: "INSPECT SELECTED OBJECT", icon: "magnifyingglass") {
+                    check(selectedAnswer == mission.correctIndex)
+                }
+            }
         }
     }
 
     private func objectButton(index: Int, symbol: String) -> some View {
         Button {
             GameEffects.shared.tap()
-            check(index == mission.correctIndex)
+            selectedAnswer = index
         } label: {
             VStack(spacing: 7) {
                 Image(systemName: symbol)
@@ -231,11 +265,7 @@ struct MissionPlayView: View {
                     guard chosenPosition == nil else { return }
                     GameEffects.shared.tap()
                     selectedSequence.append(index)
-                    if selectedSequence.count == 4 {
-                        let correct = selectedSequence == mission.correctSequence
-                        if !correct { selectedSequence = [] }
-                        check(correct, wrongText: "Timeline incorrect. Try ordering the four events again.")
-                    }
+
                 } label: {
                     HStack(spacing: 12) {
                         Image(systemName: "clock.fill")
@@ -264,6 +294,12 @@ struct MissionPlayView: View {
                 }
                 .buttonStyle(PressGameStyle())
                 .disabled(chosenPosition != nil)
+            }
+            if selectedSequence.count == 4 {
+                GameButton(title: "VERIFY TIMELINE", icon: "checkmark.seal.fill") {
+                    check(selectedSequence == mission.correctSequence,
+                          wrongText: "That order doesn't match the evidence.")
+                }
             }
             GameButton(title: "Clear my order", icon: "arrow.counterclockwise",
                        color: Art.blueLight, bottom: Art.blueDeep) {
@@ -339,7 +375,7 @@ struct MissionPlayView: View {
             ForEach(mission.choices.indices, id: \.self) { index in
                 Button {
                     GameEffects.shared.tap()
-                    check(index == mission.correctIndex)
+                    selectedAnswer = index
                 } label: {
                     HStack(spacing: 14) {
                         Text("\(index + 1)")
@@ -360,9 +396,17 @@ struct MissionPlayView: View {
                     .background(Art.blueDeep)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                     .overlay(RoundedRectangle(cornerRadius: 16)
-                        .stroke(Art.edge.opacity(0.65), lineWidth: 1.5))
+                        .stroke(selectedAnswer == index ? Art.gold : Art.edge.opacity(0.65),
+                                lineWidth: selectedAnswer == index ? 3 : 1.5))
+                    .contentShape(RoundedRectangle(cornerRadius: 16))
                 }
                 .buttonStyle(PressGameStyle())
+            }
+            if let selectedAnswer {
+                GameButton(title: mission.isFinale ? "CONFIRM ACCUSATION" : "SUBMIT ANSWER",
+                           icon: "checkmark.seal.fill") {
+                    check(selectedAnswer == mission.correctIndex)
+                }
             }
         }
     }
@@ -386,11 +430,7 @@ struct MissionPlayView: View {
                         guard !usedLetterIndices.contains(index) else { return }
                         GameEffects.shared.tap()
                         usedLetterIndices.append(index)
-                        if usedLetterIndices.count == scrambled.count {
-                            let attempt = usedLetterIndices.map { String(scrambled[$0]) }.joined()
-                            if attempt != mission.solution { usedLetterIndices = [] }
-                            check(attempt == mission.solution, wrongText: "Those letters aren't in the correct order. Try again.")
-                        }
+
                     } label: {
                         Text(String(scrambled[index]))
                             .font(.system(size: 21, weight: .black, design: .rounded))
@@ -402,6 +442,12 @@ struct MissionPlayView: View {
                     }
                     .disabled(usedLetterIndices.contains(index))
                     .buttonStyle(PressGameStyle())
+                }
+            }
+            if usedLetterIndices.count == scrambled.count {
+                GameButton(title: "DECODE WORD", icon: "checkmark.seal.fill") {
+                    let attempt = usedLetterIndices.map { String(scrambled[$0]) }.joined()
+                    check(attempt == mission.solution)
                 }
             }
             GameButton(title: "Clear letters", icon: "arrow.counterclockwise",
@@ -501,7 +547,7 @@ struct MissionPlayView: View {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "info.circle.fill")
                     .foregroundStyle(Art.cyan)
-                Text("Solve to earn XP, coins, and stars. Every cleared case unlocks the next one. Hints can reduce your star rating.")
+                Text("Wrong answers end the attempt. Unlock districts by clearing all 10 cases and earning 3 stars on at least 7.")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Art.faded)
                     .fixedSize(horizontal: false, vertical: true)
@@ -509,9 +555,54 @@ struct MissionPlayView: View {
         }
     }
 
-    private func victory(_ payout: CasePayout) -> some View {
-        VStack(alignment: .leading, spacing: 19) {
+    private var failedPanel: some View {
+        VStack(alignment: .leading, spacing: 15) {
             VStack(spacing: 12) {
+                Image(systemName: "xmark.shield.fill")
+                    .font(.system(size: 54))
+                    .foregroundStyle(Art.coral)
+                GameTitle(text: "CASE FAILED", size: 34)
+                Text("An incorrect answer ends the attempt. Review the evidence and restart for a clean 3-star run.")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Art.faded)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity)
+            GameCard(accent: Art.gold) {
+                VStack(alignment: .leading, spacing: 10) {
+                    GameKicker(text: "REVIEW THE CASE", color: Art.gold)
+                    Text(mission.setup)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Art.paper)
+                    Text(mission.hint)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Art.faded)
+                }
+            }
+            GameButton(title: "RETRY LEVEL", icon: "arrow.counterclockwise") {
+                resetAttempt()
+            }
+            GameButton(title: "LEVEL MAP", icon: "square.grid.2x2.fill",
+                       color: Art.blueLight, bottom: Art.blueDeep, action: back)
+        }
+    }
+
+    private func resetAttempt() {
+        attemptFailed = false
+        selectedSequence = []
+        typed = ""
+        usedLetterIndices = []
+        frequency = 50
+        matchedItems = []
+        selectedAnswer = nil
+        mistakes = 0
+        feedback = nil
+        // Purchased hints remain spent, and count against this run's score.
+    }
+
+    private func victory(_ payout: CasePayout) -> some View {
+        VStack(alignment: .leading, spacing: 15) {
+            VStack(spacing: 11) {
                 Image(systemName: "checkmark.seal.fill")
                     .font(.system(size: 64, weight: .black))
                     .foregroundStyle(Art.mint)
@@ -534,7 +625,9 @@ struct MissionPlayView: View {
                 }
             }
             HStack(spacing: 10) {
-                rewardTile(icon: "circle.hexagongrid.fill", text: "+\(payout.earnedCoins)", label: "COINS", color: Art.gold)
+                GameCard(accent: Art.gold) {
+                    CoinRewardAnimation(coins: payout.earnedCoins)
+                }
                 rewardTile(icon: "bolt.circle.fill", text: "+\(payout.earnedXP)", label: "XP", color: Art.cyan)
             }
             if payout.levelsGained > 0 {
@@ -552,10 +645,20 @@ struct MissionPlayView: View {
                     }
                 }
             }
-            if store.allCompleted || mission.id == 100 {
-                GameButton(title: "Return to HQ", icon: "house.fill", action: back)
-            } else {
+            if store.canAdvance(after: mission.id) {
                 GameButton(title: "NEXT LEVEL", icon: "arrow.right", action: next)
+            } else if mission.id % 10 == 0 && mission.id < 100 {
+                GameCard(accent: Art.gold) {
+                    VStack(alignment: .leading, spacing: 7) {
+                        GameKicker(text: "NEXT DISTRICT LOCKED", color: Art.gold)
+                        Text("Clear all 10 cases and earn 3 stars on at least 7 to continue.")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Art.paper)
+                        Text("\(store.perfectLevels(in: mission.episode))/7 PERFECT CLEARS")
+                            .font(.system(size: 16, weight: .black, design: .rounded))
+                            .foregroundStyle(Art.gold)
+                    }
+                }
             }
             GameButton(title: "LEVEL MAP", icon: "square.grid.2x2.fill",
                        color: Art.blueLight, bottom: Art.blueDeep, action: back)
@@ -581,13 +684,21 @@ struct MissionPlayView: View {
     private func check(_ success: Bool, wrongText: String? = nil) {
         guard payout == nil else { return }
         if success {
+            let previousRank = store.accountLevel
             GameEffects.shared.success()
             feedback = nil
             payout = store.complete(mission.id, mistakes: mistakes, hintUsed: hintUsed)
+            if let payout,
+               let identity = DetectiveIdentity.latestUnlocked(
+                    previous: previousRank, current: payout.newRank) {
+                newIdentityTheme = identity.theme
+                newIdentityTitle = identity.name
+            }
         } else {
             mistakes += 1
             GameEffects.shared.mistake()
-            feedback = wrongText ?? "Not quite. Examine the case brief and try again. You'll get it."
+            feedback = wrongText ?? "Answer not supported by the evidence."
+            attemptFailed = true
         }
     }
 }

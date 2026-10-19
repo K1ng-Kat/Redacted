@@ -69,7 +69,7 @@ enum RankRewards {
 
     static func threshold(for rank: Int) -> Int {
         // XP needed to go from rank N to N+1.
-        140 + (rank * 50)
+        160 + (rank * 65)
     }
 
     static func rank(for totalXP: Int) -> Int {
@@ -129,16 +129,47 @@ final class CampaignStore: ObservableObject {
     var unlockedThemes: [String] {
         RankRewards.cosmetics.filter { $0.level <= accountLevel }.map(\.color)
     }
-    var unlockedLevel: Int {
-        let firstIncomplete = (1...100).first { progress.bestStars[$0] == nil }
-        return firstIncomplete ?? 100
+    static let perfectStarsRequired = 7
+
+    func perfectLevels(in district: Int) -> Int {
+        guard (0..<10).contains(district) else { return 0 }
+        let start = district * 10 + 1
+        return (start..<(start + 10)).filter { stars(for: $0) == 3 }.count
     }
+
+    func districtUnlocked(_ district: Int) -> Bool {
+        guard (0..<10).contains(district) else { return false }
+        if district == 0 { return true }
+        return (0..<district).allSatisfy { prior in
+            let chapter = CampaignCatalog.episodes[prior]
+            return episodeCompleted(chapter) == 10 &&
+                   perfectLevels(in: prior) >= Self.perfectStarsRequired
+        }
+    }
+
+    var unlockedLevel: Int {
+        for level in 1...100 where isUnlocked(level) && stars(for: level) == 0 {
+            return level
+        }
+        for level in 1...100 where isUnlocked(level) && stars(for: level) < 3 {
+            return level
+        }
+        return 100
+    }
+
     var nextLevel: Int { unlockedLevel }
     var progressFraction: Double { Double(levelsCompleted) / 100.0 }
     var allCompleted: Bool { levelsCompleted == 100 }
 
     func isUnlocked(_ level: Int) -> Bool {
-        (1...100).contains(level) && level <= unlockedLevel
+        guard (1...100).contains(level) else { return false }
+        let district = (level - 1) / 10
+        guard districtUnlocked(district) else { return false }
+        return level % 10 == 1 || stars(for: level - 1) > 0
+    }
+
+    func canAdvance(after level: Int) -> Bool {
+        level < 100 && isUnlocked(level + 1)
     }
 
     func stars(for level: Int) -> Int { progress.bestStars[level] ?? 0 }
@@ -216,7 +247,17 @@ final class CampaignStore: ObservableObject {
 @MainActor
 final class GameEffects {
     static let shared = GameEffects()
-    private var player: AVAudioPlayer?
+
+    private enum Sound: Hashable { case tap, mistake, success, coin }
+    private var players: [Sound: [AVAudioPlayer]] = [:]
+    private var indices: [Sound: Int] = [:]
+
+    private init() {
+        prepare(.tap, frequencies: [480], duration: 0.075, volume: 0.13, count: 2)
+        prepare(.mistake, frequencies: [230, 180], duration: 0.18, volume: 0.17, count: 1)
+        prepare(.success, frequencies: [523, 659, 784], duration: 0.30, volume: 0.21, count: 1)
+        prepare(.coin, frequencies: [950, 1250], duration: 0.085, volume: 0.10, count: 4)
+    }
 
     var hapticsOn: Bool {
         UserDefaults.standard.object(forKey: "redacted.fx.haptics") as? Bool ?? true
@@ -227,48 +268,74 @@ final class GameEffects {
 
     func tap() {
         if hapticsOn { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
-        play(frequencies: [430], duration: 0.085, volume: 0.20)
+        play(.tap)
     }
 
     func mistake() {
         if hapticsOn { UINotificationFeedbackGenerator().notificationOccurred(.warning) }
-        play(frequencies: [220, 180], duration: 0.22, volume: 0.18)
+        play(.mistake)
     }
 
     func success() {
         if hapticsOn { UINotificationFeedbackGenerator().notificationOccurred(.success) }
-        play(frequencies: [523, 659, 784], duration: 0.34, volume: 0.23)
+        play(.success)
     }
 
-    private func play(frequencies: [Double], duration: Double, volume: Float) {
-        guard soundOn else { return }
+    func coinTick() { play(.coin) }
+
+    private func play(_ sound: Sound) {
+        guard soundOn, let bank = players[sound], !bank.isEmpty else { return }
+        let index = indices[sound, default: 0] % bank.count
+        indices[sound] = index + 1
+        let player = bank[index]
+        if player.isPlaying { player.stop() }
+        player.currentTime = 0
+        player.play()
+    }
+
+    private func prepare(_ sound: Sound, frequencies: [Double],
+                         duration: Double, volume: Float, count: Int) {
+        let data = wave(frequencies: frequencies, duration: duration)
+        var bank: [AVAudioPlayer] = []
+        for _ in 0..<count {
+            if let player = try? AVAudioPlayer(data: data) {
+                player.volume = volume
+                player.prepareToPlay()
+                bank.append(player)
+            }
+        }
+        players[sound] = bank
+    }
+
+    private func wave(frequencies: [Double], duration: Double) -> Data {
         let sampleRate = 22_050
         let count = Int(Double(sampleRate) * duration)
-        guard count > 0 else { return }
-        var samples = Data(capacity: count * 2)
+        var pcm = Data(capacity: count * 2)
+
         for i in 0..<count {
-            let t = Double(i) / Double(sampleRate)
-            let position = min(frequencies.count - 1, Int((t / duration) * Double(frequencies.count)))
-            let phase = 2 * Double.pi * frequencies[position] * t
-            let envelope = min(1.0, t * 65.0) * max(0.0, 1.0 - (t / duration))
-            let value = Int16(max(-32767, min(32767, sin(phase) * envelope * 12500)))
-            var little = value.littleEndian
-            withUnsafeBytes(of: &little) { samples.append(contentsOf: $0) }
+            let time = Double(i) / Double(sampleRate)
+            let note = min(frequencies.count - 1,
+                           Int(Double(frequencies.count) * time / duration))
+            let envelope = min(1, time * 130) * pow(max(0, 1 - time / duration), 2)
+            let sample = Int16(sin(2 * Double.pi * frequencies[note] * time) * envelope * 11000)
+            var little = sample.littleEndian
+            withUnsafeBytes(of: &little) { pcm.append(contentsOf: $0) }
         }
 
-        var wave = Data()
-        func bytes(_ text: String) { wave.append(contentsOf: text.utf8) }
-        func u16(_ number: UInt16) {
-            var value = number.littleEndian
-            withUnsafeBytes(of: &value) { wave.append(contentsOf: $0) }
+        var data = Data()
+        func ascii(_ value: String) { data.append(contentsOf: value.utf8) }
+        func u16(_ value: UInt16) {
+            var little = value.littleEndian
+            withUnsafeBytes(of: &little) { data.append(contentsOf: $0) }
         }
-        func u32(_ number: UInt32) {
-            var value = number.littleEndian
-            withUnsafeBytes(of: &value) { wave.append(contentsOf: $0) }
+        func u32(_ value: UInt32) {
+            var little = value.littleEndian
+            withUnsafeBytes(of: &little) { data.append(contentsOf: $0) }
         }
-        bytes("RIFF")
-        u32(UInt32(36 + samples.count))
-        bytes("WAVEfmt ")
+
+        ascii("RIFF")
+        u32(UInt32(36 + pcm.count))
+        ascii("WAVEfmt ")
         u32(16)
         u16(1)
         u16(1)
@@ -276,17 +343,9 @@ final class GameEffects {
         u32(UInt32(sampleRate * 2))
         u16(2)
         u16(16)
-        bytes("data")
-        u32(UInt32(samples.count))
-        wave.append(samples)
-
-        do {
-            player = try AVAudioPlayer(data: wave)
-            player?.volume = volume
-            player?.prepareToPlay()
-            player?.play()
-        } catch {
-            // Gameplay must not fail because of audio.
-        }
+        ascii("data")
+        u32(UInt32(pcm.count))
+        data.append(pcm)
+        return data
     }
 }

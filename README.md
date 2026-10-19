@@ -87,3 +87,19 @@ Once installed, simply run `red-sync` whenever you want to synchronize.
 - Requires local Git author identity and push authentication to be configured.
 
 The script checks `origin` belongs to this repository and refuses other checked-out branches. It does not execute on a schedule: run `red-sync` to initiate the sync.
+
+## Version 0.6 — Better game feel, district gates, detective portraits and app icon
+
+- Improved control feel with faster pressed states, tighter cards/layout, larger hittable controls and lighter original tap effects.
+- Both menu and level tracks are preloaded; scene changes stop the old track and start the next immediately without overlapping fade. Sound effects are pre-rendered and reused.
+- New custom minted gold coin icon and short coin counter/animation with original coin ticks on victory. Respects sound and motion preferences.
+- iPhone swipe right from the screen's left edge goes back, never forward. The edge restriction reduces conflict with sliders and puzzles.
+- Completed levels require confirmation to replay. Best star ratings are retained.
+- An incorrect submitted answer fails the attempt and shows an evidence review/retry screen. Multiple choice and scene hotspots require confirmation.
+- Next district opens only after all 10 cases in the current district are cleared and at least 7 have 3 stars (70%).
+- Dimmed tutorial overlays explain the opening case and each new district.
+- Six stylized detective portraits in the profile, rank-up equip prompt, and progressively higher XP thresholds.
+- App-icon fix: Debug and Release select ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon. The existing original 1024x1024 PNG remains unchanged.
+
+### Device testing
+Verify icon on device, music transitions, taps, victory coin ticks, edge back, failed attempts, replay, 7-of-10 gate, detective unlocks and portrait rendering. If iOS still caches the previous icon, first clean the Xcode build folder. Deleting/reinstalling removes local game progress, so only do that when necessary.

@@ -1,47 +1,53 @@
 import AVFoundation
 import Foundation
 
-/// Plays two bundled CC0 tracks. Never streams music from a third-party server.
-/// Missing resources fail quietly without affecting gameplay.
 @MainActor
 final class GameMusicController {
     static let shared = GameMusicController()
 
-    enum Scene {
-        case menu
-        case level
-    }
+    enum Scene { case menu, level }
 
     private var menuPlayer: AVAudioPlayer?
     private var levelPlayer: AVAudioPlayer?
-    private var currentScene: Scene = .menu
-
+    private var prepared = false
     private init() {}
 
     func prepare() {
-        if menuPlayer == nil {
-            menuPlayer = load(named: "MenuBossa")
+        guard !prepared else { return }
+        prepared = true
+        do {
+            try AVAudioSession.sharedInstance().setCategory(
+                .ambient, mode: .default, options: [.mixWithOthers])
+        } catch {
+            #if DEBUG
+            print("REDACTED audio session setup: \(error)")
+            #endif
         }
-        if levelPlayer == nil {
-            levelPlayer = load(named: "LevelShop")
-        }
+        menuPlayer = load(named: "MenuBossa")
+        levelPlayer = load(named: "LevelShop")
     }
 
-    func update(scene: Scene,
-                enabled: Bool,
-                menuVolume: Double,
-                levelVolume: Double) {
-        currentScene = scene
-
+    func update(scene: Scene, enabled: Bool,
+                menuVolume: Double, levelVolume: Double) {
         prepare()
+        let active = scene == .menu ? menuPlayer : levelPlayer
+        let inactive = scene == .menu ? levelPlayer : menuPlayer
 
-        let menuTarget: Float = enabled && scene == .menu
-            ? Float(min(1, max(0, menuVolume))) : 0
-        let levelTarget: Float = enabled && scene == .level
-            ? Float(min(1, max(0, levelVolume))) : 0
+        // Prevent both tracks being audible, even briefly.
+        inactive?.volume = 0
+        inactive?.pause()
 
-        transition(menuPlayer, to: menuTarget)
-        transition(levelPlayer, to: levelTarget)
+        let desired = scene == .menu ? menuVolume : levelVolume
+        let volume = Float(min(1, max(0, desired)))
+        guard enabled, volume > 0, let active else {
+            menuPlayer?.pause()
+            levelPlayer?.pause()
+            return
+        }
+        active.volume = volume
+        if !active.isPlaying {
+            active.play()
+        }
     }
 
     func pause() {
@@ -49,32 +55,23 @@ final class GameMusicController {
         levelPlayer?.pause()
     }
 
-    private func transition(_ player: AVAudioPlayer?, to target: Float) {
-        guard let player else { return }
-        if target > 0 && !player.isPlaying {
-            // Ensure fade-in is audible even when switching from a paused track.
-            player.volume = 0
-            player.play()
-        }
-        if player.isPlaying {
-            player.setVolume(target, fadeDuration: 0.55)
-        }
-    }
-
     private func load(named name: String) -> AVAudioPlayer? {
         guard let url = Bundle.main.url(forResource: name, withExtension: "mp3") else {
+            #if DEBUG
+            print("REDACTED: Missing bundled \(name).mp3")
+            #endif
             return nil
         }
-
         do {
-            // Ambient audio respects the silent switch and mixes with other audio.
-            try AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default, options: [.mixWithOthers])
             let player = try AVAudioPlayer(contentsOf: url)
             player.numberOfLoops = -1
             player.volume = 0
             player.prepareToPlay()
             return player
         } catch {
+            #if DEBUG
+            print("REDACTED: Failed audio initialization: \(error)")
+            #endif
             return nil
         }
     }

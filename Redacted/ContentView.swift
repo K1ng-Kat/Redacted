@@ -7,6 +7,7 @@ struct ContentView: View {
     @State private var startupComplete = false
     @State private var startupProgress = 0.04
     @State private var startupStep = "CONNECTING TO THE ARCHIVE"
+    @AppStorage("redacted.tutorial.home") private var homeCoached = false
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("redacted.music.enabled") private var musicEnabled = true
     @AppStorage("redacted.music.menu.volume") private var menuVolume = 0.55
@@ -27,6 +28,36 @@ struct ContentView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .overlay {
+            if startupComplete && route == .home &&
+               !homeCoached && store.levelsCompleted == 0 {
+                GameCoachOverlay(
+                    title: "YOUR FIRST CASE!",
+                    detail: "Tap PLAY to investigate. Solve cases to earn coins, stars, and new detective identities.",
+                    button: "PLAY FIRST CASE",
+                    symbol: "hand.point.up.left.fill",
+                    portraitTheme: nil
+                ) {
+                    homeCoached = true
+                    launch(store.nextLevel)
+                }
+            }
+        }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 28, coordinateSpace: .global)
+                .onEnded { gesture in
+                    // Only a swipe starting at the *left screen edge* goes back.
+                    // This avoids conflicting with sliders, puzzles or horizontal lists.
+                    guard gesture.startLocation.x < 38,
+                          gesture.translation.width > 105,
+                          abs(gesture.translation.height) < 65 else { return }
+                    switch route {
+                    case .home: break
+                    case .play: show(.levels)
+                    case .levels, .settings, .guide, .stats: show(.home)
+                    }
+                }
+        )
         .task { await prepareStartup() }
         .onChange(of: route) { _, _ in syncMusic() }
         .onChange(of: startupComplete) { _, _ in syncMusic() }
@@ -48,7 +79,13 @@ struct ContentView: View {
             case .home:
                 CampaignHomeView(
                     store: store,
-                    play: { launch(store.nextLevel) },
+                    play: {
+                        if store.stars(for: store.nextLevel) > 0 {
+                            show(.levels)
+                        } else {
+                            launch(store.nextLevel)
+                        }
+                    },
                     levels: { show(.levels) },
                     settings: { show(.settings) },
                     guide: { show(.guide) },
@@ -93,6 +130,7 @@ struct ContentView: View {
 
         startupStep = "PREPARING AUDIO"
         GameMusicController.shared.prepare()
+        _ = GameEffects.shared // Preload button and coin sounds.
         withAnimation(.easeInOut(duration: 0.25)) {
             startupProgress = 0.82
         }
@@ -120,7 +158,15 @@ struct ContentView: View {
     }
 
     private func show(_ next: Route) {
-        withAnimation(.easeInOut(duration: 0.18)) { route = next }
+        if startupComplete && scenePhase == .active {
+            GameMusicController.shared.update(
+                scene: next == .play ? .level : .menu,
+                enabled: musicEnabled,
+                menuVolume: menuVolume,
+                levelVolume: levelVolume
+            )
+        }
+        withAnimation(.easeOut(duration: 0.14)) { route = next }
     }
 
     private func launch(_ level: Int) {
@@ -145,7 +191,7 @@ struct CampaignHomeView: View {
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 15) {
                 topBar
                 identity
                 featuredMission
@@ -154,9 +200,9 @@ struct CampaignHomeView: View {
                 footer
             }
             .frame(maxWidth: 580)
-            .padding(.horizontal, 19)
-            .padding(.top, 12)
-            .padding(.bottom, 40)
+            .padding(.horizontal, 17)
+            .padding(.top, 9)
+            .padding(.bottom, 25)
             .frame(maxWidth: .infinity)
         }
         .background(GameBackdrop())
@@ -204,7 +250,7 @@ struct CampaignHomeView: View {
     }
 
     private var identity: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
                 StatChip(icon: "star.fill", value: "\(store.totalStars)", label: "STARS")
                 Spacer(minLength: 4)
@@ -240,8 +286,7 @@ struct CampaignHomeView: View {
                         }
                         Spacer()
                         VStack(alignment: .trailing, spacing: 4) {
-                            Image(systemName: "circle.hexagongrid.fill")
-                                .foregroundStyle(Art.gold)
+                            CoinIcon(size: 22)
                             Text("\(store.coins) COINS")
                                 .font(.system(size: 12, weight: .black, design: .rounded))
                                 .foregroundStyle(Art.paper)
@@ -268,7 +313,7 @@ struct CampaignHomeView: View {
                 }
             }
             GameKicker(text: "WELCOME BACK, DETECTIVE", color: Art.gold)
-            GameTitle(text: store.allCompleted ? "MASTER DETECTIVE!" : "CRACK THE\nNEXT CASE.", size: 35)
+            GameTitle(text: store.allCompleted ? "MASTER DETECTIVE!" : "CRACK THE\nNEXT CASE.", size: 32)
             Text("100 mysteries. 10 districts. Every clue counts.")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(Art.faded)
@@ -303,10 +348,10 @@ struct CampaignHomeView: View {
                 }
                 .padding(20)
             }
-            .frame(height: 275)
+            .frame(height: 244)
             .clipped()
 
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 11) {
                 if let level = CampaignCatalog.mission(store.nextLevel) {
                     Text(level.setup)
                         .font(.system(size: 14, weight: .semibold))
@@ -316,7 +361,7 @@ struct CampaignHomeView: View {
                 GameButton(title: store.allCompleted ? "Replay final case" : "PLAY LEVEL \(store.nextLevel)",
                            icon: "play.fill", action: play)
             }
-            .padding(17)
+            .padding(15)
             .background(Art.blueDeep)
         }
         .clipShape(RoundedRectangle(cornerRadius: 20))
@@ -324,7 +369,7 @@ struct CampaignHomeView: View {
     }
 
     private var actions: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             quickAction(icon: "square.grid.3x3.fill", title: "LEVELS", detail: "Choose a case", color: Art.cyan, action: levels)
             quickAction(icon: "rosette", title: "RANK", detail: "Your progress", color: Art.gold, action: stats)
         }
@@ -336,7 +381,7 @@ struct CampaignHomeView: View {
             GameEffects.shared.tap()
             action()
         } label: {
-            VStack(alignment: .leading, spacing: 9) {
+            VStack(alignment: .leading, spacing: 7) {
                 Image(systemName: icon)
                     .font(.system(size: 27, weight: .heavy))
                     .foregroundStyle(color)
@@ -348,9 +393,11 @@ struct CampaignHomeView: View {
                     .foregroundStyle(Art.faded)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(15)
+            .padding(14)
+            .frame(minHeight: 96, alignment: .leading)
             .background(Art.blueDeep)
             .clipShape(RoundedRectangle(cornerRadius: 18))
+            .contentShape(RoundedRectangle(cornerRadius: 18))
             .overlay(RoundedRectangle(cornerRadius: 18).stroke(Art.edge.opacity(0.65), lineWidth: 1.5))
         }
         .buttonStyle(PressGameStyle())
@@ -387,7 +434,7 @@ struct CampaignHomeView: View {
         HStack {
             GameKicker(text: "SOLO CAMPAIGN · OFFLINE")
             Spacer()
-            GameKicker(text: "VERSION 0.4", color: Art.faded)
+            GameKicker(text: "VERSION 0.6", color: Art.faded)
         }
     }
 }
@@ -397,10 +444,11 @@ struct LevelSelectView: View {
     let launch: (Int) -> Void
     let back: () -> Void
     @State private var chosenEpisode = 0
+    @State private var selectedReplayLevel: Int?
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 15) {
                 ScreenHeader(title: "LEVEL SELECT", subtitle: "CHOOSE YOUR NEXT MYSTERY", back: back)
                 episodePicker
                 let episode = CampaignCatalog.episodes[chosenEpisode]
@@ -417,29 +465,31 @@ struct LevelSelectView: View {
                     }
                     .padding(19)
                 }
-                .frame(height: 166)
+                .frame(height: 146)
                 .clipShape(RoundedRectangle(cornerRadius: 18))
 
                 HStack {
                     GameKicker(text: "MISSIONS \(episode.startLevel)–\(episode.endLevel)")
                     Spacer()
-                    Text("\(store.episodeCompleted(episode))/10 SOLVED")
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                    Text("\(store.episodeCompleted(episode))/10 solved · \(store.perfectLevels(in: chosenEpisode))/7 perfect")
+                        .font(.system(size: 11, weight: .black, design: .rounded))
                         .foregroundStyle(Art.gold)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                 }
 
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 10),
-                                    GridItem(.flexible(), spacing: 10)], spacing: 13) {
+                                    GridItem(.flexible(), spacing: 10)], spacing: 11) {
                     ForEach(episode.startLevel...episode.endLevel, id: \.self) { index in
                         levelTile(index)
                     }
                 }
-                GameCard {
+                GameCard(accent: Art.gold) {
                     HStack(spacing: 12) {
                         Image(systemName: "lock.shield.fill")
                             .font(.system(size: 25))
                             .foregroundStyle(Art.cyan)
-                        Text("Solve each level to unlock the next one. Replay solved levels to improve your star rating.")
+                        Text("To unlock the next district, complete all 10 cases and score 3 stars in at least 7 of them. Replay completed cases to improve your best score.")
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(Art.faded)
                     }
@@ -452,6 +502,22 @@ struct LevelSelectView: View {
         }
         .background(GameBackdrop())
         .onAppear { chosenEpisode = (store.nextLevel - 1) / 10 }
+        .alert("LEVEL ALREADY COMPLETED", isPresented: Binding(
+            get: { selectedReplayLevel != nil },
+            set: { if !$0 { selectedReplayLevel = nil } }
+        )) {
+            Button("Replay for a better score") {
+                if let level = selectedReplayLevel {
+                    selectedReplayLevel = nil
+                    launch(level)
+                }
+            }
+            Button("Cancel", role: .cancel) { selectedReplayLevel = nil }
+        } message: {
+            if let level = selectedReplayLevel {
+                Text("Level \(level) is already cleared with \(store.stars(for: level)) of 3 stars. Replay it to improve your rating. Your best result will be kept.")
+            }
+        }
     }
 
     private var episodePicker: some View {
@@ -492,7 +558,11 @@ struct LevelSelectView: View {
         return Button {
             guard unlocked else { return }
             GameEffects.shared.tap()
-            launch(level)
+            if earned > 0 {
+                selectedReplayLevel = level
+            } else {
+                launch(level)
+            }
         } label: {
             VStack(alignment: .leading, spacing: 9) {
                 HStack {
@@ -513,13 +583,14 @@ struct LevelSelectView: View {
                     .frame(minHeight: 31, alignment: .leading)
                 StarStrip(earned: earned, size: 15)
             }
-            .padding(14)
+            .padding(13)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(unlocked ? Art.blueDeep : Art.ink.opacity(0.80))
             .clipShape(RoundedRectangle(cornerRadius: 17))
             .overlay(RoundedRectangle(cornerRadius: 17)
                 .stroke(level == store.nextLevel ? Art.gold : Art.edge.opacity(0.44), lineWidth: level == store.nextLevel ? 2.5 : 1))
             .opacity(unlocked ? 1 : 0.52)
+            .contentShape(RoundedRectangle(cornerRadius: 17))
         }
         .buttonStyle(PressGameStyle())
         .disabled(!unlocked)

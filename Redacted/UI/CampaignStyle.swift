@@ -16,6 +16,32 @@ enum Art {
     static let faded = Color(red: 0.75, green: 0.83, blue: 0.93)
 }
 
+/// Original detective-star coin for game currency.
+struct CoinIcon: View {
+    var size: CGFloat = 25
+
+    var body: some View {
+        ZStack {
+            Circle().fill(Art.goldDark).offset(y: size * 0.08)
+            Circle().fill(LinearGradient(colors: [
+                Color(red: 1, green: 0.95, blue: 0.58),
+                Art.gold, Color(red: 0.94, green: 0.53, blue: 0.11)
+            ], startPoint: .topLeading, endPoint: .bottomTrailing))
+            Circle().stroke(Art.goldDark.opacity(0.75),
+                            lineWidth: max(1.4, size * 0.057))
+                .padding(size * 0.14)
+            Image(systemName: "star.fill")
+                .font(.system(size: size * 0.37, weight: .black))
+                .foregroundStyle(Art.goldDark)
+            Circle().fill(.white.opacity(0.86))
+                .frame(width: size * 0.12)
+                .offset(x: -size * 0.28, y: -size * 0.27)
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+}
+
 struct GameBackdrop: View {
     @AppStorage("redacted.profile.theme") private var selectedTheme = "midnight"
 
@@ -79,7 +105,7 @@ struct GameCard<Content: View>: View {
 
     var body: some View {
         content
-            .padding(17)
+            .padding(15)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
                 ZStack {
@@ -100,11 +126,16 @@ struct GameCard<Content: View>: View {
 
 struct PressGameStyle: ButtonStyle {
     @AppStorage("redacted.fx.motion") private var motion = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func makeBody(configuration: Configuration) -> some View {
+        let animate = motion && !reduceMotion
         configuration.label
-            .scaleEffect(configuration.isPressed && motion ? 0.965 : 1)
-            .offset(y: configuration.isPressed && motion ? 3 : 0)
-            .animation(motion ? .spring(response: 0.17, dampingFraction: 0.63) : nil,
+            .contentShape(Rectangle())
+            .scaleEffect(animate && configuration.isPressed ? 0.962 : 1)
+            .offset(y: animate && configuration.isPressed ? 2 : 0)
+            .brightness(configuration.isPressed ? -0.065 : 0)
+            .animation(animate ? .spring(response: 0.13, dampingFraction: 0.73) : nil,
                        value: configuration.isPressed)
     }
 }
@@ -137,8 +168,8 @@ struct GameButton: View {
                     .font(.system(size: 14, weight: .black))
             }
             .foregroundStyle(color == Art.gold ? Art.ink : Color.white)
-            .padding(.horizontal, 19)
-            .frame(height: 61)
+            .padding(.horizontal, 17)
+            .frame(height: 56)
             .background {
                 ZStack {
                     RoundedRectangle(cornerRadius: 15)
@@ -151,7 +182,8 @@ struct GameButton: View {
                         .stroke(.white.opacity(0.50), lineWidth: 1.7)
                 }
             }
-            .padding(.bottom, 6)
+            .padding(.bottom, 4)
+            .contentShape(Rectangle())
             .opacity(inactive ? 0.45 : 1)
         }
         .disabled(inactive)
@@ -212,9 +244,13 @@ struct StatChip: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.system(size: 17, weight: .black))
-                .foregroundStyle(tint)
+            if icon == "circle.hexagongrid.fill" {
+                CoinIcon(size: 24)
+            } else {
+                Image(systemName: icon)
+                    .font(.system(size: 17, weight: .black))
+                    .foregroundStyle(tint)
+            }
             VStack(alignment: .leading, spacing: 1) {
                 Text(value)
                     .font(.system(size: 16, weight: .black, design: .rounded))

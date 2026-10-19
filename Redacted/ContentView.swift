@@ -5,6 +5,10 @@ struct ContentView: View {
     @State private var route: Route = .home
     @State private var activeLevel = 1
     @State private var startupComplete = false
+    @AppStorage("redacted.setup.complete") private var setupComplete = false
+    @AppStorage("redacted.age.mode") private var ageModeRaw = DetectiveAgeMode.investigator.rawValue
+    @State private var backDrag: CGFloat = 0
+    @State private var backCompleting = false
     @State private var startupProgress = 0.04
     @State private var startupStep = "CONNECTING TO THE ARCHIVE"
     @AppStorage("redacted.tutorial.home") private var homeCoached = false
@@ -21,7 +25,19 @@ struct ContentView: View {
         ZStack {
             GameBackdrop()
             if startupComplete {
-                mainGame
+                if setupComplete {
+                    swipeNavigation
+                        .transition(.opacity)
+                } else {
+                    AgeOnboardingView { mode in
+                        // Only the chosen difficulty is persisted. The exact
+                        // numeric age never leaves the transient setup view.
+                        ageModeRaw = mode.rawValue
+                        setupComplete = true
+                        GameEffects.shared.success()
+                    }
+                    .transition(.opacity)
+                }
             } else {
                 StartupLoadingView(progress: startupProgress, stage: startupStep)
                     .transition(.opacity)
@@ -29,7 +45,7 @@ struct ContentView: View {
         }
         .preferredColorScheme(.dark)
         .overlay {
-            if startupComplete && route == .home &&
+            if startupComplete && setupComplete && route == .home &&
                !homeCoached && store.levelsCompleted == 0 {
                 GameCoachOverlay(
                     title: "YOUR FIRST CASE!",
@@ -43,21 +59,6 @@ struct ContentView: View {
                 }
             }
         }
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 28, coordinateSpace: .global)
-                .onEnded { gesture in
-                    // Only a swipe starting at the *left screen edge* goes back.
-                    // This avoids conflicting with sliders, puzzles or horizontal lists.
-                    guard gesture.startLocation.x < 38,
-                          gesture.translation.width > 105,
-                          abs(gesture.translation.height) < 65 else { return }
-                    switch route {
-                    case .home: break
-                    case .play: show(.levels)
-                    case .levels, .settings, .guide, .stats: show(.home)
-                    }
-                }
-        )
         .task { await prepareStartup() }
         .onChange(of: route) { _, _ in syncMusic() }
         .onChange(of: startupComplete) { _, _ in syncMusic() }
@@ -70,6 +71,99 @@ struct ContentView: View {
             } else {
                 GameMusicController.shared.pause()
             }
+        }
+    }
+
+    @ViewBuilder
+    private var swipeNavigation: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                if backDrag > 0 {
+                    backDestination
+                        .offset(x: -min(34, max(0, proxy.size.width - backDrag) * 0.06))
+                        .allowsHitTesting(false)
+                }
+
+                mainGame
+                    .offset(x: backDrag)
+                    .shadow(color: Art.ink.opacity(backDrag > 0 ? 0.56 : 0),
+                            radius: backDrag > 0 ? 14 : 0, x: -6)
+                    .allowsHitTesting(!backCompleting)
+            }
+            .clipped()
+            .overlay(alignment: .leading) {
+                // Only this narrow bezel strip receives the gesture. Nothing
+                // competes with scrolling, keypad buttons, or radio sliders.
+                if route != .home && !backCompleting {
+                    Color.clear
+                        .frame(width: 22)
+                        .frame(maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                        .gesture(
+                            DragGesture(minimumDistance: 9)
+                                .onChanged { value in
+                                    guard value.translation.width > 0,
+                                          abs(value.translation.height) <
+                                            max(45, abs(value.translation.width) * 0.7)
+                                    else { return }
+                                    backDrag = min(proxy.size.width,
+                                                   max(0, value.translation.width))
+                                }
+                                .onEnded { value in
+                                    let completionThreshold = min(112, proxy.size.width * 0.32)
+                                    let projected = value.predictedEndTranslation.width
+                                    if backDrag > completionThreshold ||
+                                       projected > completionThreshold * 1.7 {
+                                        completeEdgeBack(width: proxy.size.width)
+                                    } else {
+                                        withAnimation(.interactiveSpring(
+                                            response: 0.24, dampingFraction: 0.88)) {
+                                            backDrag = 0
+                                        }
+                                    }
+                                }
+                        )
+                        .accessibilityHidden(true)
+                }
+            }
+            .onChange(of: route) { _, _ in
+                if !backCompleting { backDrag = 0 }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var backDestination: some View {
+        if route == .play {
+            LevelSelectView(store: store, launch: launch, back: { show(.home) })
+        } else {
+            CampaignHomeView(
+                store: store,
+                play: { launch(store.nextLevel) },
+                levels: { show(.levels) },
+                settings: { show(.settings) },
+                guide: { show(.guide) },
+                stats: { show(.stats) }
+            )
+        }
+    }
+
+    private func completeEdgeBack(width: CGFloat) {
+        guard !backCompleting else { return }
+        backCompleting = true
+        let oldRoute = route
+        withAnimation(.easeOut(duration: 0.17)) {
+            backDrag = width
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(175))
+            if route == oldRoute {
+                // The destination was already visible while dragging.
+                route = oldRoute == .play ? .levels : .home
+                syncMusic()
+            }
+            backDrag = 0
+            backCompleting = false
         }
     }
 
@@ -435,7 +529,7 @@ struct CampaignHomeView: View {
         HStack {
             GameKicker(text: "SOLO CAMPAIGN · OFFLINE")
             Spacer()
-            GameKicker(text: "VERSION 0.6", color: Art.faded)
+            GameKicker(text: "VERSION 0.8", color: Art.faded)
         }
     }
 }

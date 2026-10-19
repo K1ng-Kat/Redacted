@@ -1,0 +1,33 @@
+name: Validate REDACTED iPhone and iPad Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/validate-apple-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-ios-simulator:
+    runs-on: macos-latest
+    timeout-minutes: 22
+    steps:
+      - name: Check out game
+        uses: actions/checkout@v4
+      - name: Show Xcode version
+        run: xcodebuild -version
+      - name: Build universal game for iOS Simulator
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Redacted.xcodeproj \
+            -scheme Redacted \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/RedactedDerived" \
+            CODE_SIGNING_ALLOWED=NO \
+            build 2>&1 | tee "$RUNNER_TEMP/redacted-build.log"

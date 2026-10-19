@@ -120,3 +120,20 @@ Verify icon on device, music transitions, taps, victory coin ticks, edge back, f
 - For each age profile, play one of each ten puzzle types and verify there is always a reachable correct answer.
 - Verify iPad VoiceOver/read-aloud, Profile/Settings changes, startup progress, coins and star progression.
 - A separate Xcode build and actual hardware QA are still required. Static checks don't guarantee iPadOS 17 runtime behavior.
+
+## Version 0.8 — Smooth navigation, private first-run setup, opaque icon
+
+- First-launch age setup appears after the startup splash. A wheel picker (ages 6–17 and 18+) and confirmation choose the difficulty.
+- Exact age is NEVER written to disk or sent over a network. The selected number is transient SwiftUI state; only a derived difficulty preference and a setup-complete flag are saved locally.
+- Settings remains the place to change the resulting difficulty later; its privacy description is now explicit.
+- Replaced the buggy whole-screen simultaneous swipe gesture with an interactive swipe-right starting at the extreme left 22-point bezel. The previous screen slides underneath as the user pulls, followed by a short release animation. No swipe-forward gesture.
+- Active cases navigate back to the map; other screens navigate back to HQ. Puzzle buttons, horizontal lists, and radio sliders no longer compete with a full-screen drag recognizer.
+- The existing 1024x1024 user icon was inspected. Its corners and outer region are transparent, causing a light/white matte under some iOS icon rendering. The fix composites ONLY transparent/semitransparent pixels over dark charcoal; fully opaque original logo pixels remain identical.
+- Icon repair script: Scripts/fix_icon_opacity.py. Automation: .github/workflows/fix-icon-opacity.yml. This does not replace the original artwork with a different design.
+
+### Before release
+1. Confirm the Remove REDACTED App Icon White Border GitHub Action succeeded, and that the corrected binary PNG was committed back to main.
+2. Run red-sync, clean Xcode build folder, reinstall only if necessary (reinstalling deletes local campaign progress).
+3. Test first launch and age setup, inspect original icon without a white edge, and verify persistent difficulty but NO stored numeric age.
+4. Test interactive swipe from the extreme left edge on iPhone and iPad, and test dragging the radio slider and scrolling normally.
+5. Compile and playtest on iPad 6 with iPadOS 17 and iPhone with iOS 18 or later.

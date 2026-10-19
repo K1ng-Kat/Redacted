@@ -71,7 +71,7 @@ struct CampaignSettingsView: View {
                             }
                             .buttonStyle(PressGameStyle())
                         }
-                        Text("No birthday, identity or age verification is collected. You can change this anytime. Game progress stays saved.")
+                        Text("Your exact age is never stored or sent to the developers. Only this difficulty preference is saved on your device. You can change it anytime.")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(Art.faded)
                             .fixedSize(horizontal: false, vertical: true)
@@ -113,7 +113,7 @@ struct CampaignSettingsView: View {
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(Art.paper)
                             .fixedSize(horizontal: false, vertical: true)
-                        Text("REDACTED 0.7 — iPhone & iPad campaign")
+                        Text("REDACTED 0.8 — iPhone & iPad campaign")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(Art.faded)
                     }
@@ -152,7 +152,7 @@ struct CampaignSettingsView: View {
                         .font(.system(size: 15, weight: .black, design: .rounded))
                         .foregroundStyle(Art.paper)
                     Spacer()
-                    Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.7") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "8"))")
+                    Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.8") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "9"))")
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
                         .foregroundStyle(Art.faded)
                 }

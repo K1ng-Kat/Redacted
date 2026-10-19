@@ -1,5 +1,4 @@
-name: Remove REDACTED App Icon White Border
-# Supports near-opaque PNG interiors exported with alpha 254.
+name: Fix REDACTED Full-Size App Icon
 
 on:
   push:
@@ -12,24 +11,29 @@ permissions:
   contents: write
 
 jobs:
-  make-icon-opaque:
+  repair-icon:
     if: github.repository == 'K1ng-Kat/Redacted'
     runs-on: ubuntu-latest
     steps:
-      - name: Check out REDACTED
+      - name: Checkout full history to access the original icon
         uses: actions/checkout@v4
-      - name: Install image processing dependency
+        with:
+          fetch-depth: 0
+
+      - name: Install image dependency
         run: python3 -m pip install --quiet pillow
-      - name: Preserve icon artwork and replace transparent rim
+
+      - name: Correct original app icon scale and transparent padding
         run: python3 Scripts/fix_icon_opacity.py
-      - name: Commit corrected original icon
+
+      - name: Commit full-size opaque icon to main
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "Redacted/Assets.xcassets/AppIcon.appiconset/Redacted Files App Icon (1024).png"
           if git diff --cached --quiet; then
-            echo "App icon already opaque. No binary change."
+            echo "Corrected icon already present."
           else
-            git commit -m "Remove app icon white rim by making transparent edges opaque"
+            git commit -m "Fix full-size app icon without white inset border"
             git push origin HEAD:main
           fi

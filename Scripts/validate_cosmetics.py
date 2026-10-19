@@ -46,6 +46,5 @@ assert "email" in account and "type" in account
 assert "REDACTED ID" in account_ui
 assert "SignInWithAppleButton" not in app
 assert "CloudSaveManager.shared" not in app
-, "Social tables need RLS"
 print(f"PASS: {len(items)} individually illustrated cosmetics, "
       f"{len(all_emotes)} duel-only emotes, and social RPC contracts.")

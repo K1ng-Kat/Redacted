@@ -15,7 +15,7 @@ struct ContentView: View {
     @State private var backDrag: CGFloat = 0
     @State private var backCompleting = false
     @State private var startupProgress = 0.04
-    @State private var startupStep = "CONNECTING TO THE ARCHIVE"
+    @State private var startupStep = "OPENING REDACTED"
     @AppStorage("redacted.tutorial.home") private var homeCoached = false
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("redacted.music.enabled") private var musicEnabled = true

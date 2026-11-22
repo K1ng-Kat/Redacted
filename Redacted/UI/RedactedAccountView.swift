@@ -7,8 +7,22 @@ struct RedactedAccountCard: View {
     @ObservedObject private var backup = RedactedAccountSave.shared
     @State private var showingAccount = false
 
+    @ViewBuilder
     var body: some View {
-        GameCard(accent: network.accountEmail == nil ? Art.cyan : Art.mint) {
+        if !network.configured {
+            GameCard(accent: Art.cyan) {
+                VStack(alignment: .leading, spacing: 9) {
+                    GameKicker(text: "SAVE STATUS", color: Art.cyan)
+                    Label("Saved on this iPhone or iPad", systemImage: "checkmark.shield.fill")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundStyle(Art.paper)
+                    Text("Online backup is unavailable. Keep the game installed to preserve your cases.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Art.faded)
+                }
+            }
+        } else {
+            GameCard(accent: network.accountEmail == nil ? Art.cyan : Art.mint) {
             VStack(alignment: .leading, spacing: 12) {
                 GameKicker(text: "REDACTED ID", color: Art.cyan)
                 HStack(spacing: 13) {
@@ -44,10 +58,11 @@ struct RedactedAccountCard: View {
                 }
             }
         }
-        .sheet(isPresented: $showingAccount) {
-            RedactedAccountView()
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
+            .sheet(isPresented: $showingAccount) {
+                RedactedAccountView()
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+            }
         }
     }
 }

@@ -3,6 +3,9 @@
 <plist version="1.0">
 <dict>
 	<!-- Public service configuration only, never service_role. -->
+	<!-- Leave blank until the first real UTC season launch is scheduled. -->
+	<key>RDSeasonLaunchUTC</key>
+	<string></string>
 	<key>RDSocialProjectURL</key>
 	<string></string>
 	<key>RDSocialPublishableKey</key>

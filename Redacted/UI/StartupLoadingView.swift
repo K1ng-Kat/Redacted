@@ -147,7 +147,7 @@ struct StartupLoadingView: View {
             // SwiftUI interpolates it on every rendered frame; they cannot
             // independently jump between the loading milestones anymore.
             AnimatedLoadingMeter(progress: progress, reduceMotion: reduceMotion)
-                .animation(reduceMotion ? nil : .linear(duration: 1.05), value: progress)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.23), value: progress)
 
             Text(stage.uppercased())
                 .font(.system(size: 11, weight: .bold, design: .monospaced))

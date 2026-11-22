@@ -97,7 +97,9 @@ struct CampaignSettingsView: View {
                                       value: $levelVolume, maximum: 0.45)
                     }
                 }
-                RedactedAccountCard()
+                if DetectiveSocialConfiguration.isConfigured {
+                    RedactedAccountCard()
+                }
                 GameCard(accent: Art.gold) {
                     VStack(alignment: .leading, spacing: 11) {
                         GameKicker(text: "CRYSTALS & HINTS", color: Art.gold)
@@ -121,21 +123,28 @@ struct CampaignSettingsView: View {
                 GameCard {
                     VStack(alignment: .leading, spacing: 11) {
                         GameKicker(text: "PRIVACY AND SAVES", color: Art.cyan)
-                        Text("Progress is saved locally. A verified REDACTED ID can back it up to a private account, independent of Apple ID and iCloud. A secure email code is required on new devices.")
+                        Text(DetectiveSocialConfiguration.isConfigured
+                             ? "Progress is saved on this device. Sign in to REDACTED ID to back up your campaign and restore it on another device."
+                             : "Your campaign progress is saved on this device. Online backup is not available in this version; deleting the app may erase your save.")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(Art.paper)
                             .fixedSize(horizontal: false, vertical: true)
-                        Text("REDACTED 1.6 — iPhone & iPad campaign")
+                        Text("100 cases · 10 districts · iPhone & iPad")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(Art.faded)
                     }
                 }
-                GameButton(title: "ERASE CAMPAIGN SAVE", icon: "trash.fill",
-                           color: Art.coral, bottom: Art.coralDark) {
-                    confirmingReset = true
-                }
-                GameButton(title: "DONE", icon: "checkmark", action: back)
                 appInfo
+                GameButton(title: "DONE", icon: "checkmark", action: back)
+                Button(role: .destructive) {
+                    confirmingReset = true
+                } label: {
+                    Label("ERASE CAMPAIGN PROGRESS", systemImage: "trash")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(Art.coral)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(PressGameStyle())
             }
             .frame(maxWidth: 560)
             .padding(18)
@@ -213,7 +222,7 @@ struct CampaignSettingsView: View {
                         }
                         .buttonStyle(PressGameStyle())
                     }
-                    Text("Your exact age is not stored or sent to the developers. Only your selected difficulty profile is saved on this device.")
+                    Text("Only your selected difficulty is stored on this device.")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(Art.faded)
                         .fixedSize(horizontal: false, vertical: true)

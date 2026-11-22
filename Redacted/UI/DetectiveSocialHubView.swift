@@ -106,7 +106,8 @@ struct DetectiveSocialHubView: View {
             Circle()
                 .fill(network.connected ? Art.mint : Art.gold)
                 .frame(width: 10, height: 10)
-            Text(network.connected ? "CONNECTED" :
+            Text(!network.configured ? "OFFLINE MODE" :
+                     network.connected ? "CONNECTED" :
                      network.accountEmail == nil ? "SIGN IN REQUIRED" : "NETWORK NOT CONNECTED")
                 .font(.system(size: 11, weight: .black, design: .rounded))
                 .foregroundStyle(network.connected ? Art.mint : Art.gold)
@@ -439,10 +440,10 @@ struct DetectiveSocialHubView: View {
 
     private var setupNotice: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label("NETWORK SETUP REQUIRED", systemImage: "server.rack")
+            Label("ONLINE FEATURES UNAVAILABLE", systemImage: "wifi.slash")
                 .font(.system(size: 13, weight: .black, design: .rounded))
                 .foregroundStyle(Art.gold)
-            Text("Friends and Task Forces use a private account-backed server, not iCloud. The app developer must connect the service before online accounts, invites, and activity can work.")
+            Text("Online friends and Task Forces aren't available in this version. Your solo campaign and detective customization work offline.")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(Art.paper)
                 .fixedSize(horizontal: false, vertical: true)

@@ -7,8 +7,22 @@ struct RedactedAccountCard: View {
     @ObservedObject private var backup = RedactedAccountSave.shared
     @State private var showingAccount = false
 
+    @ViewBuilder
     var body: some View {
-        GameCard(accent: network.accountEmail == nil ? Art.cyan : Art.mint) {
+        if !network.configured {
+            GameCard(accent: Art.cyan) {
+                VStack(alignment: .leading, spacing: 9) {
+                    GameKicker(text: "SAVE STATUS", color: Art.cyan)
+                    Label("Saved on this iPhone or iPad", systemImage: "checkmark.shield.fill")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundStyle(Art.paper)
+                    Text("Online backup is unavailable. Keep the game installed to preserve your cases.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Art.faded)
+                }
+            }
+        } else {
+            GameCard(accent: network.accountEmail == nil ? Art.cyan : Art.mint) {
             VStack(alignment: .leading, spacing: 12) {
                 GameKicker(text: "REDACTED ID", color: Art.cyan)
                 HStack(spacing: 13) {
@@ -44,10 +58,11 @@ struct RedactedAccountCard: View {
                 }
             }
         }
-        .sheet(isPresented: $showingAccount) {
-            RedactedAccountView()
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
+            .sheet(isPresented: $showingAccount) {
+                RedactedAccountView()
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+            }
         }
     }
 }
@@ -70,14 +85,18 @@ struct RedactedAccountView: View {
 
                     if network.accountEmail != nil {
                         signedInContent
+                    } else if !network.configured {
+                        unavailableAccount
                     } else {
                         loginContent
                     }
 
-                    Text("REDACTED ID uses private email-code verification. Your email is used for sign-in and account recovery, not displayed to other players. Your campaign stays saved locally even if you sign out.")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Art.faded)
-                        .fixedSize(horizontal: false, vertical: true)
+                    if network.configured {
+                        Text("REDACTED ID uses email-code verification. Your email is private and isn't shown to other players. Your campaign also remains saved locally if you sign out.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Art.faded)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 .frame(maxWidth: 510)
                 .padding(20)
@@ -111,6 +130,24 @@ struct RedactedAccountView: View {
         }
     }
 
+    private var unavailableAccount: some View {
+        GameCard(accent: Art.cyan) {
+            VStack(alignment: .leading, spacing: 11) {
+                Image(systemName: "externaldrive.fill.badge.checkmark")
+                    .font(.system(size: 33))
+                    .foregroundStyle(Art.cyan)
+                GameTitle(text: "YOUR CASES ARE SAVED", size: 22)
+                Text("Your investigation progress is stored on this device. Online sign-in and cross-device backup aren't available in this version.")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Art.faded)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("Keep Redacted installed to retain your local save.")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Art.paper)
+            }
+        }
+    }
+
     private var loginContent: some View {
         VStack(alignment: .leading, spacing: 15) {
             GameCard(accent: Art.gold) {
@@ -127,12 +164,6 @@ struct RedactedAccountView: View {
                                 .font(.system(size: 12))
                                 .foregroundStyle(Art.faded)
                         }
-                    }
-                    if !network.configured {
-                        Text("The REDACTED email service has not been connected by the developer. Verification emails cannot be sent yet.")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(Art.gold)
-                            .fixedSize(horizontal: false, vertical: true)
                     }
                     if network.codeSentTo == nil {
                         Text("EMAIL ADDRESS")

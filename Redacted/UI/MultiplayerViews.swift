@@ -50,11 +50,11 @@ struct MultiplayerLobbyView: View {
                 GameCard(accent: Art.cyan) {
                     VStack(alignment: .leading, spacing: 8) {
                         GameKicker(text: "PRIVATE INVITE-ONLY ROOMS", color: Art.cyan)
-                        Text("Two detectives. One mystery. First to solve all three clues wins. There are 1,000 unique case combinations. Your campaign levels and currency are unaffected.")
+                        Text("Two detectives. One mystery. First to solve all three clues wins. Each match uses a randomized case. Your campaign levels and currency are unaffected.")
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(Art.paper)
                             .fixedSize(horizontal: false, vertical: true)
-                        Text("Online connection and iCloud are required. Opponents join by room code or QR, not public matchmaking.")
+                        Text("A REDACTED ID and internet connection are required. Join a private match by room code or QR invite.")
                             .font(.system(size: 11))
                             .foregroundStyle(Art.faded)
                     }
@@ -63,7 +63,7 @@ struct MultiplayerLobbyView: View {
                 if network.accountEmail == nil {
                     RedactedAccountCard()
                 } else if !network.configured {
-                    Text("Multiplayer is not available until the REDACTED server is configured.")
+                    Text("Online matches aren't available in this version. You can play the complete solo campaign offline.")
                         .foregroundStyle(Art.gold)
                 }
 

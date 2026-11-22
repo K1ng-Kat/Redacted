@@ -71,6 +71,12 @@ struct DetectiveRealisticAvatar: View {
             }
         }
         .frame(width: size, height: size)
+        // Small status avatars frame the face instead of shrinking the
+        // entire full-body portrait down to an unreadable thumbnail.
+        .scaleEffect(size <= 96 ? 1.75 : 1)
+        .offset(y: size <= 96 ? size * 0.28 : 0)
+        .frame(width: size, height: size)
+        .clipped()
         .clipShape(RoundedRectangle(cornerRadius: size * 0.14, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: size * 0.14, style: .continuous)

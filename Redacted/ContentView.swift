@@ -68,6 +68,9 @@ struct ContentView: View {
         }
         .task {
             await prepareStartup()
+            // Present the ready screen before attaching optional online systems.
+            try? await Task.sleep(for: .milliseconds(180))
+            guard !Task.isCancelled else { return }
             RedactedAccountSave.shared.attach(store)
             MultiplayerService.shared.attach(store)
             if DetectiveSocialNetwork.shared.accountEmail != nil {

@@ -64,6 +64,7 @@ struct Detective3DCharacter: UIViewRepresentable {
                                                 equipment: equipment, theme: theme,
                                                 closeup: size < 100,
                                                 animated: size >= 170)
+        view.pointOfView = view.scene?.rootNode.childNode(withName: "Detective camera", recursively: false)
         context.coordinator.signature = signature
         return view
     }
@@ -75,6 +76,7 @@ struct Detective3DCharacter: UIViewRepresentable {
                                                 equipment: equipment, theme: theme,
                                                 closeup: size < 100,
                                                 animated: size >= 170)
+        view.pointOfView = view.scene?.rootNode.childNode(withName: "Detective camera", recursively: false)
     }
 
     final class Coordinator {
@@ -206,6 +208,7 @@ private enum DetectiveModelFactory {
                                                        blue: 0.88, alpha: 1)))
 
         let camera = SCNNode()
+        camera.name = "Detective camera"
         camera.camera = SCNCamera()
         camera.camera?.fieldOfView = closeup ? 32 : 38
         camera.camera?.wantsHDR = true
@@ -217,7 +220,6 @@ private enum DetectiveModelFactory {
                                 : SCNVector3(0, 1.01, 0))
         camera.camera?.zNear = 0.025
         scene.rootNode.addChildNode(camera)
-        scene.rootNode.camera = camera.camera
         return scene
     }
 

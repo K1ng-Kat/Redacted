@@ -368,36 +368,28 @@ struct ContentView: View {
     @MainActor
     private func prepareStartup() async {
         guard !startupComplete else { return }
-        // Show the authored loading UI before the first preparation update.
-        // Prevents the screen being swapped before its first rendered frame.
-        try? await Task.sleep(for: .milliseconds(160))
+        // Render the branded launch view once, then perform real local work.
+        try? await Task.sleep(for: .milliseconds(100))
         guard !Task.isCancelled else { return }
 
-        startupStep = "VERIFYING CASE FILES"
-        // The campaign catalog and current save are loaded before gameplay.
+        startupStep = "LOADING CASE FILES"
         _ = CampaignCatalog.levels.count
         _ = store.nextLevel
-        withAnimation(.linear(duration: 1.05)) {
-            startupProgress = 0.48
-        }
-        try? await Task.sleep(for: .milliseconds(1050))
+        startupProgress = 0.55
+        await Task.yield()
 
-        startupStep = "PREPARING AUDIO"
+        startupStep = "PREPARING SOUND"
         GameMusicController.shared.prepare()
-        _ = GameEffects.shared // Preload button and coin sounds.
-        withAnimation(.linear(duration: 1.05)) {
-            startupProgress = 0.82
-        }
-        try? await Task.sleep(for: .milliseconds(1050))
+        _ = GameEffects.shared
+        startupProgress = 0.90
+        await Task.yield()
 
-        startupStep = "WELCOME, DETECTIVE"
-        withAnimation(.linear(duration: 1.05)) {
-            startupProgress = 1
-        }
-        // Let the same animatable fraction reach 100% before the fade.
-        try? await Task.sleep(for: .milliseconds(1190))
+        startupStep = "READY TO INVESTIGATE"
+        startupProgress = 1
+        // A short visual handoff, not several seconds of artificial loading.
+        try? await Task.sleep(for: .milliseconds(190))
         guard !Task.isCancelled else { return }
-        withAnimation(.easeInOut(duration: 0.35)) {
+        withAnimation(.easeInOut(duration: 0.24)) {
             startupComplete = true
         }
     }

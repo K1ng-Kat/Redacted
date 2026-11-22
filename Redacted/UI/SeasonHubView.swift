@@ -81,7 +81,7 @@ struct SeasonHubView: View {
                 Spacer()
                 VStack(alignment: .trailing, spacing: 5) {
                     GameKicker(text: "ENDS · UTC", color: Art.faded)
-                    Text(season.endsAt.formatted(.dateTime.month(.abbreviated).day().year().hour().minute().timeZone()))
+                    Text(utcDate(season.endsAt))
                         .font(.system(size: 11, weight: .semibold))
                         .multilineTextAlignment(.trailing)
                         .foregroundStyle(Art.cyan)
@@ -148,7 +148,13 @@ struct SeasonHubView: View {
 
     private var objectives: some View {
         VStack(alignment: .leading, spacing: 11) {
-            GameKicker(text: "FIELD OBJECTIVES", color: Art.cyan)
+            HStack {
+                GameKicker(text: "FIELD OBJECTIVES", color: Art.cyan)
+                Spacer()
+                Text("\(store.totalStars) LIFETIME STARS")
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundStyle(Art.faded)
+            }
             objective(icon: "checkmark.shield.fill", name: "CLOSE 5 CASES",
                       subtitle: "Complete investigations this season",
                       current: director.activity.casesCompleted, target: 5)
@@ -211,8 +217,7 @@ struct SeasonHubView: View {
                     .fixedSize(horizontal: false, vertical: true)
                 HStack {
                     Image(systemName: "calendar.badge.clock")
-                    Text(director.upcoming.startsAt.formatted(
-                        .dateTime.month(.wide).day().year().hour().minute().timeZone()))
+                    Text(utcDate(director.upcoming.startsAt))
                 }
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(Art.cyan)
@@ -263,6 +268,15 @@ struct SeasonHubView: View {
         }
     }
     #endif
+
+    private func utcDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "MMM d, yyyy · HH:mm 'UTC'"
+        return formatter.string(from: date)
+    }
 
     private func countdown(until end: Date, from now: Date) -> String {
         let remaining = max(0, Int(ceil(end.timeIntervalSince(now))))

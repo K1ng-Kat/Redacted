@@ -165,12 +165,6 @@ struct RedactedAccountView: View {
                                 .foregroundStyle(Art.faded)
                         }
                     }
-                    if !network.configured {
-                        Text("Online sign-in is temporarily unavailable. Your cases remain saved on this device.")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(Art.gold)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
                     if network.codeSentTo == nil {
                         Text("EMAIL ADDRESS")
                             .font(.system(size: 11, weight: .black, design: .monospaced))

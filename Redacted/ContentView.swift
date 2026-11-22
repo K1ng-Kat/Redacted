@@ -213,6 +213,7 @@ struct ContentView: View {
                 DragGesture(minimumDistance: 45)
                     .onEnded { gesture in
                         guard showsMainTabs,
+                              DetectiveSocialConfiguration.isConfigured,
                               !(route == .multiplayer && MultiplayerService.shared.phase == .playing),
                               abs(gesture.translation.width) > 75,
                               abs(gesture.translation.width) > abs(gesture.translation.height) * 1.7

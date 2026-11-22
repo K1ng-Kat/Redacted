@@ -11,6 +11,8 @@ on:
       - "Redacted/**/*.storyboard"
       - "Redacted/*.swift"
       - "Redacted.xcodeproj/project.pbxproj"
+      - "Redacted-Info.plist"
+      - "SEASONS_AND_UI_OVERHAUL.md"
       - "Scripts/validate_cosmetics.py"
       - "Backend/**/*.sql"
   workflow_dispatch:
@@ -42,6 +44,26 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/RedactedDerived" \
             CODE_SIGNING_ALLOWED=NO \
             build 2>&1 | tee "$RUNNER_TEMP/redacted-build.log"
+
+      - name: Build release configuration for iOS Simulator
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Redacted.xcodeproj \
+            -scheme Redacted \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/RedactedDerived" \
+            CODE_SIGNING_ALLOWED=NO \
+            build 2>&1 | tee "$RUNNER_TEMP/redacted-release-build.log"
+
+      - name: Check release bundle has no developer preview UI
+        run: |
+          APP="$RUNNER_TEMP/RedactedDerived/Build/Products/Release-iphonesimulator/Redacted.app"
+          test -d "$APP"
+          ! grep -R -a -q "DEVELOPER PREVIEW" "$APP" || exit 1
+          ! grep -R -a -q "DEVELOPER TOOLS" "$APP" || exit 1
 
       - name: Check Game Mode support and native launch screen
         run: |

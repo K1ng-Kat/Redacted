@@ -141,9 +141,12 @@ final class DetectiveSocialNetwork: ObservableObject {
     private let keychainKey = "com.UtilityFreak.Redacted.social.session.v1"
 
     private init() {
-        token = readSession()
-        accountEmail = token?.email
-        if !configured {
+        // Keychain lookups may block the main actor while the OS unlocks its
+        // database. An offline game must not request Keychain on every launch.
+        if configured {
+            token = readSession()
+            accountEmail = token?.email
+        } else {
             message = "Online friends and Task Forces aren't available in this version."
         }
     }

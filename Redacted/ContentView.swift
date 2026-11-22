@@ -191,8 +191,14 @@ struct ContentView: View {
         }
     }
 
+    private var availableTabs: [Route] {
+        DetectiveSocialConfiguration.isConfigured
+            ? [.home, .multiplayer, .friends]
+            : [.home, .levels, .wardrobe]
+    }
+
     private var showsMainTabs: Bool {
-        route == .home || route == .multiplayer || route == .friends
+        navigationHistory.isEmpty && availableTabs.contains(route)
     }
 
     @ViewBuilder
@@ -211,7 +217,7 @@ struct ContentView: View {
                               abs(gesture.translation.width) > 75,
                               abs(gesture.translation.width) > abs(gesture.translation.height) * 1.7
                         else { return }
-                        let all: [Route] = [.home, .multiplayer, .friends]
+                        let all = availableTabs
                         guard let index = all.firstIndex(of: route) else { return }
                         let next = index + (gesture.translation.width < 0 ? 1 : -1)
                         if all.indices.contains(next) {
@@ -228,8 +234,13 @@ struct ContentView: View {
     private var mainTabBar: some View {
         HStack(spacing: 0) {
             mainTab(.home, symbol: "house.fill", label: "HOME")
-            mainTab(.multiplayer, symbol: "gamecontroller.fill", label: "DUELS")
-            mainTab(.friends, symbol: "person.2.fill", label: "SOCIAL")
+            if DetectiveSocialConfiguration.isConfigured {
+                mainTab(.multiplayer, symbol: "gamecontroller.fill", label: "DUELS")
+                mainTab(.friends, symbol: "person.2.fill", label: "SOCIAL")
+            } else {
+                mainTab(.levels, symbol: "square.grid.2x2.fill", label: "CASES")
+                mainTab(.wardrobe, symbol: "person.crop.square", label: "STYLE")
+            }
         }
         .padding(5)
         .background(Art.blueDeep)
@@ -315,7 +326,10 @@ struct ContentView: View {
         case .season:
             SeasonHubView(director: seasons, store: store, back: { popScreen() })
         case .levels:
-            LevelSelectView(store: store, launch: launch, back: { popScreen() })
+            LevelSelectView(store: store, launch: launch, back: {
+                if navigationHistory.isEmpty { selectTab(.home) }
+                else { popScreen() }
+            })
         case .play:
             if let mission = CampaignCatalog.mission(activeLevel) {
                 MissionPlayView(
@@ -340,7 +354,10 @@ struct ContentView: View {
             CampaignStatsView(store: store, back: { popScreen() },
                               customize: { show(.wardrobe) })
         case .wardrobe:
-            DetectiveWardrobeView(store: store, back: { popScreen() })
+            DetectiveWardrobeView(store: store, back: {
+                if navigationHistory.isEmpty { selectTab(.home) }
+                else { popScreen() }
+            })
         case .multiplayer:
             MultiplayerLobbyView(store: store, back: { selectTab(.home) })
         case .friends:
@@ -417,7 +434,7 @@ struct ContentView: View {
     /// Switching primary tabs does not create back-stack history. Detail
     /// screens continue to use the existing push/pop behavior.
     private func selectTab(_ next: Route) {
-        guard next == .home || next == .multiplayer || next == .friends else { return }
+        guard availableTabs.contains(next) else { return }
         navigationHistory.removeAll()
         backDrag = 0
         if route != next { setRoute(next) }
@@ -439,7 +456,9 @@ struct ContentView: View {
     }
 
     private func openPendingInvite() {
-        guard startupComplete, setupComplete, let code = pendingInvite else { return }
+        guard startupComplete, setupComplete,
+              DetectiveSocialConfiguration.isConfigured,
+              let code = pendingInvite else { return }
         pendingInvite = nil
         if route != .multiplayer { selectTab(.multiplayer) }
         MultiplayerService.shared.attach(store)
@@ -568,8 +587,10 @@ struct CampaignHomeView: View {
         } label: {
             VStack(alignment: .leading, spacing: 15) {
                 HStack(alignment: .center, spacing: 7) {
-                    Circle().fill(Art.mint).frame(width: 7, height: 7)
-                    GameKicker(text: "LIVE SEASON", color: Art.cyan)
+                    Image(systemName: "checkmark.shield.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Art.mint)
+                    GameKicker(text: "CURRENT SEASON", color: Art.cyan)
                     Spacer(minLength: 0)
                     Image(systemName: "shield.lefthalf.filled")
                         .font(.system(size: 18, weight: .semibold))
@@ -592,11 +613,18 @@ struct CampaignHomeView: View {
                 }
                 HStack(alignment: .center) {
                     VStack(alignment: .leading, spacing: 4) {
-                        GameKicker(text: "SEASON ENDS IN", color: Art.faded)
-                        TimelineView(.periodic(from: .now, by: 1)) { context in
-                            Text(seasonCountdown(at: context.date))
-                                .font(.system(size: 17, weight: .black, design: .monospaced))
-                                .monospacedDigit()
+                        if seasons.hasPublishedSchedule {
+                            GameKicker(text: "SEASON ENDS IN", color: Art.faded)
+                            TimelineView(.periodic(from: .now, by: 1)) { context in
+                                Text(seasonCountdown(at: context.date))
+                                    .font(.system(size: 17, weight: .black, design: .monospaced))
+                                    .monospacedDigit()
+                                    .foregroundStyle(Art.paper)
+                            }
+                        } else {
+                            GameKicker(text: "YOUR INVESTIGATION", color: Art.faded)
+                            Text("\(seasons.activity.intelCollected) INTEL COLLECTED")
+                                .font(.system(size: 13, weight: .heavy, design: .monospaced))
                                 .foregroundStyle(Art.paper)
                         }
                     }
@@ -630,12 +658,7 @@ struct CampaignHomeView: View {
         .accessibilityLabel("Open \(seasons.displayed.heading) season headquarters")
     }
 
-    private var seasonDisplayTitle: String {
-        #if DEBUG
-        if seasons.isPreviewing { return seasons.displayed.developerTitle }
-        #endif
-        return seasons.displayed.title
-    }
+    private var seasonDisplayTitle: String { seasons.displayed.title }
 
     private func seasonCountdown(at now: Date) -> String {
         let total = max(0, Int(ceil(seasons.displayed.endsAt.timeIntervalSince(now))))
@@ -828,7 +851,7 @@ struct CampaignHomeView: View {
         HStack {
             GameKicker(text: "SOLO CAMPAIGN · OFFLINE")
             Spacer()
-            GameKicker(text: "VERSION \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.4")", color: Art.faded)
+            GameKicker(text: "REDACTED · CASE FILES", color: Art.faded)
         }
     }
 }

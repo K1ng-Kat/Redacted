@@ -173,7 +173,7 @@ struct GameCard<Content: View>: View {
                         RoundedRectangle(cornerRadius: 19, style: .continuous)
                             .strokeBorder(accent.opacity(0.34), lineWidth: 1)
                     }
-                    .shadow(color: Art.ink.opacity(0.29), radius: 15, y: 7)
+                    .shadow(color: Art.ink.opacity(0.22), radius: 10, y: 5)
             }
     }
 }
@@ -207,38 +207,35 @@ struct GameButton: View {
             GameEffects.shared.tap()
             action()
         } label: {
-            HStack(spacing: 11) {
+            HStack(spacing: 10) {
                 Image(systemName: icon)
-                    .font(.system(size: 20, weight: .black))
-                    .frame(width: 24)
-                Spacer(minLength: 0)
+                    .font(.system(size: 17, weight: .bold))
+                    .frame(width: 23)
                 Text(title.uppercased())
-                    .font(.system(size: 17, weight: .black, design: .rounded))
-                    .tracking(0.4)
-                    .minimumScaleFactor(0.75)
+                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .tracking(0.45)
                     .lineLimit(1)
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .black))
+                    .minimumScaleFactor(0.76)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 13, weight: .bold))
+                    .frame(width: 17)
             }
             .foregroundStyle(color == Art.gold ? Art.ink : Color.white)
-            .padding(.horizontal, 17)
-            .frame(height: 56)
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, minHeight: 54)
             .background {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 15)
-                        .fill(bottom)
-                        .offset(y: 5)
-                    RoundedRectangle(cornerRadius: 15)
-                        .fill(LinearGradient(colors: [color.opacity(0.85), color],
-                                             startPoint: .top, endPoint: .bottom))
-                    RoundedRectangle(cornerRadius: 15)
-                        .stroke(.white.opacity(0.50), lineWidth: 1.7)
-                }
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(LinearGradient(colors: [color.opacity(0.88), color],
+                                         startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .strokeBorder(.white.opacity(0.25), lineWidth: 1)
+                    }
+                    .shadow(color: bottom.opacity(0.22), radius: 9, y: 4)
             }
-            .padding(.bottom, 4)
-            .contentShape(Rectangle())
-            .opacity(inactive ? 0.45 : 1)
+            .contentShape(RoundedRectangle(cornerRadius: 14))
+            .opacity(inactive ? 0.42 : 1)
         }
         .disabled(inactive)
         .buttonStyle(PressGameStyle())

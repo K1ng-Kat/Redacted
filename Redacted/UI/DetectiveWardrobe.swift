@@ -110,14 +110,27 @@ struct DetectiveCharacter: View {
 
     @AppStorage("redacted.profile.theme") private var theme = "midnight"
 
+    @ViewBuilder
     var body: some View {
-        DetectiveAvatarArt(
-            theme: previewTheme ?? theme,
-            skin: store.skin,
-            hair: store.hair,
-            loadout: loadout,
-            size: size
-        )
+        if let portrait = DetectivePortraitLibrary.portrait(skin: store.skin, hair: store.hair) {
+            DetectiveRealisticAvatar(
+                portrait: portrait,
+                theme: previewTheme ?? theme,
+                skin: store.skin,
+                hair: store.hair,
+                loadout: loadout,
+                size: size
+            )
+        } else {
+            // Keep the game playable if the art asset is missing from a build.
+            DetectiveAvatarArt(
+                theme: previewTheme ?? theme,
+                skin: store.skin,
+                hair: store.hair,
+                loadout: loadout,
+                size: size
+            )
+        }
     }
 
     private var loadout: [CosmeticSlot: String] {

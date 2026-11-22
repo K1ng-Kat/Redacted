@@ -50,7 +50,7 @@ struct MultiplayerLobbyView: View {
                 GameCard(accent: Art.cyan) {
                     VStack(alignment: .leading, spacing: 8) {
                         GameKicker(text: "PRIVATE INVITE-ONLY ROOMS", color: Art.cyan)
-                        Text("Two detectives. One mystery. First to solve all three clues wins. There are 1,000 unique case combinations. Your campaign levels and currency are unaffected.")
+                        Text("Two detectives. One mystery. First to solve all three clues wins. Each match uses a randomized case. Your campaign levels and currency are unaffected.")
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(Art.paper)
                             .fixedSize(horizontal: false, vertical: true)

@@ -152,12 +152,12 @@ private struct DetectiveRealisticEquipment: View {
         ])
         let leftArm = shape([
             CGPoint(x: 87, y: 105), CGPoint(x: 70, y: 126),
-            CGPoint(x: 61, y: 257), CGPoint(x: 91, y: 264),
+            CGPoint(x: 67, y: 235), CGPoint(x: 93, y: 238),
             CGPoint(x: 100, y: 159)
         ])
         let rightArm = shape([
             CGPoint(x: 213, y: 105), CGPoint(x: 230, y: 126),
-            CGPoint(x: 239, y: 257), CGPoint(x: 209, y: 264),
+            CGPoint(x: 233, y: 235), CGPoint(x: 207, y: 238),
             CGPoint(x: 200, y: 159)
         ])
         for piece in [left, right, leftArm, rightArm] {

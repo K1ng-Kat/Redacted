@@ -91,10 +91,12 @@ struct RedactedAccountView: View {
                         loginContent
                     }
 
-                    Text("REDACTED ID uses private email-code verification. Your email is used for sign-in and account recovery, not displayed to other players. Your campaign stays saved locally even if you sign out.")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Art.faded)
-                        .fixedSize(horizontal: false, vertical: true)
+                    if network.configured {
+                        Text("REDACTED ID uses email-code verification. Your email is private and isn't shown to other players. Your campaign also remains saved locally if you sign out.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Art.faded)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 .frame(maxWidth: 510)
                 .padding(20)

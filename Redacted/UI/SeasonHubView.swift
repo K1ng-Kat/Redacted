@@ -12,7 +12,7 @@ struct SeasonHubView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 17) {
-                ScreenHeader(title: "SEASON HQ", subtitle: "LIVE OPERATIONS", back: back)
+                ScreenHeader(title: "SEASON HQ", subtitle: "CHAPTER PROGRESS", back: back)
                 hero
                 progressPanel
                 objectives

@@ -1,10 +1,7 @@
+import Combine
 import Foundation
 import SwiftUI
-import Combine
 
-/// Seasonal presentation never edits campaign saves or detective cosmetics.
-/// The date schedule is deliberately explicit so a future backend can replace
-/// the calendar without changing the view layer.
 enum SeasonTone: Int, CaseIterable {
     case midnight, signal, ember, ultraviolet
 }
@@ -18,26 +15,22 @@ struct RedactedSeason: Equatable, Identifiable {
 
     var id: String { "chapter-\(chapter)-season-\(number)" }
     var heading: String { "CHAPTER \(chapter) · SEASON \(number)" }
-    var duration: TimeInterval { endsAt.timeIntervalSince(startsAt) }
-
-    /// Public releases never embed unreleased plot titles, character names
-    /// or unreleased artwork. Publishing real season content is a separate step.
-    var title: String {
-        if chapter == 1 && number == 1 { return "SHADOW PROTOCOL" }
-        return "CLASSIFIED OPERATION"
-    }
-
-    #if DEBUG
-    var developerTitle: String {
-        return "UNRELEASED SEASON PREVIEW"
-    }
-    #endif
+    var title: String { chapter == 1 && number == 1 ? "THE INVESTIGATION BEGINS" : "CLASSIFIED" }
 }
 
+/// Publishing a date is deliberate. An empty RDSeasonLaunchUTC means that
+/// no launch schedule has been announced; the UI will not invent a deadline.
+/// Once set to an ISO-8601 UTC timestamp, the two-month calendar rotates
+/// automatically without a new app binary for each scheduled change.
 enum SeasonCalendar {
-    /// Development launch schedule. Replace with the official UTC launch date
-    /// before shipping the first season. UTC avoids DST and timezone ambiguity.
-    static let epoch = Date(timeIntervalSince1970: 1793491200) // Nov 1, 2026 00:00 UTC
+    static var publishedLaunch: Date? {
+        guard let raw = Bundle.main.object(forInfoDictionaryKey: "RDSeasonLaunchUTC") as? String,
+              !raw.isEmpty,
+              let date = ISO8601DateFormatter().date(from: raw)
+        else { return nil }
+        return date
+    }
+
     private static var utc: Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
@@ -45,22 +38,28 @@ enum SeasonCalendar {
     }
 
     static func season(at time: Date) -> RedactedSeason {
+        guard let epoch = publishedLaunch else {
+            return RedactedSeason(chapter: 1, number: 1,
+                                  startsAt: .distantPast, endsAt: .distantFuture,
+                                  tone: .midnight)
+        }
         let months = utc.dateComponents([.month], from: epoch, to: time).month ?? 0
-        // Each season is two UTC calendar months, not a floating 60-day timer.
         let index = max(0, Int(floor(Double(months) / 2)))
-        let startsAt = utc.date(byAdding: .month, value: index * 2, to: epoch)!
-        let endsAt = utc.date(byAdding: .month, value: (index + 1) * 2, to: epoch)!
-        return RedactedSeason(
-            chapter: index / 4 + 1,
-            number: index % 4 + 1,
-            startsAt: startsAt,
-            endsAt: endsAt,
-            tone: SeasonTone.allCases[index % SeasonTone.allCases.count]
-        )
+        let start = utc.date(byAdding: .month, value: index * 2, to: epoch)!
+        let end = utc.date(byAdding: .month, value: (index + 1) * 2, to: epoch)!
+        return RedactedSeason(chapter: index / 4 + 1,
+                              number: index % 4 + 1,
+                              startsAt: start, endsAt: end,
+                              tone: SeasonTone.allCases[index % SeasonTone.allCases.count])
     }
 
     static func next(after season: RedactedSeason) -> RedactedSeason {
-        self.season(at: season.endsAt)
+        guard publishedLaunch != nil else {
+            return RedactedSeason(chapter: 1, number: 2,
+                                  startsAt: .distantFuture, endsAt: .distantFuture,
+                                  tone: .signal)
+        }
+        return self.season(at: season.endsAt)
     }
 }
 
@@ -70,18 +69,14 @@ struct SeasonActivity: Codable, Equatable {
     var intelCollected = 0
 }
 
-/// Production mode always follows the live UTC schedule. Preview is compiled
-/// exclusively into DEBUG builds, so there is no secret switch in App Store builds.
-/// Note: a device clock is NOT authoritative for paid or competitive rewards.
+/// Dates and visual themes are local presentation features. Competitive
+/// events, paid passes or time-limited purchases must have server authority.
 @MainActor
 final class SeasonDirector: ObservableObject {
     static let shared = SeasonDirector()
 
     @Published private(set) var live: RedactedSeason
     @Published private(set) var activity: SeasonActivity
-    #if DEBUG
-    @Published private(set) var previewingNext = false
-    #endif
 
     private var rolloverTimer: Timer?
     private init() {
@@ -92,49 +87,22 @@ final class SeasonDirector: ObservableObject {
         scheduleRollover()
     }
 
+    var displayed: RedactedSeason { live }
     var upcoming: RedactedSeason { SeasonCalendar.next(after: live) }
-
-    var displayed: RedactedSeason {
-        #if DEBUG
-        return previewingNext ? upcoming : live
-        #else
-        return live
-        #endif
-    }
-
-    var isPreviewing: Bool {
-        #if DEBUG
-        return previewingNext
-        #else
-        return false
-        #endif
-    }
-
-    #if DEBUG
-    func setPreview(_ enabled: Bool) {
-        guard previewingNext != enabled else { return }
-        previewingNext = enabled
-        applyAppearance()
-    }
-    #endif
+    var hasPublishedSchedule: Bool { SeasonCalendar.publishedLaunch != nil }
 
     func refresh() {
         let updated = SeasonCalendar.season(at: Date())
         if updated.id != live.id {
             live = updated
             activity = Self.readActivity(for: updated.id)
-            #if DEBUG
-            previewingNext = false
-            #endif
         }
         applyAppearance()
         scheduleRollover()
     }
 
     func recordCompletedCase(stars: Int) {
-        // Developer preview never changes live-season statistics.
-        guard !isPreviewing else { return }
-        refreshIfExpired()
+        if hasPublishedSchedule && Date() >= live.endsAt { refresh() }
         activity.casesCompleted += 1
         activity.starsEarned += max(0, min(3, stars))
         activity.intelCollected += 10 + max(0, min(3, stars)) * 5
@@ -143,18 +111,13 @@ final class SeasonDirector: ObservableObject {
         }
     }
 
-    private func refreshIfExpired() {
-        if Date() >= live.endsAt { refresh() }
-    }
-
     private func applyAppearance() {
-        UserDefaults.standard.set(displayed.tone.rawValue, forKey: "redacted.season.activeTone")
+        UserDefaults.standard.set(live.tone.rawValue, forKey: "redacted.season.activeTone")
     }
 
     private func scheduleRollover() {
         rolloverTimer?.invalidate()
-        // Reschedule at most daily to survive long-running sessions; the
-        // exact boundary is used whenever it's within the scheduling window.
+        guard hasPublishedSchedule else { return }
         let delay = max(0.1, min(86_400, live.endsAt.timeIntervalSinceNow))
         rolloverTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
             Task { @MainActor in self?.refresh() }

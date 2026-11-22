@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import Combine
 
 /// Seasonal presentation never edits campaign saves or detective cosmetics.
 /// The date schedule is deliberately explicit so a future backend can replace

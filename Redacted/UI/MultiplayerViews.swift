@@ -54,7 +54,7 @@ struct MultiplayerLobbyView: View {
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(Art.paper)
                             .fixedSize(horizontal: false, vertical: true)
-                        Text("Online connection and iCloud are required. Opponents join by room code or QR, not public matchmaking.")
+                        Text("A REDACTED ID and internet connection are required. Join a private match by room code or QR invite.")
                             .font(.system(size: 11))
                             .foregroundStyle(Art.faded)
                     }
@@ -63,7 +63,7 @@ struct MultiplayerLobbyView: View {
                 if network.accountEmail == nil {
                     RedactedAccountCard()
                 } else if !network.configured {
-                    Text("Multiplayer is not available until the REDACTED server is configured.")
+                    Text("Online matches aren't available in this version. You can play the complete solo campaign offline.")
                         .foregroundStyle(Art.gold)
                 }
 

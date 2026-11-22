@@ -222,7 +222,7 @@ private struct DetectiveRealisticEquipment: View {
                             CGPoint(x: 183, y: 98)]),
                      with: .color(Art.gold.opacity(0.75)), lineWidth: 1)
         } else {
-            for x: CGFloat in [120, 155] {
+            for x in [CGFloat(120), CGFloat(155)] {
                 let lens = rect(x, 42, 27, 20, radius: item == "glasses_round" ? 10 : 5)
                 g.fill(lens, with: .color(lensTint.opacity(
                     item == "glasses_clear" ? 0.06 : 0.26)))

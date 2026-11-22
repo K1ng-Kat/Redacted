@@ -28,8 +28,7 @@ struct RedactedSeason: Equatable, Identifiable {
 
     #if DEBUG
     var developerTitle: String {
-        if chapter == 1 && number == 2 { return "THE BLACKOUT" }
-        return title
+        return "UNRELEASED SEASON PREVIEW"
     }
     #endif
 }

@@ -104,7 +104,7 @@ private enum SocialNetworkError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .unconfigured: "Online detective network isn't configured yet."
+        case .unconfigured: "Online play is unavailable in this version."
         case .signInFailed: "Could not create your detective network account."
         case .badResponse(let detail): detail
         case .invalidSession: "Your session expired. Try reconnecting."
@@ -144,7 +144,7 @@ final class DetectiveSocialNetwork: ObservableObject {
         token = readSession()
         accountEmail = token?.email
         if !configured {
-            message = "Friends and Task Forces will be available when the detective network server is connected."
+            message = "Online friends and Task Forces aren't available in this version."
         }
     }
 
@@ -152,7 +152,7 @@ final class DetectiveSocialNetwork: ObservableObject {
     func connect() async {
         guard configured else {
             connected = false
-            message = "The detective network server hasn't been connected yet. No iCloud account will be required."
+            message = "Online friends and Task Forces are unavailable. You can still play cases offline."
             return
         }
         guard accountEmail != nil else {

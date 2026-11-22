@@ -503,11 +503,11 @@ struct CampaignHomeView: View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 15) {
                 topBar
-                seasonFeature
                 featuredMission
-                identity
+                seasonFeature
                 actions
                 progress
+                identity
                 footer
             }
             .frame(maxWidth: 580)
@@ -759,7 +759,7 @@ struct CampaignHomeView: View {
                 }
                 .padding(20)
             }
-            .frame(height: 244)
+            .frame(height: 211)
             .clipped()
 
             VStack(alignment: .leading, spacing: 11) {
@@ -769,7 +769,7 @@ struct CampaignHomeView: View {
                         .foregroundStyle(Art.paper)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                GameButton(title: store.allCompleted ? "Replay final case" : "PLAY LEVEL \(store.nextLevel)",
+                GameButton(title: store.allCompleted ? "REPLAY FINAL CASE" : "INVESTIGATE CASE \(store.nextLevel)",
                            icon: "play.fill", action: play)
             }
             .padding(15)
@@ -780,15 +780,11 @@ struct CampaignHomeView: View {
     }
 
     private var actions: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 10) {
-                quickAction(icon: "square.grid.3x3.fill", title: "LEVELS", detail: "Choose a case", color: Art.cyan, action: levels)
-                quickAction(icon: "rosette", title: "RANK", detail: "Your progress", color: Art.gold, action: stats)
-            }
-            HStack(spacing: 10) {
-                quickAction(icon: "person.crop.square.fill", title: "DETECTIVE", detail: "Customize", color: Art.gold, action: wardrobe)
-                quickAction(icon: "bag.fill", title: "STYLE LAB", detail: "Unlock gear", color: Art.gold, action: wardrobe)
-            }
+        HStack(spacing: 10) {
+            quickAction(icon: "square.grid.2x2.fill", title: "ALL CASES",
+                        detail: "Explore the campaign", color: Art.cyan, action: levels)
+            quickAction(icon: "person.crop.square.fill", title: "STYLE LAB",
+                        detail: "Customize detective", color: Art.gold, action: wardrobe)
         }
     }
 

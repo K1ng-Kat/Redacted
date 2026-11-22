@@ -88,6 +88,7 @@ final class SeasonDirector: ObservableObject {
         let current = SeasonCalendar.season(at: Date())
         live = current
         activity = Self.readActivity(for: current.id)
+        applyAppearance()
         scheduleRollover()
     }
 
@@ -113,6 +114,7 @@ final class SeasonDirector: ObservableObject {
     func setPreview(_ enabled: Bool) {
         guard previewingNext != enabled else { return }
         previewingNext = enabled
+        applyAppearance()
     }
     #endif
 
@@ -125,6 +127,7 @@ final class SeasonDirector: ObservableObject {
             previewingNext = false
             #endif
         }
+        applyAppearance()
         scheduleRollover()
     }
 
@@ -142,6 +145,10 @@ final class SeasonDirector: ObservableObject {
 
     private func refreshIfExpired() {
         if Date() >= live.endsAt { refresh() }
+    }
+
+    private func applyAppearance() {
+        UserDefaults.standard.set(displayed.tone.rawValue, forKey: "redacted.season.activeTone")
     }
 
     private func scheduleRollover() {

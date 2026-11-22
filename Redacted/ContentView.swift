@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var store = CampaignStore()
+    @StateObject private var seasons = SeasonDirector.shared
     @State private var route: Route = .home
     @State private var navigationHistory: [Route] = []
     @State private var activeLevel = 1
@@ -22,7 +23,7 @@ struct ContentView: View {
     @AppStorage("redacted.music.level.volume") private var levelVolume = 0.12
 
     private enum Route: Equatable {
-        case home, levels, play, settings, guide, stats, wardrobe, multiplayer, friends
+        case home, levels, play, settings, guide, stats, wardrobe, multiplayer, friends, season
     }
 
     var body: some View {
@@ -49,6 +50,7 @@ struct ContentView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .animation(.easeInOut(duration: 0.38), value: seasons.displayed.id)
         .overlay {
             if startupComplete && setupComplete && route == .home &&
                !homeCoached && store.levelsCompleted == 0 {
@@ -101,6 +103,7 @@ struct ContentView: View {
         .onChange(of: levelVolume) { _, _ in syncMusic() }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
+                seasons.refresh()
                 syncMusic()
                 if route == .multiplayer {
                     MultiplayerService.shared.startPresence()
@@ -276,9 +279,9 @@ struct ContentView: View {
             .background {
                 if selected {
                     RoundedRectangle(cornerRadius: 13)
-                        .fill(Art.gold)
+                        .fill(Art.cyan)
                         .matchedGeometryEffect(id: "tab-slider", in: tabIndicator)
-                        .shadow(color: Art.goldDark.opacity(0.4), radius: 0, y: 3)
+                        .shadow(color: Art.cyan.opacity(0.20), radius: 10, y: 2)
                 }
             }
             .contentShape(RoundedRectangle(cornerRadius: 13))
@@ -306,8 +309,11 @@ struct ContentView: View {
                 settings: { show(.settings) },
                 guide: { show(.guide) },
                 stats: { show(.stats) },
-                wardrobe: { show(.wardrobe) }
+                wardrobe: { show(.wardrobe) },
+                season: { show(.season) }
             )
+        case .season:
+            SeasonHubView(director: seasons, store: store, back: { popScreen() })
         case .levels:
             LevelSelectView(store: store, launch: launch, back: { popScreen() })
         case .play:
@@ -467,6 +473,8 @@ struct CampaignHomeView: View {
     let guide: () -> Void
     let stats: () -> Void
     let wardrobe: () -> Void
+    let season: () -> Void
+    @ObservedObject private var seasons = SeasonDirector.shared
 
     private var episode: CampaignEpisode {
         CampaignCatalog.episodes[(store.nextLevel - 1) / 10]
@@ -476,8 +484,9 @@ struct CampaignHomeView: View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 15) {
                 topBar
-                identity
+                seasonFeature
                 featuredMission
+                identity
                 actions
                 progress
                 footer
@@ -552,8 +561,91 @@ struct CampaignHomeView: View {
         .accessibilityLabel(name)
     }
 
+    private var seasonFeature: some View {
+        Button {
+            GameEffects.shared.tap()
+            season()
+        } label: {
+            VStack(alignment: .leading, spacing: 15) {
+                HStack(alignment: .center, spacing: 7) {
+                    Circle().fill(Art.mint).frame(width: 7, height: 7)
+                    GameKicker(text: "LIVE SEASON", color: Art.cyan)
+                    Spacer(minLength: 0)
+                    Image(systemName: "shield.lefthalf.filled")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(Art.cyan)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .black))
+                        .foregroundStyle(Art.faded)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(seasons.displayed.heading)
+                        .font(.system(size: 11, weight: .black, design: .monospaced))
+                        .tracking(1)
+                        .foregroundStyle(Art.gold)
+                    Text(seasonDisplayTitle)
+                        .font(.system(size: 26, weight: .black, design: .rounded))
+                        .tracking(-0.6)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
+                        .foregroundStyle(Art.paper)
+                }
+                HStack(alignment: .center) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        GameKicker(text: "SEASON ENDS IN", color: Art.faded)
+                        TimelineView(.periodic(from: .now, by: 1)) { context in
+                            Text(seasonCountdown(at: context.date))
+                                .font(.system(size: 17, weight: .black, design: .monospaced))
+                                .monospacedDigit()
+                                .foregroundStyle(Art.paper)
+                        }
+                    }
+                    Spacer()
+                    HStack(spacing: 7) {
+                        Image(systemName: "doc.text.magnifyingglass")
+                        Text("SEASON HQ")
+                    }
+                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .foregroundStyle(Art.ink)
+                    .padding(.horizontal, 11)
+                    .frame(height: 35)
+                    .background(Art.cyan)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+            }
+            .padding(17)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(LinearGradient(colors: [Art.blueLight, Art.blueDeep, Art.ink],
+                                         startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .strokeBorder(Art.cyan.opacity(0.42), lineWidth: 1)
+                    }
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 20))
+        }
+        .buttonStyle(PressGameStyle())
+        .accessibilityLabel("Open \(seasons.displayed.heading) season headquarters")
+    }
+
+    private var seasonDisplayTitle: String {
+        #if DEBUG
+        if seasons.isPreviewing { return seasons.displayed.developerTitle }
+        #endif
+        return seasons.displayed.title
+    }
+
+    private func seasonCountdown(at now: Date) -> String {
+        let total = max(0, Int(ceil(seasons.displayed.endsAt.timeIntervalSince(now))))
+        return String(format: "%02dD %02dH %02dM",
+                      total / 86_400, (total % 86_400) / 3_600, (total % 3_600) / 60)
+    }
+
     private var identity: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 11) {
+            GameKicker(text: "YOUR FIELD RECORD", color: Art.cyan)
             HStack(spacing: 9) {
                 StatChip(icon: "star.fill", value: "\(store.totalStars)", label: "STARS")
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -561,8 +653,8 @@ struct CampaignHomeView: View {
                          label: "SOLVED", tint: Art.mint)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            GameCard(accent: Art.gold) {
-                VStack(spacing: 11) {
+            GameCard(accent: Art.edge) {
+                VStack(spacing: 12) {
                     HStack(spacing: 12) {
                         DetectiveCharacter(store: store, size: 48)
                         VStack(alignment: .leading, spacing: 4) {
@@ -598,20 +690,21 @@ struct CampaignHomeView: View {
                     HStack {
                         GameKicker(text: store.xpForNextRank, color: Art.faded)
                         Spacer()
-                        GameKicker(text: "TAP RANK FOR REWARDS", color: Art.gold)
-                    }
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        GameEffects.shared.tap()
-                        stats()
+                        Button {
+                            GameEffects.shared.tap()
+                            stats()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text("RANK REWARDS")
+                                Image(systemName: "arrow.up.right")
+                            }
+                            .font(.system(size: 10, weight: .black, design: .monospaced))
+                            .foregroundStyle(Art.gold)
+                        }
+                        .buttonStyle(PressGameStyle())
                     }
                 }
             }
-            GameKicker(text: "WELCOME BACK, DETECTIVE", color: Art.gold)
-            GameTitle(text: store.allCompleted ? "MASTER DETECTIVE!" : "CRACK THE\nNEXT CASE.", size: 32)
-            Text("100 mysteries. 10 districts. Every clue counts.")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Art.faded)
         }
     }
 
@@ -671,7 +764,7 @@ struct CampaignHomeView: View {
             }
             HStack(spacing: 10) {
                 quickAction(icon: "person.crop.square.fill", title: "DETECTIVE", detail: "Customize", color: Art.gold, action: wardrobe)
-                quickAction(icon: "bag.fill", title: "SHOP", detail: "Buy snippets", color: Art.gold, action: wardrobe)
+                quickAction(icon: "bag.fill", title: "STYLE LAB", detail: "Unlock gear", color: Art.gold, action: wardrobe)
             }
         }
     }

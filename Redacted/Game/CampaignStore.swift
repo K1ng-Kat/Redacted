@@ -337,6 +337,8 @@ final class CampaignStore: ObservableObject {
         if levelsGained > 0 {
             progress.coins += bonusCoins
         }
+        // Track live seasonal intel without changing the existing cloud-save schema.
+        SeasonDirector.shared.recordCompletedCase(stars: stars)
         return CasePayout(
             stars: stars, earnedXP: xp,
             earnedCoins: coins + bonusCoins, earnedTickets: bonusTickets,

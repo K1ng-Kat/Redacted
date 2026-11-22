@@ -1,16 +1,71 @@
 import SwiftUI
 
 enum Art {
-    static let ink = Color(red: 0.035, green: 0.055, blue: 0.12)
-    static let blue = Color(red: 0.12, green: 0.22, blue: 0.40)
-    static let blueDeep = Color(red: 0.075, green: 0.13, blue: 0.25)
-    static let blueLight = Color(red: 0.19, green: 0.32, blue: 0.52)
-    static let edge = Color(red: 0.36, green: 0.50, blue: 0.70)
+    /// One shared palette powers the home screen, cases, wardrobe and duels.
+    /// Seasonal changes never alter coin/crystal identities or user saves.
+    private static var tone: SeasonTone {
+        SeasonTone(rawValue: UserDefaults.standard.integer(forKey: "redacted.season.activeTone")) ?? .midnight
+    }
+
+    static var ink: Color {
+        switch tone {
+        case .midnight: return Color(red: 0.035, green: 0.055, blue: 0.12)
+        case .signal: return Color(red: 0.025, green: 0.075, blue: 0.105)
+        case .ember: return Color(red: 0.10, green: 0.035, blue: 0.062)
+        case .ultraviolet: return Color(red: 0.07, green: 0.035, blue: 0.13)
+        }
+    }
+    static var blue: Color {
+        switch tone {
+        case .midnight: return Color(red: 0.12, green: 0.22, blue: 0.40)
+        case .signal: return Color(red: 0.08, green: 0.28, blue: 0.34)
+        case .ember: return Color(red: 0.27, green: 0.08, blue: 0.13)
+        case .ultraviolet: return Color(red: 0.20, green: 0.10, blue: 0.38)
+        }
+    }
+    static var blueDeep: Color {
+        switch tone {
+        case .midnight: return Color(red: 0.075, green: 0.13, blue: 0.25)
+        case .signal: return Color(red: 0.04, green: 0.16, blue: 0.20)
+        case .ember: return Color(red: 0.17, green: 0.055, blue: 0.085)
+        case .ultraviolet: return Color(red: 0.13, green: 0.065, blue: 0.25)
+        }
+    }
+    static var blueLight: Color {
+        switch tone {
+        case .midnight: return Color(red: 0.19, green: 0.32, blue: 0.52)
+        case .signal: return Color(red: 0.11, green: 0.36, blue: 0.40)
+        case .ember: return Color(red: 0.38, green: 0.14, blue: 0.19)
+        case .ultraviolet: return Color(red: 0.29, green: 0.15, blue: 0.47)
+        }
+    }
+    static var edge: Color {
+        switch tone {
+        case .midnight: return Color(red: 0.36, green: 0.50, blue: 0.70)
+        case .signal: return Color(red: 0.30, green: 0.64, blue: 0.67)
+        case .ember: return Color(red: 0.69, green: 0.37, blue: 0.43)
+        case .ultraviolet: return Color(red: 0.54, green: 0.43, blue: 0.75)
+        }
+    }
+    static var cyan: Color {
+        switch tone {
+        case .midnight: return Color(red: 0.37, green: 0.89, blue: 0.97)
+        case .signal: return Color(red: 0.37, green: 0.98, blue: 0.83)
+        case .ember: return Color(red: 1.0, green: 0.61, blue: 0.45)
+        case .ultraviolet: return Color(red: 0.78, green: 0.62, blue: 1.0)
+        }
+    }
+    static var coral: Color {
+        switch tone {
+        case .midnight: return Color(red: 0.99, green: 0.32, blue: 0.32)
+        case .signal: return Color(red: 0.24, green: 0.83, blue: 0.76)
+        case .ember: return Color(red: 1.0, green: 0.29, blue: 0.35)
+        case .ultraviolet: return Color(red: 0.69, green: 0.38, blue: 0.99)
+        }
+    }
     static let gold = Color(red: 1.0, green: 0.79, blue: 0.19)
     static let goldDark = Color(red: 0.64, green: 0.32, blue: 0.065)
-    static let coral = Color(red: 0.99, green: 0.32, blue: 0.32)
     static let coralDark = Color(red: 0.59, green: 0.14, blue: 0.22)
-    static let cyan = Color(red: 0.37, green: 0.89, blue: 0.97)
     static let mint = Color(red: 0.43, green: 0.96, blue: 0.60)
     static let paper = Color(red: 1.0, green: 0.98, blue: 0.89)
     static let faded = Color(red: 0.75, green: 0.83, blue: 0.93)
@@ -72,21 +127,23 @@ struct GameBackdrop: View {
             Art.ink
             LinearGradient(colors: palette,
                            startPoint: .topLeading, endPoint: .bottomTrailing)
-            RadialGradient(colors: [Art.cyan.opacity(0.12), .clear],
-                           center: .topTrailing, startRadius: 30, endRadius: 440)
+            RadialGradient(colors: [Art.cyan.opacity(0.20), .clear],
+                           center: .topTrailing, startRadius: 0, endRadius: 420)
+            RadialGradient(colors: [Art.coral.opacity(0.11), .clear],
+                           center: .bottomLeading, startRadius: 0, endRadius: 390)
             Canvas { context, size in
                 var path = Path()
-                for index in 0...20 {
-                    let x = CGFloat(index) * size.width / 20
+                for index in 0...14 {
+                    let x = CGFloat(index) * size.width / 14
                     path.move(to: CGPoint(x: x, y: 0))
                     path.addLine(to: CGPoint(x: x, y: size.height))
                 }
-                for index in 0...40 {
-                    let y = CGFloat(index) * size.height / 40
+                for index in 0...28 {
+                    let y = CGFloat(index) * size.height / 28
                     path.move(to: CGPoint(x: 0, y: y))
                     path.addLine(to: CGPoint(x: size.width, y: y))
                 }
-                context.stroke(path, with: .color(.white.opacity(0.026)), lineWidth: 0.8)
+                context.stroke(path, with: .color(Art.edge.opacity(0.055)), lineWidth: 0.75)
             }
             .accessibilityHidden(true)
         }
@@ -108,19 +165,16 @@ struct GameCard<Content: View>: View {
             .padding(15)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(Art.ink.opacity(0.82))
-                        .offset(y: 5)
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(LinearGradient(
-                            colors: [Art.blueLight, Art.blueDeep],
-                            startPoint: .topLeading, endPoint: .bottomTrailing))
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(accent.opacity(0.62), lineWidth: 1.7)
-                }
+                RoundedRectangle(cornerRadius: 19, style: .continuous)
+                    .fill(LinearGradient(
+                        colors: [Art.blueLight.opacity(0.91), Art.blueDeep],
+                        startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 19, style: .continuous)
+                            .strokeBorder(accent.opacity(0.34), lineWidth: 1)
+                    }
+                    .shadow(color: Art.ink.opacity(0.29), radius: 15, y: 7)
             }
-            .padding(.bottom, 5)
     }
 }
 

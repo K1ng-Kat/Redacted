@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Build-time guard: catalog unlocks must have real drawn cosmetics."""
+"""Build-time guard: catalog unlocks must have a native 3D equipment renderer."""
 from pathlib import Path
 import re
 
 root = Path(__file__).resolve().parents[1]
 catalog = (root / "Redacted/UI/DetectiveWardrobe.swift").read_text()
-drawing = (root / "Redacted/UI/DetectiveAvatarArt.swift").read_text()
+drawing = (root / "Redacted/UI/Detective3DCharacter.swift").read_text()
 duel = (root / "Redacted/Game/MultiplayerService.swift").read_text()
 social = (root / "Redacted/Game/DetectiveSocialNetwork.swift").read_text()
 db = (root / "Backend/supabase_social.sql").read_text()
@@ -18,8 +18,14 @@ app = (root / "Redacted/UI/CampaignExtras.swift").read_text()
 items = re.findall(r'\.init\(id:\s*"([^"]+)",\s*name:', catalog)
 assert len(items) >= 39, f"Expected at least 39 cosmetics; got {len(items)}"
 assert len(items) == len(set(items)), "Duplicate cosmetic inventory IDs"
-for item in items:
-    assert f'"{item}"' in drawing, f"No rendered appearance for {item}"
+# Cosmetic classes are real SceneKit mesh/material components, not decals.
+for token in ("import SceneKit", "SCNView", "SCNNode", "makeHeadwear",
+              "makeEyewear", "makeBadge", "coatColor"):
+    assert token in drawing, f"Missing native 3D renderer component: {token}"
+for slot in ("headwear", "eyewear", "badge", "coat"):
+    assert f"equipment[.{slot}]" in drawing, f"3D actor ignores {slot}"
+assert "DetectivePortraitAtlas" not in drawing
+assert "UIImage" not in drawing, "Flat character pictures must not replace 3D"
 for kind in ("headwear", "eyewear", "badge", "coat"):
     assert sum(item.startswith({"headwear": "hat_", "eyewear": "glasses_",
                                "badge": "badge_", "coat": "coat_"}[kind])
@@ -46,5 +52,5 @@ assert "email" in account and "type" in account
 assert "REDACTED ID" in account_ui
 assert "SignInWithAppleButton" not in app
 assert "CloudSaveManager.shared" not in app
-print(f"PASS: {len(items)} individually illustrated cosmetics, "
+print(f"PASS: {len(items)} catalog cosmetics use native 3D render slots, "
       f"{len(all_emotes)} duel-only emotes, and social RPC contracts.")

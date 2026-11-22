@@ -1,28 +1,32 @@
-# Photoreal detective character renderer
+# REDACTED — Native 3D Detective
 
-The game now supports an authored 4×5 portrait atlas named `DetectivePortraitAtlas` and paints selected wardrobe equipment over it. The source renderer lives in `Redacted/UI/DetectiveRealisticAvatar.swift`.
+The character is now a genuine three-dimensional **SceneKit model** built entirely inside the app. There are no AI-generated portrait tiles, fake pasted hat images, or remote art downloads.
 
-The atlas has **4 hair columns** (Classic, Textured, Side Sweep, Cropped) and **5 skin-tone rows** (Porcelain, Peach, Bronze, Umber, Deep). It is one JPEG imported into the asset catalog as `DetectivePortraitAtlas.imageset/DetectivePortraitAtlas.jpg`. This setup avoids loading 20 independent portraits.
+## In-app avatar
 
-## Adding artwork to a build
+The 3D implementation lives in `Redacted/UI/Detective3DCharacter.swift`. The existing `DetectiveCharacter` SwiftUI entry point is used on Home, Profile, and the Style Lab and creates a 3D renderer instead of composing image layers.
 
-1. Create `Redacted/Assets.xcassets/DetectivePortraitAtlas.imageset`.
-2. Put your 4×5 image in the folder as `DetectivePortraitAtlas.jpg`.
-3. Add a `Contents.json` file with:
-   ```json
-   {"images":[{"filename":"DetectivePortraitAtlas.jpg","idiom":"universal"}],
-    "info":{"author":"xcode","version":1}}
-   ```
-4. Build the app.
+- Head, eyes, ears, nose, facial features, hair, torso, arms, hands, legs, jacket, and shoes are real scene geometry.
+- Saved skin and hairstyle choices still select variants.
+- Hats, eyewear, badges, and coat materials are three-dimensional objects and materials attached to the same scene nodes. They are not pasted on a sprite.
+- A gentle idle head turn is enabled on the large character preview. Smaller previews are static to reduce frame work.
+- The player's cosmetics, wallet, unlocks, and saved `CampaignProgress` schema are unchanged.
 
-If the atlas is not bundled, the app automatically falls back to the existing SwiftUI illustration. This is intentional so existing builds keep working; an asset-backed release should be tested with the atlas included.
+This is the **native 3D character system foundation**, not a commercially sculpted photorealistic PBR human mesh. Realistic facial topology, skin normal maps, cloth simulation, motion-captured animation, LODs, and rigged garment meshes would require authored 3D assets. Those can be added later through the model factory without changing purchased item IDs.
 
-## What stays compatible
+## Where the art lives
 
-- All existing skin/hair selections, paid/unlocked cosmetic IDs, shop currencies and rank rules stay exactly the same.
-- Home, rank/profile, main wardrobe preview and equipment thumbnails all call `DetectiveCharacter`, so they automatically use the same avatar.
-- Cosmetic rendering is a photo-compositing approximation. For fully physically realistic clothes and animation, future work would require individual material layers or a rigged 3D character; this implementation is a static photoreal portrait, **not a realtime 3D model**.
+All new geometry, accessories, and material definitions are committed directly in the Swift source on GitHub. **There is no ZIP to install and no JPEG atlas to commit.** The old `DetectivePortraitAtlas` image is no longer used. Do not commit that earlier AI portrait pack.
 
-## QA
+## Startup
 
-On both iPhone and iPad verify every skin × hair selection, each headwear/glasses/badge/coat, the live try-on, unlock/equip/unequip, and all avatar sizes (48/78/122/215 points). Ensure the artwork contains no blank margins or cell borders and that cosmetics do not obscure the detective's face. Test a build missing the atlas to ensure it still renders the fallback without a crash.
+`RedactedApp.swift` now shows a lightweight first frame with a real loading indicator before constructing the heavier game view. The main loading sequence no longer waits on synchronous audio generation, and an offline game skips the unnecessary Keychain lookup.
+
+## Quality checks before release
+
+- Cold launch on a physical iPhone after force quit, warm launch, first install, and launch with airplane mode.
+- Verify Home, Stats and Style Lab, including all 5 skins × 4 hairstyles × equipped hats, glasses, badge and outfit. Use low-end iPad hardware to detect thermal/performance issues.
+- Confirm navigation remains responsive while equipment is previewed, equipped and purchased.
+- Check actual human proportions, facial details, eyewear alignment, headwear fit, and dark/light accessibility contrast.
+- Measure with Xcode Instruments and inspect first frame in system logs. The GitHub Actions build can validate compilation, not cold-launch timing on your phone.
+

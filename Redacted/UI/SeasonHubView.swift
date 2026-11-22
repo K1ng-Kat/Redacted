@@ -13,17 +13,11 @@ struct SeasonHubView: View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 17) {
                 ScreenHeader(title: "SEASON HQ", subtitle: "LIVE OPERATIONS", back: back)
-                #if DEBUG
-                if director.isPreviewing { previewBanner }
-                #endif
                 hero
                 progressPanel
                 objectives
                 upcomingPanel
-                #if DEBUG
-                developerPanel
-                #endif
-                GameKicker(text: "SEASON INTEL IS SAVED ON THIS DEVICE", color: Art.faded)
+                GameKicker(text: "SEASON PROGRESS IS SAVED ON THIS DEVICE", color: Art.faded)
                     .padding(.top, 4)
             }
             .frame(maxWidth: 580)
@@ -39,7 +33,7 @@ struct SeasonHubView: View {
     private var hero: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack {
-                Label("LIVE OPERATION", systemImage: "dot.radiowaves.left.and.right")
+                Label("CURRENT OPERATION", systemImage: "shield.lefthalf.filled")
                     .font(.system(size: 11, weight: .black, design: .monospaced))
                     .tracking(1.0)
                     .foregroundStyle(Art.cyan)
@@ -60,32 +54,37 @@ struct SeasonHubView: View {
                     .minimumScaleFactor(0.75)
                     .lineLimit(2)
                     .foregroundStyle(Art.paper)
-                Text("Every solved case moves your seasonal investigation forward.")
+                Text("Play cases and collect Intel to build your investigation record.")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(Art.faded)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            Rectangle().fill(Art.edge.opacity(0.32)).frame(height: 1)
-            HStack(alignment: .bottom) {
-                VStack(alignment: .leading, spacing: 6) {
-                    GameKicker(text: "TIME REMAINING", color: Art.faded)
-                    TimelineView(.periodic(from: .now, by: 1)) { context in
-                        Text(countdown(until: season.endsAt, from: context.date))
-                            .font(.system(size: 25, weight: .black, design: .monospaced))
-                            .monospacedDigit()
-                            .foregroundStyle(Art.paper)
-                            .contentTransition(.numericText())
+            if director.hasPublishedSchedule {
+                Rectangle().fill(Art.edge.opacity(0.32)).frame(height: 1)
+                HStack(alignment: .bottom, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        GameKicker(text: "TIME REMAINING", color: Art.faded)
+                        TimelineView(.periodic(from: .now, by: 1)) { context in
+                            Text(countdown(until: season.endsAt, from: context.date))
+                                .font(.system(size: 22, weight: .black, design: .monospaced))
+                                .monospacedDigit()
+                                .foregroundStyle(Art.paper)
+                        }
+                    }
+                    Spacer(minLength: 4)
+                    VStack(alignment: .trailing, spacing: 5) {
+                        GameKicker(text: "ENDS · UTC", color: Art.faded)
+                        Text(utcDate(season.endsAt))
+                            .font(.system(size: 11, weight: .semibold))
+                            .multilineTextAlignment(.trailing)
+                            .foregroundStyle(Art.cyan)
                     }
                 }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 5) {
-                    GameKicker(text: "ENDS · UTC", color: Art.faded)
-                    Text(utcDate(season.endsAt))
-                        .font(.system(size: 11, weight: .semibold))
-                        .multilineTextAlignment(.trailing)
-                        .foregroundStyle(Art.cyan)
-                }
+            } else {
+                Label("SEASON 1 · INVESTIGATIONS OPEN", systemImage: "checkmark.seal.fill")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundStyle(Art.mint)
             }
         }
         .padding(21)
@@ -103,12 +102,7 @@ struct SeasonHubView: View {
         .accessibilityElement(children: .contain)
     }
 
-    private var displayTitle: String {
-        #if DEBUG
-        if director.isPreviewing { return season.developerTitle }
-        #endif
-        return season.title
-    }
+    private var displayTitle: String { season.title }
 
     private var progressPanel: some View {
         GameCard(accent: Art.gold) {
@@ -155,11 +149,11 @@ struct SeasonHubView: View {
                     .font(.system(size: 9, weight: .bold, design: .monospaced))
                     .foregroundStyle(Art.faded)
             }
-            objective(icon: "checkmark.shield.fill", name: "CLOSE 5 CASES",
-                      subtitle: "Complete investigations this season",
+            objective(icon: "checkmark.shield.fill", name: "PLAY 5 CASES",
+                      subtitle: "Play investigations during this season",
                       current: director.activity.casesCompleted, target: 5)
-            objective(icon: "star.circle.fill", name: "EARN 20 STARS",
-                      subtitle: "Collect stars from completed cases",
+            objective(icon: "star.circle.fill", name: "COLLECT 20 STARS",
+                      subtitle: "Earn stars by completing investigations",
                       current: director.activity.starsEarned, target: 20)
             objective(icon: "tray.full.fill", name: "COLLECT 300 INTEL",
                       subtitle: "Every case adds to your intel record",
@@ -201,73 +195,30 @@ struct SeasonHubView: View {
 
     private var upcomingPanel: some View {
         GameCard(accent: Art.edge) {
-            VStack(alignment: .leading, spacing: 11) {
+            VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    GameKicker(text: "NEXT DEPLOYMENT", color: Art.cyan)
+                    GameKicker(text: "NEXT SEASON", color: Art.cyan)
                     Spacer()
-                    Image(systemName: "lock.shield.fill")
-                        .foregroundStyle(Art.faded)
+                    Image(systemName: "lock.shield.fill").foregroundStyle(Art.faded)
                 }
                 Text(director.upcoming.heading)
                     .font(.system(size: 19, weight: .black, design: .rounded))
                     .foregroundStyle(Art.paper)
-                Text("Details remain classified until launch. Your app will switch to the next season automatically at the scheduled UTC boundary.")
+                Text(director.hasPublishedSchedule
+                     ? "Next season's case files remain classified until they are released."
+                     : "The next season's theme and start date have not been announced.")
                     .font(.system(size: 12))
                     .foregroundStyle(Art.faded)
                     .fixedSize(horizontal: false, vertical: true)
-                HStack {
-                    Image(systemName: "calendar.badge.clock")
-                    Text(utcDate(director.upcoming.startsAt))
+                if director.hasPublishedSchedule {
+                    Label(utcDate(director.upcoming.startsAt),
+                          systemImage: "calendar.badge.clock")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Art.cyan)
                 }
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(Art.cyan)
             }
         }
     }
-
-    #if DEBUG
-    private var previewBanner: some View {
-        HStack(spacing: 9) {
-            Image(systemName: "eye.fill")
-            Text("DEVELOPER PREVIEW — NOT LIVE")
-                .font(.system(size: 11, weight: .black, design: .monospaced))
-            Spacer()
-        }
-        .foregroundStyle(Art.ink)
-        .padding(12)
-        .background(Art.gold)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-
-    private var developerPanel: some View {
-        GameCard(accent: Art.gold) {
-            VStack(alignment: .leading, spacing: 12) {
-                GameKicker(text: "DEVELOPER TOOLS · DEBUG ONLY", color: Art.gold)
-                Text("Preview the upcoming palette and season presentation without changing live dates or players' activity.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Art.faded)
-                Button {
-                    withAnimation(.easeInOut(duration: 0.35)) {
-                        director.setPreview(!director.isPreviewing)
-                    }
-                } label: {
-                    HStack {
-                        Image(systemName: director.isPreviewing ? "arrow.uturn.backward" : "eye.fill")
-                        Text(director.isPreviewing ? "RETURN TO LIVE SEASON" : "PREVIEW NEXT SEASON")
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                    }
-                    .font(.system(size: 12, weight: .black, design: .rounded))
-                    .foregroundStyle(Art.ink)
-                    .padding(14)
-                    .background(Art.gold)
-                    .clipShape(RoundedRectangle(cornerRadius: 13))
-                }
-                .buttonStyle(PressGameStyle())
-            }
-        }
-    }
-    #endif
 
     private func utcDate(_ date: Date) -> String {
         let formatter = DateFormatter()

@@ -279,9 +279,9 @@ struct ContentView: View {
             .background {
                 if selected {
                     RoundedRectangle(cornerRadius: 13)
-                        .fill(Art.gold)
+                        .fill(Art.cyan)
                         .matchedGeometryEffect(id: "tab-slider", in: tabIndicator)
-                        .shadow(color: Art.goldDark.opacity(0.4), radius: 0, y: 3)
+                        .shadow(color: Art.cyan.opacity(0.20), radius: 10, y: 2)
                 }
             }
             .contentShape(RoundedRectangle(cornerRadius: 13))
@@ -583,7 +583,7 @@ struct CampaignHomeView: View {
                         .font(.system(size: 11, weight: .black, design: .monospaced))
                         .tracking(1)
                         .foregroundStyle(Art.gold)
-                    Text(seasons.displayed.title)
+                    Text(seasonDisplayTitle)
                         .font(.system(size: 26, weight: .black, design: .rounded))
                         .tracking(-0.6)
                         .lineLimit(2)
@@ -628,6 +628,13 @@ struct CampaignHomeView: View {
         }
         .buttonStyle(PressGameStyle())
         .accessibilityLabel("Open \(seasons.displayed.heading) season headquarters")
+    }
+
+    private var seasonDisplayTitle: String {
+        #if DEBUG
+        if seasons.isPreviewing { return seasons.displayed.developerTitle }
+        #endif
+        return seasons.displayed.title
     }
 
     private func seasonCountdown(at now: Date) -> String {

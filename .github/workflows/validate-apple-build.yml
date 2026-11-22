@@ -3,6 +3,8 @@ name: Validate REDACTED iPhone and iPad Build
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
     paths:
       - ".github/workflows/validate-apple-build.yml"
       - "Redacted/**/*.swift"

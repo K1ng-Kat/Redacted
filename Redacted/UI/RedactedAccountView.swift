@@ -70,6 +70,8 @@ struct RedactedAccountView: View {
 
                     if network.accountEmail != nil {
                         signedInContent
+                    } else if !network.configured {
+                        unavailableAccount
                     } else {
                         loginContent
                     }
@@ -111,6 +113,24 @@ struct RedactedAccountView: View {
         }
     }
 
+    private var unavailableAccount: some View {
+        GameCard(accent: Art.cyan) {
+            VStack(alignment: .leading, spacing: 11) {
+                Image(systemName: "externaldrive.fill.badge.checkmark")
+                    .font(.system(size: 33))
+                    .foregroundStyle(Art.cyan)
+                GameTitle(text: "YOUR CASES ARE SAVED", size: 22)
+                Text("Your investigation progress is stored on this device. Online sign-in and cross-device backup aren't available in this version.")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Art.faded)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("Keep Redacted installed to retain your local save.")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Art.paper)
+            }
+        }
+    }
+
     private var loginContent: some View {
         VStack(alignment: .leading, spacing: 15) {
             GameCard(accent: Art.gold) {
@@ -129,7 +149,7 @@ struct RedactedAccountView: View {
                         }
                     }
                     if !network.configured {
-                        Text("The REDACTED email service has not been connected by the developer. Verification emails cannot be sent yet.")
+                        Text("Online sign-in is temporarily unavailable. Your cases remain saved on this device.")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(Art.gold)
                             .fixedSize(horizontal: false, vertical: true)

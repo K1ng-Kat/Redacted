@@ -9,18 +9,16 @@ struct ContentView: View {
     @ObservedObject private var social = DetectiveSocialNetwork.shared
     @Namespace private var tabIndicator
     @State private var pendingInvite: String?
-    @State private var startupComplete = false
     @AppStorage("redacted.setup.complete") private var setupComplete = false
     @AppStorage("redacted.age.mode") private var ageModeRaw = DetectiveAgeMode.investigator.rawValue
     @State private var backDrag: CGFloat = 0
     @State private var backCompleting = false
-    @State private var startupProgress = 0.04
-    @State private var startupStep = "OPENING REDACTED"
     @AppStorage("redacted.tutorial.home") private var homeCoached = false
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("redacted.music.enabled") private var musicEnabled = true
     @AppStorage("redacted.music.menu.volume") private var menuVolume = 0.55
     @AppStorage("redacted.music.level.volume") private var levelVolume = 0.12
+    @AppStorage("redacted.offlineMode") private var offlineMode = false
 
     private enum Route: Equatable {
         case home, levels, play, settings, guide, stats, wardrobe, multiplayer, friends, season, more
@@ -29,30 +27,23 @@ struct ContentView: View {
     var body: some View {
         ZStack {
             GameBackdrop()
-            if startupComplete {
-                if setupComplete {
-                    swipeNavigation
-                        .transition(.opacity)
-                } else {
-                    AgeOnboardingView { mode in
-                        // Only the chosen difficulty is persisted. The exact
-                        // numeric age never leaves the transient setup view.
-                        ageModeRaw = mode.rawValue
-                        setupComplete = true
-                        GameEffects.shared.success()
-                        openPendingInvite()
-                    }
+            if setupComplete {
+                swipeNavigation
                     .transition(.opacity)
-                }
             } else {
-                StartupLoadingView(progress: startupProgress, stage: startupStep)
-                    .transition(.opacity)
+                AgeOnboardingView { mode in
+                    ageModeRaw = mode.rawValue
+                    setupComplete = true
+                    GameEffects.shared.success()
+                    openPendingInvite()
+                }
+                .transition(.opacity)
             }
         }
         .preferredColorScheme(.dark)
         .animation(.easeInOut(duration: 0.38), value: seasons.displayed.id)
         .overlay {
-            if startupComplete && setupComplete && route == .home &&
+            if setupComplete && route == .home &&
                !homeCoached && store.levelsCompleted == 0 {
                 GameCoachOverlay(
                     title: "YOUR FIRST CASE!",
@@ -67,19 +58,22 @@ struct ContentView: View {
             }
         }
         .task {
-            await prepareStartup()
-            // Present the ready screen before attaching optional online systems.
-            try? await Task.sleep(for: .milliseconds(180))
+            // The launch manager has already finished the only loading UI.
+            // Optional account services must never delay a local case.
+            try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled else { return }
-            RedactedAccountSave.shared.attach(store)
-            MultiplayerService.shared.attach(store)
-            if DetectiveSocialNetwork.shared.accountEmail != nil {
-                await DetectiveSocialNetwork.shared.connect()
+            syncMusic()
+            if !offlineMode && DetectiveSocialConfiguration.isConfigured {
+                RedactedAccountSave.shared.attach(store)
+                MultiplayerService.shared.attach(store)
+                if DetectiveSocialNetwork.shared.accountEmail != nil {
+                    await DetectiveSocialNetwork.shared.connect()
+                }
             }
             openPendingInvite()
-            // Presence follows app activity, not only the Social tab.
             while !Task.isCancelled {
-                if scenePhase == .active,
+                if !offlineMode && scenePhase == .active &&
+                   DetectiveSocialConfiguration.isConfigured &&
                    DetectiveSocialNetwork.shared.accountEmail != nil {
                     await DetectiveSocialNetwork.shared.heartbeat()
                 }
@@ -96,18 +90,18 @@ struct ContentView: View {
             openPendingInvite()
         }
         .onChange(of: route) { _, _ in syncMusic() }
-        .onChange(of: startupComplete) { _, finished in
-            openPendingInvite()
-            if finished {
-                // Do not initialize audio players before the first game frame.
+        .onChange(of: setupComplete) { _, _ in openPendingInvite() }
+        .onChange(of: offlineMode) { _, isOffline in
+            if isOffline {
+                MultiplayerService.shared.stopPresence()
+            } else if DetectiveSocialConfiguration.isConfigured {
                 Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(350))
-                    guard !Task.isCancelled else { return }
-                    syncMusic()
+                    RedactedAccountSave.shared.attach(store)
+                    MultiplayerService.shared.attach(store)
+                    await DetectiveSocialNetwork.shared.connect()
                 }
             }
         }
-        .onChange(of: setupComplete) { _, _ in openPendingInvite() }
         .onChange(of: musicEnabled) { _, _ in syncMusic() }
         .onChange(of: menuVolume) { _, _ in syncMusic() }
         .onChange(of: levelVolume) { _, _ in syncMusic() }
@@ -115,7 +109,7 @@ struct ContentView: View {
             if newPhase == .active {
                 seasons.refresh()
                 syncMusic()
-                if route == .multiplayer {
+                if !offlineMode && route == .multiplayer {
                     MultiplayerService.shared.startPresence()
                 }
             } else {
@@ -379,29 +373,9 @@ struct ContentView: View {
         }
     }
 
-    @MainActor
-    private func prepareStartup() async {
-        guard !startupComplete else { return }
-        startupStep = "LOADING CASE FILES"
-        startupProgress = 0.22
-        // Keep startup limited to actual game-state readiness. Audio decoders,
-        // synthesizers, and multiplayer are NOT required to display the menu.
-        await Task.yield()
-        _ = CampaignCatalog.levels.count
-        _ = store.nextLevel
-        startupProgress = 0.85
-        startupStep = "READY TO INVESTIGATE"
-        // Give the visible loading animation a frame to complete.
-        try? await Task.sleep(for: .milliseconds(100))
-        guard !Task.isCancelled else { return }
-        startupProgress = 1
-        withAnimation(.easeOut(duration: 0.2)) {
-            startupComplete = true
-        }
-    }
 
     private func syncMusic() {
-        guard startupComplete && scenePhase == .active else { return }
+        guard scenePhase == .active else { return }
         GameMusicController.shared.update(
             scene: route == .play || route == .multiplayer ? .level : .menu,
             enabled: musicEnabled,
@@ -412,7 +386,7 @@ struct ContentView: View {
 
     private func setRoute(_ next: Route, animated: Bool = true) {
         guard next != route else { return }
-        if startupComplete && scenePhase == .active {
+        if scenePhase == .active {
             GameMusicController.shared.update(
                 scene: next == .play || next == .multiplayer ? .level : .menu,
                 enabled: musicEnabled,
@@ -454,7 +428,7 @@ struct ContentView: View {
     }
 
     private func openPendingInvite() {
-        guard startupComplete, setupComplete,
+        guard setupComplete, !offlineMode,
               DetectiveSocialConfiguration.isConfigured,
               let code = pendingInvite else { return }
         pendingInvite = nil

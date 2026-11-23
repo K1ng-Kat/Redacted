@@ -41,6 +41,7 @@ struct MultiplayerLobbyView: View {
     @ObservedObject private var network = DetectiveSocialNetwork.shared
     @State private var enteredCode = ""
     @State private var showingScanner = false
+    @AppStorage("redacted.offlineMode") private var offlineMode = false
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -60,12 +61,15 @@ struct MultiplayerLobbyView: View {
                     }
                 }
 
-                if !network.configured {
+                if offlineMode || !network.configured {
                     GameCard(accent: Art.gold) {
-                        Label("ONLINE MATCHES UNAVAILABLE", systemImage: "wifi.slash")
+                        Label(offlineMode ? "OFFLINE MODE" : "ONLINE MATCHES UNAVAILABLE",
+                              systemImage: offlineMode ? "airplane" : "wifi.slash")
                             .font(.system(size: 13, weight: .black, design: .rounded))
                             .foregroundStyle(Art.gold)
-                        Text("Private matches, room codes and QR invites require the online service. The solo campaign stays playable.")
+                        Text(offlineMode
+                             ? "Multiplayer is paused while Offline Mode is on. Open More → Settings to reconnect. Your solo campaign works without Wi-Fi."
+                             : "Private matches, room codes and QR invites require the online service. The solo campaign stays playable.")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(Art.faded)
                             .fixedSize(horizontal: false, vertical: true)
@@ -77,7 +81,7 @@ struct MultiplayerLobbyView: View {
                 switch service.phase {
                 case .idle, .error:
                     GameButton(title: "CREATE PRIVATE MATCH", icon: "plus.circle.fill",
-                               inactive: network.accountEmail == nil || !network.configured) {
+                               inactive: offlineMode || network.accountEmail == nil || !network.configured) {
                         Task { await service.hostRoom() }
                     }
                     GameCard(accent: Art.gold) {
@@ -93,13 +97,13 @@ struct MultiplayerLobbyView: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
                                 .accessibilityLabel("Enter multiplayer room code")
                             GameButton(title: "JOIN MATCH", icon: "arrow.right.circle.fill",
-                                       inactive: network.accountEmail == nil || !network.configured ||
+                                       inactive: offlineMode || network.accountEmail == nil || !network.configured ||
                                            enteredCode.trimmingCharacters(in: .whitespaces).count != 6) {
                                 Task { await service.joinRoom(enteredCode) }
                             }
                             GameButton(title: "SCAN INVITE QR", icon: "qrcode.viewfinder",
                                        color: Art.blueLight, bottom: Art.blueDeep,
-                                       inactive: network.accountEmail == nil || !network.configured) {
+                                       inactive: offlineMode || network.accountEmail == nil || !network.configured) {
                                 showingScanner = true
                             }
                         }

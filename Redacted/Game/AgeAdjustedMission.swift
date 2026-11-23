@@ -77,15 +77,16 @@ struct AgeAdjustedMission {
     }
 
     var brief: String {
+        // Higher profiles no longer receive solutions embedded in the brief.
+        // Numbered locks, tuning channels and codewords are instead distributed
+        // across independent, readable evidence records.
+        let story = mode == .junior ? easierStory :
+                    CaseEvidence.introduction(for: mission, mode: mode)
         switch mode {
-        case .junior:
-            return easierStory + "\n\n" + simpleQuestion
-        case .explorer:
-            return mission.setup + "\n\n" + middleQuestion
-        case .investigator:
-            return mission.setup + "\n\n" + investigatorQuestion
-        case .expert:
-            return mission.setup + "\n\n" + expertQuestion
+        case .junior: return story + "\n\n" + simpleQuestion
+        case .explorer: return story + "\n\n" + middleQuestion
+        case .investigator: return story + "\n\n" + investigatorQuestion
+        case .expert: return story + "\n\n" + expertQuestion
         }
     }
 
@@ -95,12 +96,12 @@ struct AgeAdjustedMission {
             switch mission.kind {
             case .findClue: return "Tap the object that looks like an important clue."
             case .timeline: return "Tap what happened first, then next, until all four are in order."
-            case .keypad: return "Look at the number in the story. Enter its last 3 digits."
+            case .keypad: return "Find the authenticated label, then enter its last three digits."
             case .contradiction: return "Which fact shows someone is not telling the truth?"
             case .anomaly: return "Tap the item that doesn't match the others."
             case .escapeRoute: return "Find the secret way someone could leave."
             case .anagram: return "Tap the letters to make the hidden word."
-            case .signal: return "Move the radio dial to the number in the story."
+            case .signal: return "Read the transmitter record, then tune the matching channel."
             case .connect: return "Pick TWO clues that go together."
             case .verdict: return "Who do you think did it? Use what you learned."
             }
@@ -108,13 +109,13 @@ struct AgeAdjustedMission {
             return mission.kind.instruction
         case .investigator:
             switch mission.kind {
-            case .keypad: return "Read the final three digits, then enter them BACKWARDS."
+            case .keypad: return "Discard the first label digit and enter the last three BACKWARDS."
             case .signal: return "Tune 10 MHz ABOVE the logged value (wrap past 100 back to 0)."
             default: return mission.kind.instruction + " Use the strongest evidence."
             }
         case .expert:
             switch mission.kind {
-            case .keypad: return "Take the last three digits; MOVE THE LAST DIGIT TO THE FRONT."
+            case .keypad: return "Discard the first label digit. Move the LAST digit of the remaining three to the FRONT."
             case .signal: return "Tune to the MIRROR frequency: 100 minus the logged number."
             default: return mission.kind.instruction + " Eliminate the plausible false leads."
             }

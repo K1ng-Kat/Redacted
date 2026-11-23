@@ -42,9 +42,10 @@ struct Detective3DCharacter: UIViewRepresentable {
     let equipment: [CosmeticSlot: String]
     let theme: String
     let size: CGFloat
+    var portraitMode: Bool = false
 
     private var signature: String {
-        ([skin.rawValue, hair.rawValue, theme] +
+        ([skin.rawValue, hair.rawValue, theme, portraitMode ? "portrait" : "body"] +
          CosmeticSlot.allCases.map { equipment[$0] ?? "-" }).joined(separator: "|")
     }
 
@@ -56,13 +57,13 @@ struct Detective3DCharacter: UIViewRepresentable {
         view.isOpaque = false
         view.allowsCameraControl = false
         view.autoenablesDefaultLighting = false
-        view.antialiasingMode = size >= 170 ? .multisampling4X : .none
+        view.antialiasingMode = size >= 170 ? .multisampling4X : .multisampling2X
         view.preferredFramesPerSecond = size >= 170 ? 30 : 15
         view.rendersContinuously = size >= 170
         view.isPlaying = size >= 170
         view.scene = DetectiveModelFactory.make(skin: skin, hair: hair,
                                                 equipment: equipment, theme: theme,
-                                                closeup: size < 100,
+                                                closeup: portraitMode || size < 130,
                                                 animated: size >= 170)
         view.pointOfView = view.scene?.rootNode.childNode(withName: "Detective camera", recursively: false)
         context.coordinator.signature = signature
@@ -74,7 +75,7 @@ struct Detective3DCharacter: UIViewRepresentable {
         context.coordinator.signature = signature
         view.scene = DetectiveModelFactory.make(skin: skin, hair: hair,
                                                 equipment: equipment, theme: theme,
-                                                closeup: size < 100,
+                                                closeup: portraitMode || size < 130,
                                                 animated: size >= 170)
         view.pointOfView = view.scene?.rootNode.childNode(withName: "Detective camera", recursively: false)
     }
@@ -136,6 +137,7 @@ private enum DetectiveModelFactory {
         mannequin.addChildNode(ellipsoid("Hip", navy, 0, 1.09, 0,
                                         0.193, 0.184, 0.108))
         mannequin.addChildNode(tailoredTorso(color: jacket))
+        makeCoatDetails(into: mannequin, id: equipment[.coat], base: jacket)
         mannequin.addChildNode(box("Shirt placket", shirt,
                                   width: 0.112, height: 0.370, length: 0.015,
                                   x: 0, y: 1.420, z: 0.137,
@@ -210,14 +212,14 @@ private enum DetectiveModelFactory {
         let camera = SCNNode()
         camera.name = "Detective camera"
         camera.camera = SCNCamera()
-        camera.camera?.fieldOfView = closeup ? 32 : 38
+        camera.camera?.fieldOfView = closeup ? 37 : 34
         camera.camera?.wantsHDR = true
-        camera.camera?.exposureOffset = -0.30
+        camera.camera?.exposureOffset = -0.08
         camera.position = closeup
-            ? SCNVector3(0, 1.80, 0.91)
-            : SCNVector3(0, 1.11, 3.28)
-        camera.look(at: closeup ? SCNVector3(0, 1.79, 0)
-                                : SCNVector3(0, 1.01, 0))
+            ? SCNVector3(0, 1.80, 1.08)
+            : SCNVector3(0, 1.12, 3.55)
+        camera.look(at: closeup ? SCNVector3(0, 1.78, 0)
+                                : SCNVector3(0, 1.04, 0))
         camera.camera?.zNear = 0.025
         scene.rootNode.addChildNode(camera)
         return scene
@@ -378,122 +380,349 @@ private enum DetectiveModelFactory {
     }
 
     private static func makeHair(into head: SCNNode, style: DetectiveHair) {
-        let topY: Float = style == .cropped ? 0.247 : 0.265
-        head.addChildNode(ellipsoid("Hair foundation", hairColor, 0, topY, -0.004,
-                                    0.114, style == .cropped ? 0.037 : 0.062,
-                                    0.105, roughness: 0.93))
-        let count = style == .cropped ? 9 : style == .textured ? 19 : 13
+        // Four different hair silhouettes. Thin volume strands sit above the
+        // scalp instead of large disconnected spheres.
+        let foundationHeight: CGFloat = style == .cropped ? 0.039 : 0.058
+        head.addChildNode(ellipsoid("Scalp hair", hairColor, 0, 0.255, -0.015,
+                                    0.108, foundationHeight, 0.101,
+                                    roughness: 0.98))
+        let count = style == .cropped ? 36 : style == .textured ? 52 : 32
         for i in 0..<count {
-            let angle = Float(i) * 2.39996
-            let radius = Float(sqrt(Double(i) / Double(count))) * 0.087
-            let x = cos(angle) * radius
-            let z = sin(angle) * radius
-            let frontShift: Float = style == .swept ? 0.018 : 0
-            let height: Float = style == .textured ? Float(i % 5) * 0.009 : 0
-            let tuft = ellipsoid("Hair strand clump", hairColor,
-                                  x + frontShift, topY + 0.025 + height, z,
-                                  0.027, style == .cropped ? 0.013 : 0.033,
-                                  0.032, roughness: 0.95)
-            tuft.eulerAngles.z = style == .swept ? -0.29 : Float(i % 3 - 1) * 0.09
-            head.addChildNode(tuft)
+            let theta = Float(i) * 2.3999632
+            let radius = Float(sqrt(Double(i + 1) / Double(count + 2))) * 0.089
+            let x = cos(theta) * radius
+            let z = sin(theta) * radius
+            let front = z > 0.020
+            let offset: Float
+            let height: CGFloat
+            let breadth: CGFloat
+            switch style {
+            case .cropped:
+                offset = 0
+                height = 0.010 + CGFloat(i % 3) * 0.002
+                breadth = 0.012
+            case .classic:
+                offset = x > 0 ? 0.006 : -0.005
+                height = 0.020 + CGFloat(i % 3) * 0.003
+                breadth = 0.016
+            case .textured:
+                offset = front ? 0.004 : 0
+                height = 0.026 + CGFloat(i % 7) * 0.006
+                breadth = 0.012
+            case .swept:
+                offset = 0.017
+                height = front ? 0.028 : 0.020
+                breadth = 0.016
+            }
+            let strand = ellipsoid("Sculpted hair strand", hairColor,
+                                   x + offset, 0.279 + Float(height) * 0.5, z,
+                                   breadth, height, breadth * 1.25,
+                                   roughness: 0.97)
+            strand.eulerAngles.z = style == .swept ? -0.35 :
+                                    style == .classic ? -0.10 : Float(i % 3 - 1) * 0.10
+            head.addChildNode(strand)
+        }
+        if style == .swept || style == .textured {
+            let count = style == .swept ? 10 : 13
+            for i in 0..<count {
+                let x = Float(i) / Float(max(1, count - 1)) * 0.176 - 0.088
+                let fringe = ellipsoid("Hair fringe", hairColor,
+                                       x + (style == .swept ? 0.012 : 0),
+                                       0.251 + Float(i % 4) * 0.005, 0.094,
+                                       0.012, style == .swept ? 0.024 : 0.016,
+                                       0.013, roughness: 0.97)
+                fringe.eulerAngles.z = style == .swept ? -0.38 : 0
+                head.addChildNode(fringe)
+            }
         }
     }
 
     private static func makeEyewear(into head: SCNNode, id: String?) {
         guard let id else { return }
-        let dark = UIColor(red: 0.10, green: 0.12, blue: 0.15, alpha: 1)
-        let frame: UIColor = id == "glasses_clear" ? metal :
-                             id == "glasses_monocle" ? UIColor(red: 0.78, green: 0.61, blue: 0.32, alpha: 1)
-                             : dark
-        let shield = ["glasses_visor", "glasses_night", "glasses_ice", "glasses_holo"]
-        if shield.contains(id) {
-            let glass = box("3D eye visor", UIColor(red: 0.15, green: 0.33,
-                            blue: 0.40, alpha: 0.88),
-                            width: 0.177, height: 0.046, length: 0.015,
-                            x: 0, y: 0.161, z: 0.128, chamfer: 0.014)
-            glass.geometry?.firstMaterial?.transparency = id == "glasses_holo" ? 0.60 : 0.88
+        let dark = UIColor(red: 0.08, green: 0.11, blue: 0.15, alpha: 1)
+        let steel = UIColor(red: 0.63, green: 0.69, blue: 0.75, alpha: 1)
+        if ["glasses_visor", "glasses_night", "glasses_ice", "glasses_holo"].contains(id) {
+            let lens: UIColor
+            switch id {
+            case "glasses_night": lens = UIColor(red: 0.16, green: 0.46, blue: 0.23, alpha: 1)
+            case "glasses_ice": lens = UIColor(red: 0.60, green: 0.79, blue: 0.88, alpha: 1)
+            case "glasses_holo": lens = UIColor(red: 0.15, green: 0.80, blue: 0.91, alpha: 1)
+            default: lens = UIColor(red: 0.15, green: 0.31, blue: 0.42, alpha: 1)
+            }
+            let wide = id == "glasses_visor" || id == "glasses_holo"
+            let glass = box("3D " + id, lens,
+                            width: wide ? 0.186 : 0.172,
+                            height: wide ? 0.052 : 0.067, length: 0.020,
+                            x: 0, y: 0.160, z: 0.126, chamfer: 0.015,
+                            metalness: id == "glasses_holo" ? 0.30 : 0.10)
+            glass.geometry?.firstMaterial?.transparency = id == "glasses_holo" ? 0.48 : 0.73
             head.addChildNode(glass)
+            let band = box("Visor upper frame", dark,
+                           width: 0.194, height: 0.008, length: 0.023,
+                           x: 0, y: 0.194, z: 0.124, chamfer: 0.004)
+            head.addChildNode(band)
+            if id == "glasses_night" {
+                for side in [-1.0, 1.0] {
+                    let optic = SCNCylinder(radius: 0.022, height: 0.022)
+                    optic.firstMaterial = material(dark, roughness: 0.3)
+                    let node = SCNNode(geometry: optic)
+                    node.name = "Night optic barrel"
+                    node.eulerAngles.x = .pi / 2
+                    node.position = SCNVector3(Float(side) * 0.043, 0.164, 0.149)
+                    head.addChildNode(node)
+                }
+            }
             return
         }
-        let monocle = id == "glasses_monocle"
-        for side in [-1.0, 1.0] where !monocle || side == 1 {
-            let lens = SCNTorus(ringRadius: 0.026, pipeRadius: 0.003)
-            lens.firstMaterial = material(frame, roughness: 0.30, metalness: 0.7)
-            let rim = SCNNode(geometry: lens)
-            rim.name = "Real 3D eyeglass frame"
-            rim.position = SCNVector3(Float(side) * 0.045, 0.159, 0.122)
+
+        let mono = id == "glasses_monocle"
+        let round = id == "glasses_round" || mono
+        let frame = id == "glasses_clear" ? steel :
+                    mono ? UIColor(red: 0.84, green: 0.67, blue: 0.32, alpha: 1) :
+                    dark
+        for side in [-1.0, 1.0] where !mono || side > 0 {
+            let geom = SCNTorus(ringRadius: round ? 0.024 : 0.027,
+                                pipeRadius: id == "glasses_clear" ? 0.0019 : 0.0032)
+            geom.firstMaterial = material(frame, roughness: 0.30, metalness: 0.65)
+            let rim = SCNNode(geometry: geom)
+            rim.name = "3D " + id + " rim"
             rim.eulerAngles.x = .pi / 2
+            if !round { rim.scale.y = 0.77 }
+            rim.position = SCNVector3(Float(side) * 0.045, 0.157, 0.119)
             head.addChildNode(rim)
-            if id == "glasses_amber" || id == "glasses_ruby" {
-                let tint = id == "glasses_ruby" ? UIColor.systemRed : UIColor.systemOrange
-                let lens = ellipsoid("Tinted lens", tint.withAlphaComponent(0.20),
-                                    Float(side) * 0.045, 0.159, 0.122,
-                                    0.023, 0.022, 0.0015, roughness: 0.17)
-                lens.geometry?.firstMaterial?.transparency = 0.25
+            if id == "glasses_amber" || id == "glasses_ruby" || id == "glasses_clear" {
+                let color: UIColor = id == "glasses_ruby" ? UIColor.systemRed :
+                                     id == "glasses_amber" ? UIColor.systemOrange : steel
+                let lens = ellipsoid("3D " + id + " lens", color,
+                                    Float(side) * 0.045, 0.157, 0.123,
+                                    0.024, round ? 0.024 : 0.019, 0.0015,
+                                    roughness: 0.12)
+                lens.geometry?.firstMaterial?.transparency =
+                    id == "glasses_clear" ? 0.14 : 0.33
                 head.addChildNode(lens)
             }
         }
-        if !monocle {
-            head.addChildNode(box("3D spectacle bridge", frame, width: 0.035,
-                                  height: 0.004, length: 0.006,
-                                  x: 0, y: 0.162, z: 0.123, chamfer: 0.001))
+        if mono {
+            let chain = SCNTorus(ringRadius: 0.006, pipeRadius: 0.001)
+            chain.firstMaterial = material(frame, roughness: 0.20, metalness: 0.9)
+            let charm = SCNNode(geometry: chain)
+            charm.eulerAngles.x = .pi / 2
+            charm.position = SCNVector3(0.084, 0.089, 0.111)
+            head.addChildNode(charm)
+        } else {
+            head.addChildNode(box("Glasses bridge", frame,
+                                  width: 0.037, height: 0.004, length: 0.009,
+                                  x: 0, y: 0.164, z: 0.126, chamfer: 0.001))
         }
     }
 
     private static func makeHeadwear(into head: SCNNode, id: String?) {
         guard let id else { return }
+        let black = UIColor(red: 0.08, green: 0.10, blue: 0.14, alpha: 1)
+        let gold = UIColor(red: 0.83, green: 0.65, blue: 0.30, alpha: 1)
         let fabric: UIColor
         switch id {
-        case "hat_beret": fabric = UIColor(red: 0.34, green: 0.10, blue: 0.14, alpha: 1)
-        case "hat_newsboy": fabric = UIColor(red: 0.40, green: 0.31, blue: 0.22, alpha: 1)
-        case "hat_winter": fabric = UIColor(red: 0.75, green: 0.80, blue: 0.85, alpha: 1)
-        case "hat_visor": fabric = UIColor(red: 0.11, green: 0.32, blue: 0.28, alpha: 1)
-        case "hat_cap": fabric = UIColor(red: 0.15, green: 0.24, blue: 0.33, alpha: 1)
-        default: fabric = UIColor(red: 0.09, green: 0.12, blue: 0.16, alpha: 1)
+        case "hat_cap": fabric = UIColor(red: 0.14, green: 0.25, blue: 0.36, alpha: 1)
+        case "hat_beret": fabric = UIColor(red: 0.40, green: 0.13, blue: 0.20, alpha: 1)
+        case "hat_fedora": fabric = black
+        case "hat_director": fabric = UIColor(red: 0.16, green: 0.19, blue: 0.27, alpha: 1)
+        case "hat_beanie": fabric = UIColor(red: 0.10, green: 0.16, blue: 0.23, alpha: 1)
+        case "hat_newsboy": fabric = UIColor(red: 0.43, green: 0.32, blue: 0.22, alpha: 1)
+        case "hat_visor": fabric = UIColor(red: 0.13, green: 0.37, blue: 0.36, alpha: 1)
+        case "hat_winter": fabric = UIColor(red: 0.72, green: 0.78, blue: 0.84, alpha: 1)
+        case "hat_hood": fabric = UIColor(red: 0.09, green: 0.15, blue: 0.20, alpha: 1)
+        case "hat_pilot": fabric = UIColor(red: 0.15, green: 0.23, blue: 0.33, alpha: 1)
+        default: fabric = black
         }
-        if id == "hat_fedora" {
-            let crown = SCNCylinder(radius: 0.092, height: 0.093)
-            crown.firstMaterial = material(fabric)
+        switch id {
+        case "hat_fedora":
+            let crown = SCNCylinder(radius: 0.093, height: 0.082)
+            crown.firstMaterial = material(fabric, roughness: 0.92)
             let cap = SCNNode(geometry: crown)
             cap.position = SCNVector3(0, 0.319, 0)
             head.addChildNode(cap)
-            let brim = SCNCylinder(radius: 0.147, height: 0.012)
-            brim.firstMaterial = material(fabric)
+            let brim = SCNCylinder(radius: 0.150, height: 0.009)
+            brim.firstMaterial = material(fabric, roughness: 0.80)
             let rim = SCNNode(geometry: brim)
-            rim.position = SCNVector3(0, 0.278, 0.01)
+            rim.position = SCNVector3(0, 0.281, 0.008)
             head.addChildNode(rim)
-        } else if id == "hat_beret" {
-            head.addChildNode(ellipsoid("3D wool beret", fabric, -0.017, 0.294, 0,
-                                       0.142, 0.036, 0.114))
-        } else if id == "hat_hood" {
-            head.addChildNode(ellipsoid("3D hood behind head", fabric, 0, 0.179, -0.066,
-                                       0.140, 0.175, 0.080))
-        } else {
-            head.addChildNode(ellipsoid("3D cap crown", fabric, 0, 0.289, -0.005,
-                                       0.116, 0.057, 0.110))
-            if id != "hat_beanie" && id != "hat_winter" {
-                let brim = box("3D visor brim", fabric,
-                                width: 0.184, height: 0.011, length: 0.075,
-                                x: 0, y: 0.281, z: 0.113, chamfer: 0.008)
-                head.addChildNode(brim)
+        case "hat_beret":
+            head.addChildNode(ellipsoid("Shadow beret", fabric, -0.027, 0.302, 0.006,
+                                        0.143, 0.039, 0.117))
+            head.addChildNode(box("Beret stem", black, width: 0.013,
+                                  height: 0.018, length: 0.011,
+                                  x: -0.015, y: 0.340, z: 0, chamfer: 0.005))
+        case "hat_hood":
+            head.addChildNode(ellipsoid("Covert hood", fabric, 0, 0.168, -0.076,
+                                        0.151, 0.180, 0.105))
+            for side in [-1.0, 1.0] {
+                head.addChildNode(ellipsoid("Hood fabric edge", fabric,
+                                            Float(side) * 0.116, 0.163, 0.053,
+                                            0.030, 0.137, 0.036))
             }
+        case "hat_visor":
+            head.addChildNode(ellipsoid("Field visor band", fabric, 0, 0.253, 0,
+                                        0.119, 0.017, 0.102))
+            head.addChildNode(box("Visor brim", fabric, width: 0.205,
+                                  height: 0.010, length: 0.103,
+                                  x: 0, y: 0.249, z: 0.112, chamfer: 0.013))
+        case "hat_beanie", "hat_winter":
+            head.addChildNode(ellipsoid("Knit cap", fabric, 0, 0.290, -0.003,
+                                        0.122, 0.076, 0.111))
+            head.addChildNode(ellipsoid("Knit cuff", fabric,
+                                        0, 0.260, 0.037, 0.124, 0.022, 0.078))
+            if id == "hat_winter" {
+                head.addChildNode(ellipsoid("Snow patrol pom", UIColor.white,
+                                            0, 0.374, 0, 0.030, 0.030, 0.030))
+            }
+        case "hat_newsboy":
+            head.addChildNode(ellipsoid("Eight-panel newsboy cap", fabric,
+                                        0, 0.297, -0.013, 0.140, 0.068, 0.133))
+            head.addChildNode(box("Newsboy peak", fabric, width: 0.196,
+                                  height: 0.011, length: 0.090,
+                                  x: 0, y: 0.264, z: 0.121, chamfer: 0.026))
+            head.addChildNode(ellipsoid("Cap button", black, 0, 0.365, 0,
+                                        0.015, 0.007, 0.015))
+        case "hat_director", "hat_pilot":
+            head.addChildNode(ellipsoid("Uniform peaked cap", fabric,
+                                        0, 0.297, -0.013, 0.123, 0.069, 0.115))
+            head.addChildNode(box("Uniform hat brim", black,
+                                  width: 0.210, height: 0.014, length: 0.088,
+                                  x: 0, y: 0.270, z: 0.112, chamfer: 0.018))
+            head.addChildNode(box("Uniform gold band", gold,
+                                  width: 0.178, height: 0.010, length: 0.010,
+                                  x: 0, y: 0.283, z: 0.119, chamfer: 0.005,
+                                  metalness: 0.67))
+            if id == "hat_pilot" {
+                head.addChildNode(box("Air marshal insignia", gold,
+                                      width: 0.067, height: 0.012, length: 0.012,
+                                      x: 0, y: 0.316, z: 0.119, chamfer: 0.004))
+            } else {
+                head.addChildNode(ellipsoid("Director crest", gold,
+                                            0, 0.323, 0.113,
+                                            0.021, 0.028, 0.008,
+                                            roughness: 0.29))
+            }
+        default:
+            head.addChildNode(ellipsoid("Patrol cap", fabric,
+                                        0, 0.289, -0.009, 0.122, 0.063, 0.112))
+            head.addChildNode(box("Patrol peak", fabric, width: 0.192,
+                                  height: 0.013, length: 0.088,
+                                  x: 0, y: 0.267, z: 0.119, chamfer: 0.014))
         }
     }
 
     private static func makeBadge(into body: SCNNode, id: String?) {
         guard let id else { return }
-        let gold = id.contains("bronze") ? UIColor(red: 0.62, green: 0.40,
-                                                  blue: 0.22, alpha: 1) :
-                   id.contains("silver") || id.contains("diamond")
-                     ? metal : UIColor(red: 0.85, green: 0.65, blue: 0.30, alpha: 1)
-        let shield = box("Metal agency badge", gold,
-                         width: 0.047, height: 0.058, length: 0.008,
-                         x: 0.142, y: 1.522, z: 0.146, chamfer: 0.010,
-                         metalness: 0.94)
-        body.addChildNode(shield)
-        body.addChildNode(ellipsoid("Badge emblem", metal,
-                                    0.142, 1.528, 0.152,
-                                    0.010, 0.011, 0.003, roughness: 0.24))
+        let gold = UIColor(red: 0.86, green: 0.69, blue: 0.36, alpha: 1)
+        let steel = UIColor(red: 0.82, green: 0.88, blue: 0.92, alpha: 1)
+        let metal: UIColor
+        let symbol: String
+        switch id {
+        case "badge_bronze":
+            metal = UIColor(red: 0.71, green: 0.43, blue: 0.24, alpha: 1)
+            symbol = "★"
+        case "badge_silver":
+            metal = steel; symbol = "★"
+        case "badge_gold":
+            metal = gold; symbol = "★"
+        case "badge_compass":
+            metal = gold; symbol = "✦"
+        case "badge_case":
+            metal = UIColor(red: 0.31, green: 0.77, blue: 0.89, alpha: 1)
+            symbol = "✓"
+        case "badge_onyx":
+            metal = UIColor(red: 0.20, green: 0.24, blue: 0.29, alpha: 1)
+            symbol = "◆"
+        case "badge_diamond":
+            metal = steel; symbol = "◆"
+        case "badge_royal":
+            metal = gold; symbol = "♛"
+        case "badge_neon":
+            metal = UIColor(red: 0.18, green: 0.88, blue: 0.92, alpha: 1)
+            symbol = "✦"
+        case "badge_director":
+            metal = gold; symbol = "♛"
+        default:
+            metal = gold; symbol = "★"
+        }
+        let plaque = box("3D " + id + " badge", metal,
+                         width: id.contains("royal") || id.contains("director") ? 0.058 : 0.049,
+                         height: id.contains("diamond") ? 0.068 : 0.057,
+                         length: 0.009,
+                         x: 0.142, y: 1.521, z: 0.150,
+                         chamfer: 0.010, metalness: 0.87)
+        if id == "badge_diamond" {
+            plaque.eulerAngles.z = .pi / 4
+        }
+        body.addChildNode(plaque)
+        let engraving = SCNText(string: symbol, extrusionDepth: 0.0015)
+        engraving.font = UIFont.systemFont(ofSize: 0.042, weight: .heavy)
+        engraving.flatness = 0.001
+        engraving.firstMaterial = material(
+            id == "badge_onyx" ? steel : UIColor(red: 0.12, green: 0.18, blue: 0.24, alpha: 1),
+            roughness: 0.33, metalness: 0.65)
+        let mark = SCNNode(geometry: engraving)
+        mark.name = id + " distinct emblem"
+        mark.scale = SCNVector3(0.83, 0.83, 0.83)
+        mark.position = SCNVector3(0.128, 1.502, 0.158)
+        body.addChildNode(mark)
+    }
+
+    private static func makeCoatDetails(into body: SCNNode, id: String?, base: UIColor) {
+        guard let id else { return }
+        let gold = UIColor(red: 0.85, green: 0.67, blue: 0.33, alpha: 1)
+        let trim: UIColor
+        switch id {
+        case "coat_ghost", "coat_arctic": trim = UIColor(red: 0.19, green: 0.23, blue: 0.29, alpha: 1)
+        case "coat_royal", "coat_cipher": trim = gold
+        case "coat_sunset": trim = UIColor(red: 0.97, green: 0.66, blue: 0.31, alpha: 1)
+        default: trim = UIColor(red: 0.54, green: 0.61, blue: 0.68, alpha: 1)
+        }
+        if id == "coat_sand" || id == "coat_noir" || id == "coat_royal" {
+            let belt = box(id + " tailored belt", trim,
+                           width: 0.330, height: 0.028, length: 0.018,
+                           x: 0, y: 1.217, z: 0.122, chamfer: 0.006)
+            body.addChildNode(belt)
+            for side in [-1.0, 1.0] {
+                body.addChildNode(box("Double breasted button", gold,
+                           width: 0.013, height: 0.013, length: 0.007,
+                           x: Float(side) * 0.055, y: 1.390, z: 0.151,
+                           chamfer: 0.004, metalness: 0.8))
+            }
+        }
+        if id == "coat_arctic" {
+            let fur = UIColor(red: 0.91, green: 0.93, blue: 0.94, alpha: 1)
+            for side in [-1.0, 1.0] {
+                body.addChildNode(ellipsoid("Arctic insulated collar", fur,
+                                            Float(side) * 0.107, 1.614, 0.093,
+                                            0.089, 0.030, 0.062, roughness: 0.98))
+            }
+        } else if id == "coat_sunset" {
+            for side in [-1.0, 1.0] {
+                body.addChildNode(ellipsoid("Bomber jacket ribbed collar", trim,
+                                            Float(side) * 0.087, 1.610, 0.108,
+                                            0.069, 0.023, 0.039))
+            }
+        } else if id == "coat_evergreen" || id == "coat_cipher" {
+            let armPatch = box(id + " sleeve insignia", trim,
+                               width: 0.031, height: 0.052, length: 0.009,
+                               x: -0.279, y: 1.418, z: 0.070,
+                               chamfer: 0.009, metalness: 0.26)
+            body.addChildNode(armPatch)
+        }
+        if id == "coat_crimson" || id == "coat_navy" || id == "coat_ghost" {
+            body.addChildNode(box(id + " zipper", trim,
+                                  width: 0.007, height: 0.260, length: 0.009,
+                                  x: 0.008, y: 1.385, z: 0.157,
+                                  chamfer: 0.002, metalness: 0.73))
+        }
+        if id == "coat_royal" || id == "coat_cipher" {
+            body.addChildNode(box(id + " chest insignia", trim,
+                                  width: 0.067, height: 0.022, length: 0.010,
+                                  x: -0.117, y: 1.533, z: 0.146,
+                                  chamfer: 0.006, metalness: 0.78))
+        }
     }
 
     private static func light(at position: SCNVector3, intensity: CGFloat,

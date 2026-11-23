@@ -14,6 +14,7 @@ on:
       - "Redacted-Info.plist"
       - "SEASONS_AND_UI_OVERHAUL.md"
       - "Scripts/validate_cosmetics.py"
+      - "Scripts/validate_release_navigation.py"
       - "Backend/**/*.sql"
   workflow_dispatch:
 
@@ -32,6 +33,9 @@ jobs:
       - name: Validate cosmetic catalog and duel emote coverage
         run: |
           python3 Scripts/validate_cosmetics.py
+      - name: Validate original navigation, live character and offline startup
+        run: |
+          python3 Scripts/validate_release_navigation.py
       - name: Build universal game for iOS Simulator
         run: |
           set -o pipefail

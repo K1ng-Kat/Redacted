@@ -9,6 +9,7 @@ struct CampaignSettingsView: View {
     @AppStorage("redacted.fx.motion") private var motion = true
     @AppStorage("redacted.fx.hints") private var hints = true
     @AppStorage("redacted.age.mode") private var ageModeRaw = DetectiveAgeMode.investigator.rawValue
+    @AppStorage("redacted.offlineMode") private var offlineMode = false
     @AppStorage("redacted.music.enabled") private var musicEnabled = true
     @AppStorage("redacted.music.menu.volume") private var menuVolume = 0.55
     @AppStorage("redacted.music.level.volume") private var levelVolume = 0.12
@@ -97,7 +98,34 @@ struct CampaignSettingsView: View {
                                       value: $levelVolume, maximum: 0.45)
                     }
                 }
-                if DetectiveSocialConfiguration.isConfigured {
+                GameCard(accent: Art.cyan) {
+                    VStack(alignment: .leading, spacing: 9) {
+                        Toggle(isOn: $offlineMode) {
+                            HStack(spacing: 10) {
+                                Image(systemName: "airplane")
+                                    .font(.system(size: 23, weight: .semibold))
+                                    .foregroundStyle(Art.cyan)
+                                    .frame(width: 33)
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text("OFFLINE MODE")
+                                        .font(.system(size: 15, weight: .black, design: .rounded))
+                                        .foregroundStyle(Art.paper)
+                                    Text("Play saved cases without a connection")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(Art.faded)
+                                }
+                            }
+                        }
+                        .tint(Art.mint)
+                        Text(offlineMode
+                             ? "Offline Mode is on. Solo cases, detective customization and local saves remain available. Re-enable online mode here after your flight."
+                             : "Turn this on for flights or unreliable Wi-Fi. Duels, friends and cloud backup are paused while Offline Mode is on.")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Art.faded)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                if DetectiveSocialConfiguration.isConfigured && !offlineMode {
                     RedactedAccountCard()
                 }
                 GameCard(accent: Art.gold) {
@@ -123,7 +151,7 @@ struct CampaignSettingsView: View {
                 GameCard {
                     VStack(alignment: .leading, spacing: 11) {
                         GameKicker(text: "PRIVACY AND SAVES", color: Art.cyan)
-                        Text(DetectiveSocialConfiguration.isConfigured
+                        Text(DetectiveSocialConfiguration.isConfigured && !offlineMode
                              ? "Progress is saved on this device. Sign in to REDACTED ID to back up your campaign and restore it on another device."
                              : "Your campaign progress is saved on this device. Online backup is not available in this version; deleting the app may erase your save.")
                             .font(.system(size: 14, weight: .medium))

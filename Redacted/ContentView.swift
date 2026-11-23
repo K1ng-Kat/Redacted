@@ -9,57 +9,49 @@ struct ContentView: View {
     @ObservedObject private var social = DetectiveSocialNetwork.shared
     @Namespace private var tabIndicator
     @State private var pendingInvite: String?
-    @State private var startupComplete = false
     @AppStorage("redacted.setup.complete") private var setupComplete = false
     @AppStorage("redacted.age.mode") private var ageModeRaw = DetectiveAgeMode.investigator.rawValue
     @State private var backDrag: CGFloat = 0
     @State private var backCompleting = false
-    @State private var startupProgress = 0.04
-    @State private var startupStep = "OPENING REDACTED"
     @AppStorage("redacted.tutorial.home") private var homeCoached = false
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("redacted.music.enabled") private var musicEnabled = true
     @AppStorage("redacted.music.menu.volume") private var menuVolume = 0.55
     @AppStorage("redacted.music.level.volume") private var levelVolume = 0.12
+    @AppStorage("redacted.offlineMode") private var offlineMode = false
 
     private enum Route: Equatable {
-        case home, levels, play, settings, guide, stats, wardrobe, multiplayer, friends, season
+        case home, levels, play, settings, guide, stats, wardrobe, multiplayer, friends, season, more
     }
 
     var body: some View {
         ZStack {
             GameBackdrop()
-            if startupComplete {
-                if setupComplete {
-                    swipeNavigation
-                        .transition(.opacity)
-                } else {
-                    AgeOnboardingView { mode in
-                        // Only the chosen difficulty is persisted. The exact
-                        // numeric age never leaves the transient setup view.
-                        ageModeRaw = mode.rawValue
-                        setupComplete = true
-                        GameEffects.shared.success()
-                        openPendingInvite()
-                    }
+            if setupComplete {
+                swipeNavigation
                     .transition(.opacity)
-                }
             } else {
-                StartupLoadingView(progress: startupProgress, stage: startupStep)
-                    .transition(.opacity)
+                AgeOnboardingView { mode in
+                    ageModeRaw = mode.rawValue
+                    setupComplete = true
+                    GameEffects.shared.success()
+                    openPendingInvite()
+                }
+                .transition(.opacity)
             }
         }
         .preferredColorScheme(.dark)
         .animation(.easeInOut(duration: 0.38), value: seasons.displayed.id)
         .overlay {
-            if startupComplete && setupComplete && route == .home &&
+            if setupComplete && route == .home &&
                !homeCoached && store.levelsCompleted == 0 {
                 GameCoachOverlay(
                     title: "YOUR FIRST CASE!",
                     detail: "Tap PLAY to investigate. Solve cases to earn coins, stars, and new detective identities.",
                     button: "PLAY FIRST CASE",
                     symbol: "hand.point.up.left.fill",
-                    portraitTheme: nil
+                    portraitTheme: nil,
+                    dismiss: { homeCoached = true }
                 ) {
                     homeCoached = true
                     launch(store.nextLevel)
@@ -67,19 +59,22 @@ struct ContentView: View {
             }
         }
         .task {
-            await prepareStartup()
-            // Present the ready screen before attaching optional online systems.
-            try? await Task.sleep(for: .milliseconds(180))
+            // The launch manager has already finished the only loading UI.
+            // Optional account services must never delay a local case.
+            try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled else { return }
-            RedactedAccountSave.shared.attach(store)
-            MultiplayerService.shared.attach(store)
-            if DetectiveSocialNetwork.shared.accountEmail != nil {
-                await DetectiveSocialNetwork.shared.connect()
+            syncMusic()
+            if !offlineMode && DetectiveSocialConfiguration.isConfigured {
+                RedactedAccountSave.shared.attach(store)
+                MultiplayerService.shared.attach(store)
+                if DetectiveSocialNetwork.shared.accountEmail != nil {
+                    await DetectiveSocialNetwork.shared.connect()
+                }
             }
             openPendingInvite()
-            // Presence follows app activity, not only the Social tab.
             while !Task.isCancelled {
-                if scenePhase == .active,
+                if !offlineMode && scenePhase == .active &&
+                   DetectiveSocialConfiguration.isConfigured &&
                    DetectiveSocialNetwork.shared.accountEmail != nil {
                     await DetectiveSocialNetwork.shared.heartbeat()
                 }
@@ -96,18 +91,18 @@ struct ContentView: View {
             openPendingInvite()
         }
         .onChange(of: route) { _, _ in syncMusic() }
-        .onChange(of: startupComplete) { _, finished in
-            openPendingInvite()
-            if finished {
-                // Do not initialize audio players before the first game frame.
+        .onChange(of: setupComplete) { _, _ in openPendingInvite() }
+        .onChange(of: offlineMode) { _, isOffline in
+            if isOffline {
+                MultiplayerService.shared.stopPresence()
+            } else if DetectiveSocialConfiguration.isConfigured {
                 Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(350))
-                    guard !Task.isCancelled else { return }
-                    syncMusic()
+                    RedactedAccountSave.shared.attach(store)
+                    MultiplayerService.shared.attach(store)
+                    await DetectiveSocialNetwork.shared.connect()
                 }
             }
         }
-        .onChange(of: setupComplete) { _, _ in openPendingInvite() }
         .onChange(of: musicEnabled) { _, _ in syncMusic() }
         .onChange(of: menuVolume) { _, _ in syncMusic() }
         .onChange(of: levelVolume) { _, _ in syncMusic() }
@@ -115,7 +110,7 @@ struct ContentView: View {
             if newPhase == .active {
                 seasons.refresh()
                 syncMusic()
-                if route == .multiplayer {
+                if !offlineMode && route == .multiplayer {
                     MultiplayerService.shared.startPresence()
                 }
             } else {
@@ -201,10 +196,10 @@ struct ContentView: View {
         }
     }
 
+    // Always show the full navigation. Online destinations stay visible
+    // and explain unavailable connections instead of disappearing.
     private var availableTabs: [Route] {
-        DetectiveSocialConfiguration.isConfigured
-            ? [.home, .multiplayer, .friends]
-            : [.home, .levels, .wardrobe]
+        [.home, .levels, .multiplayer, .friends, .more]
     }
 
     private var showsMainTabs: Bool {
@@ -222,9 +217,10 @@ struct ContentView: View {
             .simultaneousGesture(
                 DragGesture(minimumDistance: 45)
                     .onEnded { gesture in
+                        // Cases, Duels and Social have their own horizontal
+                        // interactions; do not steal their gestures for tabs.
                         guard showsMainTabs,
-                              DetectiveSocialConfiguration.isConfigured,
-                              !(route == .multiplayer && MultiplayerService.shared.phase == .playing),
+                              route == .home || route == .more,
                               abs(gesture.translation.width) > 75,
                               abs(gesture.translation.width) > abs(gesture.translation.height) * 1.7
                         else { return }
@@ -240,30 +236,25 @@ struct ContentView: View {
             )
     }
 
-    // A single contiguous game tab control. Selected backing SLIDES between
-    // cells; no Liquid Glass and no separator gaps or uncovered safe-area band.
+    // Attach directly to the bottom safe-area edge. The background extends
+    // behind the home indicator; the controls never float in a padded capsule.
     private var mainTabBar: some View {
         HStack(spacing: 0) {
             mainTab(.home, symbol: "house.fill", label: "HOME")
-            if DetectiveSocialConfiguration.isConfigured {
-                mainTab(.multiplayer, symbol: "gamecontroller.fill", label: "DUELS")
-                mainTab(.friends, symbol: "person.2.fill", label: "SOCIAL")
-            } else {
-                mainTab(.levels, symbol: "square.grid.2x2.fill", label: "CASES")
-                mainTab(.wardrobe, symbol: "person.crop.square", label: "STYLE")
-            }
+            mainTab(.levels, symbol: "square.grid.2x2.fill", label: "CASES")
+            mainTab(.multiplayer, symbol: "gamecontroller.fill", label: "DUELS")
+            mainTab(.friends, symbol: "person.2.fill", label: "SOCIAL")
+            mainTab(.more, symbol: "ellipsis.circle.fill", label: "MORE")
         }
-        .padding(5)
-        .background(Art.blueDeep)
-        .clipShape(RoundedRectangle(cornerRadius: 17))
-        .overlay(RoundedRectangle(cornerRadius: 17)
-            .stroke(Art.edge.opacity(0.35), lineWidth: 1))
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 4)
         .padding(.top, 7)
-        .padding(.bottom, 3)
         .frame(maxWidth: .infinity)
         .background {
             Art.ink
+                .overlay(alignment: .top) {
+                    Rectangle().fill(Art.edge.opacity(0.40))
+                        .frame(height: 1)
+                }
                 .ignoresSafeArea(edges: .bottom)
         }
         .accessibilityElement(children: .contain)
@@ -297,16 +288,15 @@ struct ContentView: View {
                     .minimumScaleFactor(0.78)
             }
             .foregroundStyle(selected ? Art.ink : Art.faded)
-            .frame(maxWidth: .infinity, minHeight: 54)
+            .frame(maxWidth: .infinity, minHeight: 51)
             .background {
                 if selected {
-                    RoundedRectangle(cornerRadius: 13)
+                    RoundedRectangle(cornerRadius: 12)
                         .fill(Art.cyan)
                         .matchedGeometryEffect(id: "tab-slider", in: tabIndicator)
-                        .shadow(color: Art.cyan.opacity(0.20), radius: 10, y: 2)
                 }
             }
-            .contentShape(RoundedRectangle(cornerRadius: 13))
+            .contentShape(Rectangle())
         }
         .buttonStyle(PressGameStyle())
         .accessibilityLabel(target == .friends && onlineCount > 0
@@ -373,32 +363,20 @@ struct ContentView: View {
             MultiplayerLobbyView(store: store, back: { selectTab(.home) })
         case .friends:
             DetectiveSocialHubView(openMultiplayer: { selectTab(.multiplayer) })
+        case .more:
+            CampaignMoreView(
+                settings: { show(.settings) },
+                guide: { show(.guide) },
+                stats: { show(.stats) },
+                wardrobe: { show(.wardrobe) },
+                season: { show(.season) }
+            )
         }
     }
 
-    @MainActor
-    private func prepareStartup() async {
-        guard !startupComplete else { return }
-        startupStep = "LOADING CASE FILES"
-        startupProgress = 0.22
-        // Keep startup limited to actual game-state readiness. Audio decoders,
-        // synthesizers, and multiplayer are NOT required to display the menu.
-        await Task.yield()
-        _ = CampaignCatalog.levels.count
-        _ = store.nextLevel
-        startupProgress = 0.85
-        startupStep = "READY TO INVESTIGATE"
-        // Give the visible loading animation a frame to complete.
-        try? await Task.sleep(for: .milliseconds(100))
-        guard !Task.isCancelled else { return }
-        startupProgress = 1
-        withAnimation(.easeOut(duration: 0.2)) {
-            startupComplete = true
-        }
-    }
 
     private func syncMusic() {
-        guard startupComplete && scenePhase == .active else { return }
+        guard scenePhase == .active else { return }
         GameMusicController.shared.update(
             scene: route == .play || route == .multiplayer ? .level : .menu,
             enabled: musicEnabled,
@@ -409,7 +387,7 @@ struct ContentView: View {
 
     private func setRoute(_ next: Route, animated: Bool = true) {
         guard next != route else { return }
-        if startupComplete && scenePhase == .active {
+        if scenePhase == .active {
             GameMusicController.shared.update(
                 scene: next == .play || next == .multiplayer ? .level : .menu,
                 enabled: musicEnabled,
@@ -436,7 +414,7 @@ struct ContentView: View {
     }
 
     private func show(_ next: Route) {
-        if next == .home || next == .multiplayer || next == .friends {
+        if next == .home || next == .multiplayer || next == .friends || next == .more {
             selectTab(next)
             return
         }
@@ -451,7 +429,7 @@ struct ContentView: View {
     }
 
     private func openPendingInvite() {
-        guard startupComplete, setupComplete,
+        guard setupComplete, !offlineMode,
               DetectiveSocialConfiguration.isConfigured,
               let code = pendingInvite else { return }
         pendingInvite = nil

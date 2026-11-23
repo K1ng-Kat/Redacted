@@ -16,44 +16,32 @@ struct RedactedApp: App {
     }
 }
 
-/// A lightweight first UIKit frame before constructing the game.
-/// The app's old heavy state initialization could keep the static iOS
-/// LaunchScreen visible without an activity indicator on cold starts.
+/// The loading screen is the first real SwiftUI frame. ContentView, SceneKit
+/// actors, audio decoders and online account managers are constructed only
+/// after the launch bar reaches 100%. The native LaunchScreen remains static
+/// and cannot itself display an animated loading bar.
 private struct RedactedFirstFrameGate: View {
-    @State private var gameReadyToMount = false
+    @StateObject private var launch = RedactedLaunchManager()
 
     var body: some View {
-        Group {
-            if gameReadyToMount {
+        ZStack {
+            if launch.ready {
                 ContentView()
+                    .transition(.opacity)
             } else {
-                ZStack {
-                    Color(red: 0.035, green: 0.055, blue: 0.12)
-                        .ignoresSafeArea()
-                    VStack(spacing: 13) {
-                        Text("REDACTED")
-                            .font(.system(size: 33, weight: .heavy, design: .rounded))
-                            .foregroundStyle(Color(red: 1, green: 0.98, blue: 0.89))
-                        Text("DETECTIVE AGENCY")
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color(red: 0.37, green: 0.89, blue: 0.97))
-                        ProgressView()
-                            .tint(Color(red: 0.37, green: 0.89, blue: 0.97))
-                            .padding(.top, 8)
-                            .accessibilityLabel("Opening Redacted")
-                    }
-                }
+                StartupLoadingView(
+                    progress: launch.progress,
+                    stage: launch.stage,
+                    issue: launch.issue,
+                    retry: { Task { await launch.retry() } },
+                    playOffline: { launch.playOffline() }
+                )
+                .transition(.opacity)
             }
         }
         .preferredColorScheme(.dark)
-        .task {
-            guard !gameReadyToMount else { return }
-            // Allow at least a few UIKit display cycles for this first frame.
-            // This is a presentation gate, not artificial game initialization.
-            try? await Task.sleep(for: .milliseconds(80))
-            guard !Task.isCancelled else { return }
-            gameReadyToMount = true
-        }
+        .task { await launch.start() }
+        .animation(.easeOut(duration: 0.20), value: launch.ready)
     }
 }
 

@@ -15,6 +15,7 @@ on:
       - "SEASONS_AND_UI_OVERHAUL.md"
       - "Scripts/validate_cosmetics.py"
       - "Scripts/validate_release_navigation.py"
+      - "Scripts/validate_casework.swift"
       - "Backend/**/*.sql"
   workflow_dispatch:
 
@@ -36,6 +37,14 @@ jobs:
       - name: Validate original navigation, live character and offline startup
         run: |
           python3 Scripts/validate_release_navigation.py
+      - name: Validate all 100 cases for all 4 age profiles
+        run: |
+          swiftc -o "$RUNNER_TEMP/casework-check" \
+            Redacted/Game/CampaignCatalog.swift \
+            Redacted/Game/AgeAdjustedMission.swift \
+            Redacted/Game/CaseEvidence.swift \
+            Scripts/validate_casework.swift
+          "$RUNNER_TEMP/casework-check"
       - name: Build universal game for iOS Simulator
         run: |
           set -o pipefail

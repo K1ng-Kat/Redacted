@@ -842,13 +842,34 @@ struct LevelSelectView: View {
     @ObservedObject var store: CampaignStore
     let launch: (Int) -> Void
     let back: () -> Void
+    @AppStorage("redacted.age.mode") private var ageModeRaw = DetectiveAgeMode.investigator.rawValue
+    private var selectedAgeMode: DetectiveAgeMode {
+        DetectiveAgeMode(rawValue: ageModeRaw) ?? .investigator
+    }
     @State private var chosenEpisode = 0
     @State private var selectedReplayLevel: Int?
 
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 15) {
-                ScreenHeader(title: "LEVEL SELECT", subtitle: "CHOOSE YOUR NEXT MYSTERY", back: back)
+                ScreenHeader(title: "CASE FILES", subtitle: "100 INVESTIGATIONS · 10 DISTRICTS", back: back)
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "shield.checkered")
+                        .foregroundStyle(Art.cyan)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("DIFFICULTY · \(selectedAgeMode.title.uppercased())")
+                            .font(.system(size: 11, weight: .black, design: .rounded))
+                            .foregroundStyle(Art.paper)
+                        Text(selectedAgeMode.subtitle + " · Change in More → Settings")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(Art.faded)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(12)
+                .background(Art.blueDeep)
+                .clipShape(RoundedRectangle(cornerRadius: 13))
                 episodePicker
                 let episode = CampaignCatalog.episodes[chosenEpisode]
                 ZStack(alignment: .bottomLeading) {

@@ -26,6 +26,11 @@ struct MissionPlayView: View {
     @State private var frequency: Double = 50
     @State private var matchedItems: Set<Int> = []
     @State private var mistakes = 0
+    @State private var pinnedEvidence: Set<Int> = []
+    @State private var evidenceVerified = false
+    @State private var showingVerifiedRecords = false
+    @State private var deductionSolved = false
+    @State private var selectedTheory: Int?
     // A redeemed clue belongs to the saved case, not one temporary view.
     // This also refreshes automatically after a cloud-save restoration.
     private var hintUsed: Bool { store.hasRevealedHint(for: mission.id) }
@@ -39,7 +44,15 @@ struct MissionPlayView: View {
     @State private var newIdentityTheme: String?
     @State private var newIdentityTitle = ""
 
-    private var scrambled: [Character] { Array(mission.solution.reversed()) }
+    private var scrambled: [Character] { CaseEvidence.scrambledWord(for: mission) }
+    private var dossier: [CaseEvidenceNote] {
+        CaseEvidence.dossier(for: mission, mode: ageMode)
+    }
+    private var evidenceNeeded: Int {
+        CaseEvidence.requiredEvidenceCount(for: ageMode)
+    }
+    private var attemptLimit: Int { ageMode.attemptsAllowed }
+    private var attemptsRemaining: Int { max(0, attemptLimit - mistakes) }
 
     var body: some View {
         ZStack {
@@ -65,7 +78,30 @@ struct MissionPlayView: View {
                                 }
                             }
                         }
-                        puzzle
+                        if evidenceVerified {
+                            HStack(spacing: 10) {
+                                Label("EVIDENCE VERIFIED", systemImage: "checkmark.shield.fill")
+                                    .font(.system(size: 11, weight: .black, design: .monospaced))
+                                    .foregroundStyle(Art.mint)
+                                Spacer()
+                                Button(showingVerifiedRecords ? "HIDE CASEBOARD" : "REVIEW CASEBOARD") {
+                                    withAnimation(.easeInOut(duration: 0.22)) {
+                                        showingVerifiedRecords.toggle()
+                                    }
+                                }
+                                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                .foregroundStyle(Art.cyan)
+                            }
+                            .padding(.horizontal, 3)
+                            if showingVerifiedRecords { evidenceBoard }
+                            if deductionSolved {
+                                closingArguments
+                            } else {
+                                puzzle
+                            }
+                        } else {
+                            evidenceBoard
+                        }
                         if hintVisible {
                             GameCard(accent: Art.gold) {
                                 VStack(alignment: .leading, spacing: 7) {
@@ -109,7 +145,9 @@ struct MissionPlayView: View {
             if coaching {
                 GameCoachOverlay(
                     title: mission.id == 1 ? "WELCOME, DETECTIVE!" : "NEW DISTRICT!",
-                    detail: "Read the case brief before choosing. An incorrect answer ends this attempt. Aim for 3 stars!",
+                    detail: ageMode == .junior
+                        ? "Pick the checked clue, solve the puzzle and earn stars. You can try up to five times!"
+                        : "Compare the sources, pin good evidence and solve the puzzle. You have \(attemptLimit) attempts to make your case.",
                     button: "START INVESTIGATION",
                     symbol: "magnifyingglass",
                     portraitTheme: nil
@@ -164,6 +202,20 @@ struct MissionPlayView: View {
 
     private var missionIntro: some View {
         VStack(alignment: .leading, spacing: 11) {
+            HStack(spacing: 10) {
+                Label(ageMode == .junior ? "JUNIOR DETECTIVE" :
+                      ageMode == .explorer ? "EXPLORER" :
+                      ageMode == .investigator ? "INVESTIGATOR" : "EXPERT",
+                      systemImage: "shield.checkered")
+                    .font(.system(size: 11, weight: .black, design: .monospaced))
+                    .foregroundStyle(Art.cyan)
+                Spacer()
+                Label("\(attemptsRemaining) ATTEMPTS LEFT", systemImage: "heart.text.square.fill")
+                    .font(.system(size: 10, weight: .heavy, design: .monospaced))
+                    .foregroundStyle(attemptsRemaining <= 1 ? Art.coral : Art.gold)
+                    .monospacedDigit()
+            }
+            .padding(.horizontal, 3)
             ZStack(alignment: .bottomLeading) {
                 DistrictIllustration(episode: mission.episode)
                 LinearGradient(colors: [.clear, Art.ink.opacity(0.9)],
@@ -208,6 +260,207 @@ struct MissionPlayView: View {
                     }
                 }
             }
+        }
+    }
+
+    private var evidenceBoard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    GameKicker(text: "INVESTIGATION CASEBOARD", color: Art.gold)
+                    Text(evidenceVerified ? "REVIEW VERIFIED SOURCES" :
+                         "PIN \(evidenceNeeded) CORROBORATING \(evidenceNeeded == 1 ? "SOURCE" : "SOURCES")")
+                        .font(.system(size: 16, weight: .black, design: .rounded))
+                        .foregroundStyle(Art.paper)
+                }
+                Spacer()
+                Text("\(pinnedEvidence.count)/\(evidenceNeeded)")
+                    .font(.system(size: 17, weight: .black, design: .monospaced))
+                    .foregroundStyle(Art.gold)
+                    .monospacedDigit()
+            }
+            Text(evidenceVerified
+                 ? "Your evidence has been filed. Review the records if you need to double-check your deduction."
+                 : ageMode.sourceGuidance)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Art.faded)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if ageMode == .junior || ageMode == .explorer {
+                Button {
+                    narrator.stopSpeaking(at: .immediate)
+                    let spoken = dossier.map { "\($0.title). \($0.detail)" }
+                        .joined(separator: ". ")
+                    let utterance = AVSpeechUtterance(string: spoken)
+                    utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+                    utterance.rate = ageMode == .junior ? 0.43 : 0.49
+                    narrator.speak(utterance)
+                } label: {
+                    Label("READ EVIDENCE ALOUD", systemImage: "speaker.wave.2.fill")
+                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .foregroundStyle(Art.gold)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(Art.blueDeep)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(PressGameStyle())
+                .accessibilityHint("Read the caseboard records using speech")
+            }
+
+            ForEach(dossier) { record in
+                Button {
+                    guard !evidenceVerified else { return }
+                    GameEffects.shared.tap()
+                    if pinnedEvidence.contains(record.id) {
+                        pinnedEvidence.remove(record.id)
+                    } else if pinnedEvidence.count < evidenceNeeded {
+                        pinnedEvidence.insert(record.id)
+                    }
+                    feedback = nil
+                } label: {
+                    HStack(alignment: .top, spacing: 11) {
+                        Image(systemName: record.symbol)
+                            .font(.system(size: 21, weight: .medium))
+                            .foregroundStyle(pinnedEvidence.contains(record.id) ? Art.mint : Art.cyan)
+                            .frame(width: 27)
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text(record.title)
+                                .font(.system(size: 11, weight: .black, design: .monospaced))
+                                .tracking(0.5)
+                                .foregroundStyle(Art.paper)
+                            Text(record.detail)
+                                .font(.system(size: ageMode == .junior ? 14 : 12,
+                                              weight: .medium))
+                                .multilineTextAlignment(.leading)
+                                .foregroundStyle(Art.faded)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: pinnedEvidence.contains(record.id)
+                              ? "pin.fill" : "pin")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(pinnedEvidence.contains(record.id) ? Art.mint : Art.faded)
+                    }
+                    .padding(13)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Art.blueDeep)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 14)
+                            .strokeBorder(pinnedEvidence.contains(record.id)
+                                          ? Art.mint : Art.edge.opacity(0.45),
+                                          lineWidth: pinnedEvidence.contains(record.id) ? 2 : 1)
+                    }
+                    .contentShape(RoundedRectangle(cornerRadius: 14))
+                }
+                .buttonStyle(PressGameStyle())
+                .disabled(evidenceVerified)
+                .accessibilityLabel("\(record.title): \(record.detail)")
+                .accessibilityHint(pinnedEvidence.contains(record.id)
+                    ? "Unpin this record" : "Pin this record for analysis")
+            }
+            if !evidenceVerified {
+                GameButton(title: "VERIFY EVIDENCE", icon: "checkmark.shield.fill",
+                           inactive: pinnedEvidence.count != evidenceNeeded) {
+                    if CaseEvidence.verifies(pinnedEvidence, mission: mission, mode: ageMode) {
+                        GameEffects.shared.success()
+                        evidenceVerified = true
+                        feedback = nil
+                    } else {
+                        pinnedEvidence = []
+                        recordMistake(CaseEvidence.failedEvidenceFeedback(mode: ageMode))
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .background(Art.ink.opacity(0.52))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18)
+                .strokeBorder(Art.gold.opacity(0.28), lineWidth: 1)
+        }
+    }
+
+    private var closingArguments: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 9) {
+                Image(systemName: "text.book.closed.fill")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(Art.gold)
+                VStack(alignment: .leading, spacing: 4) {
+                    GameKicker(text: "CLOSING ARGUMENT", color: Art.gold)
+                    Text("EXPLAIN YOUR DEDUCTION")
+                        .font(.system(size: 20, weight: .black, design: .rounded))
+                        .foregroundStyle(Art.paper)
+                }
+            }
+            Text("Your answer fits the puzzle. Which explanation is actually supported by the verified evidence? Select the strongest reasoning to close the case.")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Art.faded)
+                .fixedSize(horizontal: false, vertical: true)
+
+            ForEach(CaseEvidence.theories(for: mission)) { theory in
+                Button {
+                    GameEffects.shared.tap()
+                    selectedTheory = selectedTheory == theory.id ? nil : theory.id
+                    feedback = nil
+                } label: {
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: selectedTheory == theory.id
+                              ? "checkmark.circle.fill" : "circle")
+                            .font(.system(size: 23))
+                            .foregroundStyle(selectedTheory == theory.id ? Art.mint : Art.gold)
+                        Text(theory.statement)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Art.paper)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(13)
+                    .background(Art.blueDeep)
+                    .clipShape(RoundedRectangle(cornerRadius: 15))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 15)
+                            .strokeBorder(selectedTheory == theory.id
+                                          ? Art.mint : Art.edge.opacity(0.45),
+                                          lineWidth: selectedTheory == theory.id ? 2 : 1)
+                    }
+                    .contentShape(RoundedRectangle(cornerRadius: 15))
+                }
+                .buttonStyle(PressGameStyle())
+                .accessibilityHint("Select or deselect this explanation")
+            }
+            GameButton(title: "CLOSE THE CASE", icon: "checkmark.seal.fill",
+                       inactive: selectedTheory == nil) {
+                guard let selection = selectedTheory else { return }
+                if CaseEvidence.theories(for: mission)
+                    .contains(where: { $0.id == selection && $0.supported }) {
+                    finalizeCase()
+                } else {
+                    selectedTheory = nil
+                    recordMistake("Your explanation does not account for the verified evidence. Reconsider the chain of proof.")
+                }
+            }
+        }
+        .padding(15)
+        .background(Art.ink.opacity(0.6))
+        .clipShape(RoundedRectangle(cornerRadius: 19))
+        .overlay {
+            RoundedRectangle(cornerRadius: 19)
+                .strokeBorder(Art.gold.opacity(0.36), lineWidth: 1)
+        }
+    }
+
+    private func recordMistake(_ reason: String) {
+        mistakes += 1
+        GameEffects.shared.mistake()
+        if mistakes >= attemptLimit {
+            attemptFailed = true
+            feedback = nil
+        } else {
+            feedback = reason + " \(attemptsRemaining) \(attemptsRemaining == 1 ? "attempt" : "attempts") remaining."
         }
     }
 
@@ -375,7 +628,7 @@ struct MissionPlayView: View {
 
     private var keypadPuzzle: some View {
         VStack(spacing: 17) {
-            if ageMode == .investigator || ageMode == .expert {
+            if ageMode.needsClosingArgument {
                 Text(adjusted.instruction)
                     .font(.system(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(Art.gold)
@@ -418,7 +671,7 @@ struct MissionPlayView: View {
                 if typed.count == 3 {
                     let valid = typed == adjusted.actualCode
                     if !valid { typed = "" }
-                    check(valid, wrongText: "That combination didn't unlock it. Try the clue in the case brief.")
+                    check(valid, wrongText: "That combination didn't unlock it. Review the identifier and lock protocol on your caseboard.")
                 }
             } else if typed.count < 3 {
                 typed += title
@@ -562,7 +815,7 @@ struct MissionPlayView: View {
             }
             GameButton(title: "Lock frequency", icon: "waveform.path") {
                 check(abs(frequency - adjusted.frequency) < 2.6,
-                      wrongText: "No clear signal at this frequency. Try the frequency mentioned in the case.")
+                      wrongText: "No clear signal at this setting. Compare the transmitter log with the active receiver calibration.")
             }
         }
     }
@@ -625,7 +878,7 @@ struct MissionPlayView: View {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "info.circle.fill")
                     .foregroundStyle(Art.cyan)
-                Text("Wrong answers end the attempt. Unlock districts by clearing all 10 cases and earning 3 stars on at least 7.")
+                Text("You have \(attemptLimit) attempts per case. Verify sources before making deductions. Complete all 10 cases and earn 3 stars on at least 7 to unlock the next district.")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Art.faded)
                     .fixedSize(horizontal: false, vertical: true)
@@ -640,7 +893,7 @@ struct MissionPlayView: View {
                     .font(.system(size: 54))
                     .foregroundStyle(Art.coral)
                 GameTitle(text: "CASE FAILED", size: 34)
-                Text("An incorrect answer ends the attempt. Review the evidence and restart for a clean 3-star run.")
+                Text("Your \(attemptLimit) attempts are used up. Review the evidence and retry the case with a new plan.")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Art.faded)
                     .multilineTextAlignment(.center)
@@ -673,8 +926,14 @@ struct MissionPlayView: View {
         frequency = 50
         matchedItems = []
         selectedAnswer = nil
+        pinnedEvidence = []
+        evidenceVerified = false
+        showingVerifiedRecords = false
+        deductionSolved = false
+        selectedTheory = nil
         mistakes = 0
         feedback = nil
+        narrator.stopSpeaking(at: .immediate)
         // Previously redeemed hints stay revealed on retry and revisit.
         // They remain recorded in CampaignProgress, not this transient view.
     }
@@ -781,21 +1040,29 @@ struct MissionPlayView: View {
     private func check(_ success: Bool, wrongText: String? = nil) {
         guard payout == nil else { return }
         if success {
-            let previousRank = store.accountLevel
             GameEffects.shared.success()
             feedback = nil
-            payout = store.complete(mission.id, mistakes: mistakes, hintUsed: hintUsed)
-            if let payout,
-               let identity = DetectiveIdentity.latestUnlocked(
-                    previous: previousRank, current: payout.newRank) {
-                newIdentityTheme = identity.theme
-                newIdentityTitle = identity.name
+            if ageMode == .investigator || ageMode == .expert {
+                deductionSolved = true
+            } else {
+                finalizeCase()
             }
         } else {
-            mistakes += 1
-            GameEffects.shared.mistake()
-            feedback = wrongText ?? "Answer not supported by the evidence."
-            attemptFailed = true
+            recordMistake(wrongText ?? "That deduction is not supported by the evidence.")
+        }
+    }
+
+    private func finalizeCase() {
+        guard payout == nil, !attemptFailed else { return }
+        let previousRank = store.accountLevel
+        GameEffects.shared.success()
+        feedback = nil
+        payout = store.complete(mission.id, mistakes: mistakes, hintUsed: hintUsed)
+        if let payout,
+           let identity = DetectiveIdentity.latestUnlocked(
+                previous: previousRank, current: payout.newRank) {
+            newIdentityTheme = identity.theme
+            newIdentityTitle = identity.name
         }
     }
 }

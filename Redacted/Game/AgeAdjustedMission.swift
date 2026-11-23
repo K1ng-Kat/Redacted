@@ -21,10 +21,38 @@ enum DetectiveAgeMode: String, CaseIterable, Identifiable {
 
     var subtitle: String {
         switch self {
-        case .junior: "Brief instructions · 2 choices · more clues"
-        case .explorer: "Story clues · 3 choices · guided reasoning"
-        case .investigator: "Evidence comparisons · 4 choices · transformed codes"
-        case .expert: "Multi-step logic · 4 choices · tougher signal and codes"
+        case .junior: "Read or listen · 2 evidence sources · 5 tries"
+        case .explorer: "Investigate 3 sources · guided reasoning · 4 tries"
+        case .investigator: "4 records · deductions · defend your conclusion"
+        case .expert: "5 records · misleading leads · only 2 tries"
+        }
+    }
+
+    /// Young investigators receive forgiving, scaffolded practice. Expert
+    /// investigators get just two unsupported submissions per case.
+    var attemptsAllowed: Int {
+        switch self {
+        case .junior: 5
+        case .explorer: 4
+        case .investigator: 3
+        case .expert: 2
+        }
+    }
+
+    var needsClosingArgument: Bool {
+        self == .investigator || self == .expert
+    }
+
+    var sourceGuidance: String {
+        switch self {
+        case .junior:
+            return "Which note was checked? A guess without proof is not a good clue."
+        case .explorer:
+            return "Look for two records that agree. A rumor or an old report might be misleading."
+        case .investigator:
+            return "Check the time, source, and whether each report independently supports the same conclusion."
+        case .expert:
+            return "Not every official-looking document is relevant. Select two independently authenticated records that establish the necessary chain of proof."
         }
     }
 
@@ -38,10 +66,10 @@ enum DetectiveAgeMode: String, CaseIterable, Identifiable {
 
     var introduction: String {
         switch self {
-        case .junior: "You are a detective! Follow the clues one step at a time."
-        case .explorer: "A detective notices details. Read the evidence before you decide."
-        case .investigator: "Compare testimony to recorded evidence before committing to an answer."
-        case .expert: "Look for contradictions, indirect evidence, and the hidden rule in the data."
+        case .junior: "Find one good clue, solve the puzzle, and have fun investigating."
+        case .explorer: "Compare two reliable records, then solve the mystery."
+        case .investigator: "Verify two independent records, solve the puzzle, then defend your conclusion."
+        case .expert: "Separate strong evidence from plausible red herrings, solve the puzzle, then prove why your answer is correct."
         }
     }
 }
@@ -77,15 +105,16 @@ struct AgeAdjustedMission {
     }
 
     var brief: String {
+        // Higher profiles no longer receive solutions embedded in the brief.
+        // Numbered locks, tuning channels and codewords are instead distributed
+        // across independent, readable evidence records.
+        let story = mode == .junior ? easierStory :
+                    CaseEvidence.introduction(for: mission, mode: mode)
         switch mode {
-        case .junior:
-            return easierStory + "\n\n" + simpleQuestion
-        case .explorer:
-            return mission.setup + "\n\n" + middleQuestion
-        case .investigator:
-            return mission.setup + "\n\n" + investigatorQuestion
-        case .expert:
-            return mission.setup + "\n\n" + expertQuestion
+        case .junior: return story + "\n\n" + simpleQuestion
+        case .explorer: return story + "\n\n" + middleQuestion
+        case .investigator: return story + "\n\n" + investigatorQuestion
+        case .expert: return story + "\n\n" + expertQuestion
         }
     }
 
@@ -95,12 +124,12 @@ struct AgeAdjustedMission {
             switch mission.kind {
             case .findClue: return "Tap the object that looks like an important clue."
             case .timeline: return "Tap what happened first, then next, until all four are in order."
-            case .keypad: return "Look at the number in the story. Enter its last 3 digits."
+            case .keypad: return "Find the authenticated label, then enter its last three digits."
             case .contradiction: return "Which fact shows someone is not telling the truth?"
             case .anomaly: return "Tap the item that doesn't match the others."
             case .escapeRoute: return "Find the secret way someone could leave."
             case .anagram: return "Tap the letters to make the hidden word."
-            case .signal: return "Move the radio dial to the number in the story."
+            case .signal: return "Read the transmitter record, then tune the matching channel."
             case .connect: return "Pick TWO clues that go together."
             case .verdict: return "Who do you think did it? Use what you learned."
             }
@@ -108,13 +137,13 @@ struct AgeAdjustedMission {
             return mission.kind.instruction
         case .investigator:
             switch mission.kind {
-            case .keypad: return "Read the final three digits, then enter them BACKWARDS."
+            case .keypad: return "Discard the first label digit and enter the last three BACKWARDS."
             case .signal: return "Tune 10 MHz ABOVE the logged value (wrap past 100 back to 0)."
             default: return mission.kind.instruction + " Use the strongest evidence."
             }
         case .expert:
             switch mission.kind {
-            case .keypad: return "Take the last three digits; MOVE THE LAST DIGIT TO THE FRONT."
+            case .keypad: return "Discard the first label digit. Move the LAST digit of the remaining three to the FRONT."
             case .signal: return "Tune to the MIRROR frequency: 100 minus the logged number."
             default: return mission.kind.instruction + " Eliminate the plausible false leads."
             }

@@ -21,10 +21,38 @@ enum DetectiveAgeMode: String, CaseIterable, Identifiable {
 
     var subtitle: String {
         switch self {
-        case .junior: "Brief instructions · 2 choices · more clues"
-        case .explorer: "Story clues · 3 choices · guided reasoning"
-        case .investigator: "Evidence comparisons · 4 choices · transformed codes"
-        case .expert: "Multi-step logic · 4 choices · tougher signal and codes"
+        case .junior: "Read or listen · 2 evidence sources · 5 tries"
+        case .explorer: "Investigate 3 sources · guided reasoning · 4 tries"
+        case .investigator: "4 records · deductions · defend your conclusion"
+        case .expert: "5 records · misleading leads · only 2 tries"
+        }
+    }
+
+    /// Young investigators receive forgiving, scaffolded practice. Expert
+    /// investigators get just two unsupported submissions per case.
+    var attemptsAllowed: Int {
+        switch self {
+        case .junior: 5
+        case .explorer: 4
+        case .investigator: 3
+        case .expert: 2
+        }
+    }
+
+    var needsClosingArgument: Bool {
+        self == .investigator || self == .expert
+    }
+
+    var sourceGuidance: String {
+        switch self {
+        case .junior:
+            return "Which note was checked? A guess without proof is not a good clue."
+        case .explorer:
+            return "Look for two records that agree. A rumor or an old report might be misleading."
+        case .investigator:
+            return "Check the time, source, and whether each report independently supports the same conclusion."
+        case .expert:
+            return "Not every official-looking document is relevant. Select two independently authenticated records that establish the necessary chain of proof."
         }
     }
 
@@ -38,10 +66,10 @@ enum DetectiveAgeMode: String, CaseIterable, Identifiable {
 
     var introduction: String {
         switch self {
-        case .junior: "You are a detective! Follow the clues one step at a time."
-        case .explorer: "A detective notices details. Read the evidence before you decide."
-        case .investigator: "Compare testimony to recorded evidence before committing to an answer."
-        case .expert: "Look for contradictions, indirect evidence, and the hidden rule in the data."
+        case .junior: "Find one good clue, solve the puzzle, and have fun investigating."
+        case .explorer: "Compare two reliable records, then solve the mystery."
+        case .investigator: "Verify two independent records, solve the puzzle, then defend your conclusion."
+        case .expert: "Separate strong evidence from plausible red herrings, solve the puzzle, then prove why your answer is correct."
         }
     }
 }

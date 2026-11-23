@@ -425,7 +425,7 @@ struct DetectiveWardrobeView: View {
                         .foregroundStyle(Art.cyan)
                     }
                     .frame(maxWidth: .infinity)
-                    .frame(height: 122)
+                    .frame(height: 132)
                 Text("NONE")
                     .font(.system(size: 11, weight: .black, design: .rounded))
                     .foregroundStyle(Art.paper)
@@ -466,24 +466,23 @@ struct DetectiveWardrobeView: View {
         } label: {
             VStack(alignment: .leading, spacing: 7) {
                 ZStack(alignment: .bottomTrailing) {
-                    // A single live 3D actor is kept in the main preview.
-                    // Do not instantiate dozens of SceneKit scenes while
-                    // scrolling the equipment shop.
+                    // Actual item-only SceneKit mesh snapshot, cached by
+                    // cosmetic ID. No generic icons or pasted-on artwork.
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(Art.ink.opacity(0.62))
+                        .fill(
+                            LinearGradient(
+                                colors: [Art.ink.opacity(0.9),
+                                         Art.blueDeep.opacity(0.55)],
+                                startPoint: .topLeading, endPoint: .bottomTrailing)
+                        )
                         .overlay {
-                            VStack(spacing: 7) {
-                                Image(systemName: item.symbol)
-                                    .font(.system(size: 32, weight: .medium))
-                                    .symbolRenderingMode(.hierarchical)
-                                Text(item.slot.label)
-                                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                            }
-                            .foregroundStyle(item.tint)
+                            CosmeticItemThumbnail(item: item)
+                                .padding(7)
                         }
                         .frame(maxWidth: .infinity)
-                        .frame(height: 122)
-                        .opacity(rankLocked ? 0.58 : 1)
+                        .frame(height: 132)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .opacity(rankLocked ? 0.72 : 1)
                     Image(systemName: rankLocked ? "lock.fill"
                           : isEquipped ? "checkmark.circle.fill"
                           : isOwned ? "checkmark.seal.fill" : "eye.fill")
@@ -495,7 +494,7 @@ struct DetectiveWardrobeView: View {
                         .padding(5)
                 }
                 Text(item.name.uppercased())
-                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .font(.system(size: 12, weight: .black, design: .rounded))
                     .foregroundStyle(Art.paper)
                     .lineLimit(2)
                     .frame(height: 28, alignment: .topLeading)

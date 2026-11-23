@@ -25,7 +25,18 @@ for token in ("import SceneKit", "SCNView", "SCNNode", "makeHeadwear",
 for slot in ("headwear", "eyewear", "badge", "coat"):
     assert f"equipment[.{slot}]" in drawing, f"3D actor ignores {slot}"
 assert "DetectivePortraitAtlas" not in drawing
-assert "UIImage" not in drawing, "Flat character pictures must not replace 3D"
+# Static UIImage objects are allowed *only* as snapshots of the real item
+# meshes, not as pasted portraits or replacement avatar sprites.
+for token in ("CosmeticItemThumbnail", "CosmeticPreviewCache", "SCNRenderer",
+              "renderer.snapshot(", "makeCosmeticPreview", "NSCache",
+              "makeHeadwear(into: geometry", "makeEyewear(into: geometry",
+              "makeBadge(into: geometry", "tailoredTorso(color: jacket)"):
+    assert token in drawing, f"Missing real item-only thumbnail: {token}"
+assert "CosmeticItemThumbnail(item: item)" in catalog
+assert "Image(systemName: item.symbol)" not in catalog, "Placeholder cosmetics returned"
+assert "skinMaterial(_ color: UIColor)" in drawing
+assert 'let lids = node.childNodes.filter { $0.name == "Upper eyelid" }' in drawing
+assert "eyelid.scale.y =" not in drawing, "Old eye stretching must not recur"
 for kind in ("headwear", "eyewear", "badge", "coat"):
     assert sum(item.startswith({"headwear": "hat_", "eyewear": "glasses_",
                                "badge": "badge_", "coat": "coat_"}[kind])

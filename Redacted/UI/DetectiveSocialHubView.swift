@@ -28,15 +28,16 @@ struct DetectiveSocialHubView: View {
             VStack(alignment: .leading, spacing: 13) {
                 titleBar
                 compactStatus
-                if network.accountEmail == nil {
+                if network.configured && network.accountEmail == nil {
                     RedactedAccountCard()
+                }
+                // Keep the original Friends and Task Force sections visible
+                // even before the online service is available.
+                picker
+                if section == .friends {
+                    friendsContent
                 } else {
-                    picker
-                    if section == .friends {
-                        friendsContent
-                    } else {
-                        taskForceContent
-                    }
+                    taskForceContent
                 }
                 if !network.configured {
                     setupNotice
@@ -224,7 +225,9 @@ struct DetectiveSocialHubView: View {
                         .font(.system(size: 17, weight: .black, design: .rounded))
                         .foregroundStyle(Art.paper)
                         .multilineTextAlignment(.center)
-                    Text("Share your code with a friend to see when they're online.")
+                    Text(network.configured
+                         ? "Share your code with a friend to see when they're online."
+                         : "Friend codes and online presence aren't available in this version.")
                         .font(.system(size: 12))
                         .foregroundStyle(Art.faded)
                         .multilineTextAlignment(.center)
@@ -419,7 +422,9 @@ struct DetectiveSocialHubView: View {
                         .font(.system(size: 43, weight: .semibold))
                         .foregroundStyle(Art.gold)
                     GameTitle(text: "TASK FORCES", size: 25)
-                    Text("Form a private squad of up to 20 detectives. Join with an invite code, see who's active, and investigate together.")
+                    Text(network.configured
+                         ? "Form a private squad of up to 20 detectives. Join with an invite code, see who's active, and investigate together."
+                         : "Create or join a Task Force once online accounts are available.")
                         .font(.system(size: 13))
                         .foregroundStyle(Art.faded)
                         .multilineTextAlignment(.center)

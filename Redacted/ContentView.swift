@@ -68,6 +68,9 @@ struct ContentView: View {
         }
         .task {
             await prepareStartup()
+            // Present the ready screen before attaching optional online systems.
+            try? await Task.sleep(for: .milliseconds(180))
+            guard !Task.isCancelled else { return }
             RedactedAccountSave.shared.attach(store)
             MultiplayerService.shared.attach(store)
             if DetectiveSocialNetwork.shared.accountEmail != nil {
@@ -93,9 +96,16 @@ struct ContentView: View {
             openPendingInvite()
         }
         .onChange(of: route) { _, _ in syncMusic() }
-        .onChange(of: startupComplete) { _, _ in
-            syncMusic()
+        .onChange(of: startupComplete) { _, finished in
             openPendingInvite()
+            if finished {
+                // Do not initialize audio players before the first game frame.
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(350))
+                    guard !Task.isCancelled else { return }
+                    syncMusic()
+                }
+            }
         }
         .onChange(of: setupComplete) { _, _ in openPendingInvite() }
         .onChange(of: musicEnabled) { _, _ in syncMusic() }
@@ -369,28 +379,20 @@ struct ContentView: View {
     @MainActor
     private func prepareStartup() async {
         guard !startupComplete else { return }
-        // Render the branded launch view once, then perform real local work.
-        try? await Task.sleep(for: .milliseconds(100))
-        guard !Task.isCancelled else { return }
-
         startupStep = "LOADING CASE FILES"
+        startupProgress = 0.22
+        // Keep startup limited to actual game-state readiness. Audio decoders,
+        // synthesizers, and multiplayer are NOT required to display the menu.
+        await Task.yield()
         _ = CampaignCatalog.levels.count
         _ = store.nextLevel
-        startupProgress = 0.55
-        await Task.yield()
-
-        startupStep = "PREPARING SOUND"
-        GameMusicController.shared.prepare()
-        _ = GameEffects.shared
-        startupProgress = 0.90
-        await Task.yield()
-
+        startupProgress = 0.85
         startupStep = "READY TO INVESTIGATE"
-        startupProgress = 1
-        // A short visual handoff, not several seconds of artificial loading.
-        try? await Task.sleep(for: .milliseconds(190))
+        // Give the visible loading animation a frame to complete.
+        try? await Task.sleep(for: .milliseconds(100))
         guard !Task.isCancelled else { return }
-        withAnimation(.easeInOut(duration: 0.24)) {
+        startupProgress = 1
+        withAnimation(.easeOut(duration: 0.2)) {
             startupComplete = true
         }
     }

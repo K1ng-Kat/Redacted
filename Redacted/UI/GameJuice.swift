@@ -24,8 +24,7 @@ enum DetectiveIdentity {
     }
 }
 
-/// Rank identities use the same professionally aligned vector character art
-/// as the wardrobe, rather than a second incompatible portrait renderer.
+/// Rank identities share the same 3D character engine as the Style Lab.
 struct DetectivePortrait: View {
     let theme: String
     var size: CGFloat = 83
@@ -40,8 +39,10 @@ struct DetectivePortrait: View {
     }
 
     var body: some View {
-        DetectiveAvatarArt(theme: theme, skin: .peach,
-                           hair: hair, loadout: [:], size: size)
+        Detective3DCharacter(skin: .peach, hair: hair,
+                             equipment: [:], theme: theme, size: size)
+            .frame(width: size, height: size)
+            .clipShape(RoundedRectangle(cornerRadius: size * 0.14))
             .accessibilityLabel("\(DetectiveIdentity.names[DetectiveIdentity.index(for: theme)]) detective portrait")
     }
 }

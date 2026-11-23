@@ -10,8 +10,49 @@ struct RedactedApp: App {
                    OperatingSystemVersion(majorVersion: 18, minorVersion: 0, patchVersion: 0)) {
                 PhoneOSRequirementView()
             } else {
-                ContentView()
+                RedactedFirstFrameGate()
             }
+        }
+    }
+}
+
+/// A lightweight first UIKit frame before constructing the game.
+/// The app's old heavy state initialization could keep the static iOS
+/// LaunchScreen visible without an activity indicator on cold starts.
+private struct RedactedFirstFrameGate: View {
+    @State private var gameReadyToMount = false
+
+    var body: some View {
+        Group {
+            if gameReadyToMount {
+                ContentView()
+            } else {
+                ZStack {
+                    Color(red: 0.035, green: 0.055, blue: 0.12)
+                        .ignoresSafeArea()
+                    VStack(spacing: 13) {
+                        Text("REDACTED")
+                            .font(.system(size: 33, weight: .heavy, design: .rounded))
+                            .foregroundStyle(Color(red: 1, green: 0.98, blue: 0.89))
+                        Text("DETECTIVE AGENCY")
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color(red: 0.37, green: 0.89, blue: 0.97))
+                        ProgressView()
+                            .tint(Color(red: 0.37, green: 0.89, blue: 0.97))
+                            .padding(.top, 8)
+                            .accessibilityLabel("Opening Redacted")
+                    }
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+        .task {
+            guard !gameReadyToMount else { return }
+            // Allow at least a few UIKit display cycles for this first frame.
+            // This is a presentation gate, not artificial game initialization.
+            try? await Task.sleep(for: .milliseconds(80))
+            guard !Task.isCancelled else { return }
+            gameReadyToMount = true
         }
     }
 }

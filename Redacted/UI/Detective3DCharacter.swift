@@ -379,24 +379,60 @@ private enum DetectiveModelFactory {
     }
 
     private static func makeHair(into head: SCNNode, style: DetectiveHair) {
-        let topY: Float = style == .cropped ? 0.247 : 0.265
-        head.addChildNode(ellipsoid("Hair foundation", hairColor, 0, topY, -0.004,
-                                    0.114, style == .cropped ? 0.037 : 0.062,
-                                    0.105, roughness: 0.93))
-        let count = style == .cropped ? 9 : style == .textured ? 19 : 13
+        // Four different hair silhouettes. Thin volume strands sit above the
+        // scalp instead of large disconnected spheres.
+        let foundationHeight: CGFloat = style == .cropped ? 0.039 : 0.058
+        head.addChildNode(ellipsoid("Scalp hair", hairColor, 0, 0.255, -0.015,
+                                    0.108, foundationHeight, 0.101,
+                                    roughness: 0.98))
+        let count = style == .cropped ? 36 : style == .textured ? 52 : 32
         for i in 0..<count {
-            let angle = Float(i) * 2.39996
-            let radius = Float(sqrt(Double(i) / Double(count))) * 0.087
-            let x = cos(angle) * radius
-            let z = sin(angle) * radius
-            let frontShift: Float = style == .swept ? 0.018 : 0
-            let height: Float = style == .textured ? Float(i % 5) * 0.009 : 0
-            let tuft = ellipsoid("Hair strand clump", hairColor,
-                                  x + frontShift, topY + 0.025 + height, z,
-                                  0.027, style == .cropped ? 0.013 : 0.033,
-                                  0.032, roughness: 0.95)
-            tuft.eulerAngles.z = style == .swept ? -0.29 : Float(i % 3 - 1) * 0.09
-            head.addChildNode(tuft)
+            let theta = Float(i) * 2.3999632
+            let radius = Float(sqrt(Double(i + 1) / Double(count + 2))) * 0.089
+            let x = cos(theta) * radius
+            let z = sin(theta) * radius
+            let front = z > 0.020
+            let offset: Float
+            let height: CGFloat
+            let breadth: CGFloat
+            switch style {
+            case .cropped:
+                offset = 0
+                height = 0.010 + CGFloat(i % 3) * 0.002
+                breadth = 0.012
+            case .classic:
+                offset = x > 0 ? 0.006 : -0.005
+                height = 0.020 + CGFloat(i % 3) * 0.003
+                breadth = 0.016
+            case .textured:
+                offset = front ? 0.004 : 0
+                height = 0.026 + CGFloat(i % 7) * 0.006
+                breadth = 0.012
+            case .swept:
+                offset = 0.017
+                height = front ? 0.028 : 0.020
+                breadth = 0.016
+            }
+            let strand = ellipsoid("Sculpted hair strand", hairColor,
+                                   x + offset, 0.279 + Float(height) * 0.5, z,
+                                   breadth, height, breadth * 1.25,
+                                   roughness: 0.97)
+            strand.eulerAngles.z = style == .swept ? -0.35 :
+                                    style == .classic ? -0.10 : Float(i % 3 - 1) * 0.10
+            head.addChildNode(strand)
+        }
+        if style == .swept || style == .textured {
+            let count = style == .swept ? 10 : 13
+            for i in 0..<count {
+                let x = Float(i) / Float(max(1, count - 1)) * 0.176 - 0.088
+                let fringe = ellipsoid("Hair fringe", hairColor,
+                                       x + (style == .swept ? 0.012 : 0),
+                                       0.251 + Float(i % 4) * 0.005, 0.094,
+                                       0.012, style == .swept ? 0.024 : 0.016,
+                                       0.013, roughness: 0.97)
+                fringe.eulerAngles.z = style == .swept ? -0.38 : 0
+                head.addChildNode(fringe)
+            }
         }
     }
 

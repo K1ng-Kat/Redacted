@@ -53,7 +53,11 @@ final class RedactedLaunchManager: ObservableObject {
         try? await Task.sleep(for: .milliseconds(100))
         guard !Task.isCancelled else { return }
         advance(to: 0.18, stage: "READING LOCAL CASE FILES")
-        _ = UserDefaults.standard.data(forKey: "redacted.campaign.v1")
+        if let saved = UserDefaults.standard.data(forKey: "redacted.campaign.v1") {
+            // Decode the actual local save while the progress screen is
+            // visible, rather than doing every initialization after 100%.
+            _ = try? JSONDecoder().decode(CampaignProgress.self, from: saved)
+        }
         await animateCheckpoint()
 
         _ = CampaignCatalog.levels.count

@@ -6,6 +6,10 @@
 	<!-- Leave blank until the first real UTC season launch is scheduled. -->
 	<key>RDSeasonLaunchUTC</key>
 	<string></string>
+	<!-- Optional HTTPS JSON endpoint for minimum online build checks. -->
+	<!-- Blank means no online update-check claim is made. -->
+	<key>RDStartupManifestURL</key>
+	<string></string>
 	<key>RDSocialProjectURL</key>
 	<string></string>
 	<key>RDSocialPublishableKey</key>

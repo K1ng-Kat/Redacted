@@ -706,8 +706,9 @@ struct MissionPlayView: View {
             HStack(spacing: 10) {
                 GameCard(accent: Art.gold) {
                     CoinRewardAnimation(coins: payout.earnedCoins)
+                        .frame(height: 80)
                 }
-                rewardTile(icon: "bolt.circle.fill", text: "+\(payout.earnedXP)", label: "XP", color: Art.cyan)
+                rewardTile(icon: "bolt.circle.fill", text: "+\(payout.earnedXP)", label: "XP EARNED", color: Art.cyan)
             }
             if payout.earnedCrystals > 0 {
                 GameCard(accent: Art.cyan) {
@@ -764,13 +765,16 @@ struct MissionPlayView: View {
                 Image(systemName: icon)
                     .font(.system(size: 29))
                     .foregroundStyle(color)
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text(text)
-                        .font(.system(size: 24, weight: .black, design: .rounded))
-                        .foregroundStyle(Art.paper)
+                        .font(.system(size: 28, weight: .black, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(color)
                     GameKicker(text: label, color: Art.faded)
                 }
+                Spacer(minLength: 0)
             }
+            .frame(height: 80)
         }
     }
 

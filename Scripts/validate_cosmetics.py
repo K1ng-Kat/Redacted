@@ -37,6 +37,24 @@ assert "Image(systemName: item.symbol)" not in catalog, "Placeholder cosmetics r
 assert "skinMaterial(_ color: UIColor)" in drawing
 assert 'let lids = node.childNodes.filter { $0.name == "Upper eyelid" }' in drawing
 assert "eyelid.scale.y =" not in drawing, "Old eye stretching must not recur"
+# Styling controls must show literal images rendered by the same SceneKit
+# factory and palette as the large live avatar, not an approximate swatch.
+assert "DetectiveLookThumbnail(skin: shade, hair: .cropped)" in catalog
+assert "DetectiveLookThumbnail(skin: store.skin, hair: style)" in catalog
+assert "showUncoveredHair" in catalog and "previewEmptySlot: showUncoveredHair" in catalog
+assert "showUncoveredHair = true" in catalog
+assert 'renderStyle(skin: DetectiveSkin, hair: DetectiveHair)' in drawing
+assert "skin: skin, hair: hair, equipment: [:]" in drawing
+assert "camera.position = SCNVector3(0, 1.87, 0.76)" in drawing
+# None of the four hairstyle modes can be erased just because a hat is worn.
+assert 'makeHair(into: head, style: hair,' in drawing
+assert 'headwear: equipment[.headwear]' in drawing
+assert "guard !wearingHeadwear else { return }" not in drawing
+for token in ('case .classic:', 'case .textured:', 'case .swept:', 'case .cropped:',
+              'Classic parted fringe', 'Textured forward curl',
+              'Side swept long fringe', 'Cropped hairline',
+              'Fitted headband', 'head.addChildNode(fitted)'):
+    assert token in drawing, f"Missing fitted headwear/hair component: {token}"
 for kind in ("headwear", "eyewear", "badge", "coat"):
     assert sum(item.startswith({"headwear": "hat_", "eyewear": "glasses_",
                                "badge": "badge_", "coat": "coat_"}[kind])

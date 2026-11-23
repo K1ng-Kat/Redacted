@@ -152,6 +152,8 @@ struct DetectiveWardrobeView: View {
     @State private var selectedID = ""
     @State private var isTryingOn = false
     @State private var showFaceDetail = false
+    // Temporary styling preview: never unequips an owned headwear item.
+    @State private var showUncoveredHair = false
     @State private var showSnippetShop = false
     @State private var pendingItem: DetectiveCosmetic?
     @State private var payingCrystals = false
@@ -191,7 +193,9 @@ struct DetectiveWardrobeView: View {
             .frame(maxWidth: 570)
             .padding(.horizontal, 16)
             .padding(.top, 8)
-            .padding(.bottom, 44)
+            // Keep the content close to the bottom safe area; the previous
+            // 44-point trailing pad created an unused empty strip.
+            .padding(.bottom, 10)
             .frame(maxWidth: .infinity)
         }
         .background(GameBackdrop())
@@ -245,7 +249,9 @@ struct DetectiveWardrobeView: View {
                 }
                 DetectiveCharacter(store: store, size: 275,
                                    previewCosmetic: isTryingOn ? selectedItem : nil,
-                                   previewEmptySlot: isTryingOn && selectedID.isEmpty ? slot : nil,
+                                   previewEmptySlot: showUncoveredHair
+                                       ? .headwear
+                                       : isTryingOn && selectedID.isEmpty ? slot : nil,
                                    portraitMode: showFaceDetail)
                     .frame(maxWidth: .infinity)
                     .accessibilityHint("Preview includes the selected item before buying or equipping it")
@@ -273,6 +279,20 @@ struct DetectiveWardrobeView: View {
                 }
                 .font(.system(size: 10, weight: .black, design: .rounded))
                 .buttonStyle(PressGameStyle())
+                Button {
+                    showUncoveredHair.toggle()
+                    GameEffects.shared.tap()
+                } label: {
+                    Label(showUncoveredHair ? "SHOW MY HEADWEAR" : "SHOW HAIRSTYLE WITHOUT HAT",
+                          systemImage: showUncoveredHair ? "hat.widebrim.fill" : "person.crop.square")
+                        .font(.system(size: 11, weight: .black, design: .rounded))
+                        .foregroundStyle(showUncoveredHair ? Art.ink : Art.cyan)
+                        .frame(maxWidth: .infinity, minHeight: 40)
+                        .background(showUncoveredHair ? Art.gold : Art.ink)
+                        .clipShape(RoundedRectangle(cornerRadius: 11))
+                }
+                .buttonStyle(PressGameStyle())
+                .accessibilityHint("Only changes the preview; does not remove owned hats")
                 HStack(spacing: 7) {
                     Image(systemName: "eye.fill")
                         .foregroundStyle(Art.cyan)
@@ -294,47 +314,70 @@ struct DetectiveWardrobeView: View {
                 Text("Skin tone")
                     .font(.system(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(Art.paper)
-                HStack(spacing: 9) {
+                Text("These portraits use the same skin material and studio lighting as your detective.")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Art.faded)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 6) {
                     ForEach(DetectiveSkin.allCases) { shade in
                         Button {
                             store.setSkin(shade)
                             GameEffects.shared.tap()
                         } label: {
-                            Circle()
-                                .fill(shade.color)
-                                .frame(width: 30, height: 30)
-                                .frame(maxWidth: .infinity, minHeight: 45)
-                                .background(store.skin == shade
-                                            ? Art.blueLight : Art.ink)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                                .overlay(RoundedRectangle(cornerRadius: 12)
-                                    .stroke(store.skin == shade ? Art.gold : Art.edge,
-                                            lineWidth: store.skin == shade ? 2.5 : 1))
+                            VStack(spacing: 5) {
+                                DetectiveLookThumbnail(skin: shade, hair: .cropped)
+                                    .frame(height: 64)
+                                Text(shade.label.uppercased())
+                                    .font(.system(size: 8, weight: .black,
+                                                  design: .rounded))
+                                    .foregroundStyle(store.skin == shade ? Art.gold : Art.paper)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.65)
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 90)
+                            .padding(4)
+                            .background(Art.blueDeep)
+                            .clipShape(RoundedRectangle(cornerRadius: 11))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 11)
+                                    .strokeBorder(store.skin == shade ? Art.gold : Art.edge,
+                                                  lineWidth: store.skin == shade ? 2.5 : 1)
+                            }
                         }
                         .buttonStyle(PressGameStyle())
-                        .accessibilityLabel("\(shade.label) skin")
+                        .accessibilityLabel("\(shade.label) skin tone")
                         .accessibilityAddTraits(store.skin == shade ? .isSelected : [])
                     }
                 }
                 Text("Hair style")
                     .font(.system(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(Art.paper)
-                HStack(spacing: 7) {
+                HStack(spacing: 6) {
                     ForEach(DetectiveHair.allCases) { style in
                         Button {
                             store.setHair(style)
+                            // Reveal the hair in the main preview when changed.
+                            showUncoveredHair = true
                             GameEffects.shared.tap()
                         } label: {
-                            Text(style.label)
-                                .font(.system(size: 10, weight: .black, design: .rounded))
-                                .foregroundStyle(store.hair == style ? Art.ink : Art.paper)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.7)
-                                .frame(maxWidth: .infinity, minHeight: 42)
-                                .background(store.hair == style ? Art.gold : Art.blueDeep)
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                            VStack(spacing: 5) {
+                                DetectiveLookThumbnail(skin: store.skin, hair: style)
+                                    .frame(height: 74)
+                                Text(style.label.uppercased())
+                                    .font(.system(size: 9, weight: .black,
+                                                  design: .rounded))
+                                    .foregroundStyle(store.hair == style ? Art.ink : Art.paper)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.7)
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 101)
+                            .padding(5)
+                            .background(store.hair == style ? Art.gold : Art.blueDeep)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
                         .buttonStyle(PressGameStyle())
+                        .accessibilityLabel("\(style.label) hairstyle")
+                        .accessibilityAddTraits(store.hair == style ? .isSelected : [])
                     }
                 }
             }
@@ -412,7 +455,7 @@ struct DetectiveWardrobeView: View {
             }
             GameEffects.shared.tap()
         } label: {
-            VStack(alignment: .leading, spacing: 7) {
+            VStack(alignment: .leading, spacing: 5) {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(Art.ink.opacity(0.62))
                     .overlay {
@@ -429,7 +472,7 @@ struct DetectiveWardrobeView: View {
                 Text("NONE")
                     .font(.system(size: 11, weight: .black, design: .rounded))
                     .foregroundStyle(Art.paper)
-                    .frame(height: 28, alignment: .topLeading)
+                    .frame(height: 25, alignment: .topLeading)
                 Text(isEquippedNone ? "EQUIPPED · FREE" : "REMOVE ITEM · FREE")
                     .font(.system(size: 9, weight: .bold, design: .monospaced))
                     .foregroundStyle(isEquippedNone ? Art.mint : Art.faded)
@@ -459,12 +502,13 @@ struct DetectiveWardrobeView: View {
         return Button {
             withAnimation(.easeInOut(duration: 0.16)) {
                 selectedID = item.id
+                if item.slot == .headwear { showUncoveredHair = false }
                 isTryingOn = true
                 notice = nil
             }
             GameEffects.shared.tap()
         } label: {
-            VStack(alignment: .leading, spacing: 7) {
+            VStack(alignment: .leading, spacing: 5) {
                 ZStack(alignment: .bottomTrailing) {
                     // Actual item-only SceneKit mesh snapshot, cached by
                     // cosmetic ID. No generic icons or pasted-on artwork.
@@ -497,7 +541,7 @@ struct DetectiveWardrobeView: View {
                     .font(.system(size: 12, weight: .black, design: .rounded))
                     .foregroundStyle(Art.paper)
                     .lineLimit(2)
-                    .frame(height: 28, alignment: .topLeading)
+                    .frame(height: 25, alignment: .topLeading)
                 Text(isEquipped ? "EQUIPPED" :
                         isOwned ? "OWNED" :
                         rankLocked ? "RANK \(item.requiredRank) REQUIRED" :

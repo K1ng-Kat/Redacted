@@ -132,6 +132,46 @@ struct CosmeticItemThumbnail: View {
     }
 }
 
+/// The same face and hair materials, geometry and light rig used by the live
+/// detective are shown in small cached portraits, not flat approximate swatches.
+struct DetectiveLookThumbnail: View {
+    let skin: DetectiveSkin
+    let hair: DetectiveHair
+    @State private var image: UIImage?
+
+    private var key: String { "\(skin.rawValue)|\(hair.rawValue)" }
+
+    var body: some View {
+        ZStack {
+            // The true palette tone is visible while the lit scene renders.
+            RoundedRectangle(cornerRadius: 8)
+                .fill(skin.color.opacity(0.55))
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .transition(.opacity)
+            } else {
+                ProgressView().tint(.white)
+                    .scaleEffect(0.65)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .task(id: key) {
+            if let saved = CosmeticPreviewCache.shared.cachedStyle(key) {
+                image = saved
+                return
+            }
+            image = nil
+            let rendered = await CosmeticPreviewCache.shared.renderStyle(
+                skin: skin, hair: hair)
+            guard !Task.isCancelled else { return }
+            image = rendered
+        }
+        .accessibilityHidden(true)
+    }
+}
+
 private final class CosmeticPreviewCache {
     static let shared = CosmeticPreviewCache()
     private let images: NSCache<NSString, UIImage> = {
@@ -144,6 +184,51 @@ private final class CosmeticPreviewCache {
 
     func cached(_ id: String) -> UIImage? {
         images.object(forKey: id as NSString)
+    }
+
+    func cachedStyle(_ key: String) -> UIImage? {
+        images.object(forKey: ("look:" + key) as NSString)
+    }
+
+    /// A real close-up of the existing avatar, without equipped hats, so
+    /// every swatch matches the face's literal material under studio lights
+    /// and hairstyles are easy to compare side by side.
+    func renderStyle(skin: DetectiveSkin, hair: DetectiveHair) async -> UIImage? {
+        let key = skin.rawValue + "|" + hair.rawValue
+        if let old = cachedStyle(key) { return old }
+        return await withCheckedContinuation { continuation in
+            worker.async {
+                if let saved = self.cachedStyle(key) {
+                    continuation.resume(returning: saved)
+                    return
+                }
+                guard let device = MTLCreateSystemDefaultDevice() else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                let scene = DetectiveModelFactory.make(
+                    skin: skin, hair: hair, equipment: [:],
+                    theme: "midnight", closeup: true, animated: false)
+                let renderer = SCNRenderer(device: device, options: nil)
+                renderer.scene = scene
+                renderer.autoenablesDefaultLighting = false
+                guard let camera = scene.rootNode.childNode(
+                    withName: "Detective camera", recursively: false) else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                camera.camera?.fieldOfView = 34
+                camera.position = SCNVector3(0, 1.87, 0.76)
+                camera.look(at: SCNVector3(0, 1.85, 0))
+                renderer.pointOfView = camera
+                let result = renderer.snapshot(
+                    atTime: 0,
+                    with: CGSize(width: 220, height: 220),
+                    antialiasingMode: .multisampling2X)
+                self.images.setObject(result, forKey: ("look:" + key) as NSString)
+                continuation.resume(returning: result)
+            }
+        }
     }
 
     /// SceneKit offscreen rendering is serialized on a dedicated queue:
@@ -343,7 +428,7 @@ private enum DetectiveModelFactory {
         mannequin.addChildNode(head)
         makeFace(into: head, skin: color)
         makeHair(into: head, style: hair,
-                 wearingHeadwear: equipment[.headwear] != nil)
+                 headwear: equipment[.headwear])
         makeEyewear(into: head, id: equipment[.eyewear])
         makeHeadwear(into: head, id: equipment[.headwear])
         makeBadge(into: mannequin, id: equipment[.badge])
@@ -622,67 +707,122 @@ private enum DetectiveModelFactory {
     }
 
     private static func makeHair(into head: SCNNode, style: DetectiveHair,
-                                 wearingHeadwear: Bool) {
-        // Hair is actually hidden beneath a worn hat. Previously the full
-        // crown intersected the hat, making berets and caps float.
-        // Short side hair remains at the temples for a natural hairline.
+                                 headwear: String?) {
+        // Keep the four silhouettes different. A hat compresses the crown;
+        // it must not delete the fringe and sideburns that identify the haircut.
+        let coveredCrown = headwear != nil && headwear != "hat_visor"
+        let hood = headwear == "hat_hood"
+        let cutShort = style == .cropped
+        let swept = style == .swept
+        let textured = style == .textured
+
+        // Real temple/side hair, shaped differently on each side and per cut.
+        // These remain visible beneath a fitted cap or beret.
         for side in [-1.0, 1.0] {
-            let sideLock = ellipsoid("Hair at temple", hairColor,
-                                     Float(side) * 0.091, 0.204, 0.006,
-                                     0.018, 0.044, 0.064, roughness: 0.96)
+            let s = Float(side)
+            let sideWidth: CGFloat = cutShort ? 0.012 : textured ? 0.021 : 0.017
+            let sideLength: CGFloat = cutShort ? 0.028 :
+                swept && side < 0 ? 0.065 : 0.051
+            let sideLock = ellipsoid("Visible \(style.rawValue) sideburn", hairColor,
+                                     s * 0.097, 0.203 - Float(sideLength) * 0.12,
+                                     0.011,
+                                     sideWidth, sideLength, 0.050,
+                                     roughness: 0.97)
             head.addChildNode(sideLock)
         }
-        guard !wearingHeadwear else { return }
 
-        let foundationHeight: CGFloat = style == .cropped ? 0.035 : 0.055
-        head.addChildNode(ellipsoid("Scalp hair", hairColor, 0, 0.249, -0.017,
-                                    0.107, foundationHeight, 0.102,
-                                    roughness: 0.96))
-        let count = style == .cropped ? 29 : style == .textured ? 47 : 31
-        for i in 0..<count {
-            let theta = Float(i) * 2.3999632
-            let radius = Float(sqrt(Double(i + 1) / Double(count + 2))) * 0.083
-            let x = cos(theta) * radius
-            let z = sin(theta) * radius
-            let front = z > 0.020
-            let offset: Float
-            let height: CGFloat
-            let breadth: CGFloat
-            switch style {
-            case .cropped:
-                offset = 0
-                height = 0.009 + CGFloat(i % 3) * 0.002
-                breadth = 0.012
-            case .classic:
-                offset = x > 0 ? 0.004 : -0.003
-                height = 0.017 + CGFloat(i % 3) * 0.003
-                breadth = 0.015
-            case .textured:
-                offset = front ? 0.003 : 0
-                height = 0.019 + CGFloat(i % 7) * 0.004
-                breadth = 0.012
-            case .swept:
-                offset = 0.013
-                height = front ? 0.025 : 0.017
-                breadth = 0.014
+        if !coveredCrown {
+            let crownHeight: CGFloat = cutShort ? 0.023 :
+                textured ? 0.060 : swept ? 0.047 : 0.037
+            head.addChildNode(ellipsoid("Rooted \(style.rawValue) hair crown",
+                                         hairColor, 0, 0.254, -0.016,
+                                         0.103, crownHeight, 0.095,
+                                         roughness: 0.97))
+            let count = cutShort ? 28 : textured ? 54 : swept ? 39 : 36
+            for i in 0..<count {
+                let theta = Float(i) * 2.3999632
+                let radius = Float(sqrt(Double(i + 1) / Double(count + 1))) * 0.090
+                let x = cos(theta) * radius
+                let z = sin(theta) * radius - 0.016
+                let height: CGFloat
+                let width: CGFloat
+                switch style {
+                case .classic:
+                    height = 0.018 + CGFloat(i % 4) * 0.003
+                    width = 0.018
+                case .textured:
+                    height = 0.033 + CGFloat(i % 6) * 0.006
+                    width = 0.013
+                case .swept:
+                    height = 0.026 + CGFloat(i % 4) * 0.005
+                    width = 0.015
+                case .cropped:
+                    height = 0.008 + CGFloat(i % 3) * 0.003
+                    width = 0.013
+                }
+                let strand = ellipsoid("\(style.rawValue) sculpted hair clump",
+                                       hairColor,
+                                       x + (swept ? 0.011 : 0),
+                                       0.267 + Float(height) * 0.31,
+                                       z,
+                                       width, height, width * 0.90,
+                                       roughness: 0.97)
+                strand.eulerAngles.z = swept ? -0.58 :
+                    textured ? Float(i % 5 - 2) * 0.21 :
+                    cutShort ? 0 : -0.11
+                head.addChildNode(strand)
             }
-            let strand = ellipsoid("Groomed hair strand", hairColor,
-                                   x + offset, 0.271 + Float(height) * 0.35, z,
-                                   breadth, height, breadth * 1.21,
-                                   roughness: 0.96)
-            strand.eulerAngles.z = style == .swept ? -0.29 :
-                                    style == .classic ? -0.08 : Float(i % 3 - 1) * 0.08
-            head.addChildNode(strand)
         }
-        if style == .swept || style == .textured {
-            let amount = style == .swept ? 10 : 12
-            for i in 0..<amount {
-                let x = Float(i) / Float(max(1, amount - 1)) * 0.168 - 0.084
-                head.addChildNode(ellipsoid("Forehead fringe", hairColor,
-                                             x + (style == .swept ? 0.008 : 0),
-                                             0.244 + Float(i % 3) * 0.004, 0.087,
-                                             0.011, style == .swept ? 0.022 : 0.014,
-                                             0.012, roughness: 0.98))
+
+        // Distinct front hairline is intentionally *below* the hat band.
+        // All local coordinates are in head space, so head turns keep the
+        // fringe, temples and headwear together.
+        guard !hood else { return }
+        switch style {
+        case .classic:
+            // Neat side part with a low, controlled front edge.
+            for i in 0..<9 {
+                let x = Float(i) * 0.018 - 0.075
+                let part = ellipsoid("Classic parted fringe", hairColor,
+                                     x, 0.242 + (i > 6 ? 0.007 : 0),
+                                     0.091,
+                                     0.012, 0.017, 0.015, roughness: 0.97)
+                part.eulerAngles.z = -0.20
+                head.addChildNode(part)
+            }
+        case .textured:
+            // Loose, forward clumps that remain visible with a hat.
+            for i in 0..<12 {
+                let x = Float(i) * 0.014 - 0.077
+                let droop = Float(i % 4) * 0.004
+                let curl = ellipsoid("Textured forward curl", hairColor,
+                                      x, 0.240 - droop, 0.106,
+                                      0.011, 0.020 + CGFloat(i % 3) * 0.004,
+                                      0.014, roughness: 0.97)
+                curl.eulerAngles.z = Float(i % 5 - 2) * 0.24
+                head.addChildNode(curl)
+            }
+        case .swept:
+            // Strong diagonal sweep: largest locks fall to one side.
+            for i in 0..<9 {
+                let t = Float(i) / 8
+                let lock = ellipsoid("Side swept long fringe", hairColor,
+                                      -0.079 + t * 0.167,
+                                      0.260 - t * 0.022,
+                                      0.100,
+                                      0.015, 0.026, 0.017,
+                                      roughness: 0.97)
+                lock.eulerAngles.z = -0.67
+                head.addChildNode(lock)
+            }
+        case .cropped:
+            // The short cut has a crisp outline, not a fake long fringe.
+            for i in 0..<10 {
+                let x = Float(i) * 0.016 - 0.072
+                head.addChildNode(ellipsoid("Cropped hairline", hairColor,
+                                             x, 0.247, 0.087,
+                                             0.010, 0.007, 0.009,
+                                             roughness: 0.97))
             }
         }
     }
@@ -784,82 +924,105 @@ private enum DetectiveModelFactory {
         case "hat_pilot": fabric = UIColor(red: 0.15, green: 0.23, blue: 0.33, alpha: 1)
         default: fabric = black
         }
+        // All hats attach to a single fitted head-local anchor. One correction
+        // is applied to crown, brim and trim so hats don't float above the hair.
+        let fitted = SCNNode()
+        fitted.name = "Fitted \(id) headwear"
         switch id {
         case "hat_fedora":
             let crown = SCNCylinder(radius: 0.093, height: 0.082)
             crown.firstMaterial = material(fabric, roughness: 0.92)
             let cap = SCNNode(geometry: crown)
             cap.position = SCNVector3(0, 0.319, 0)
-            head.addChildNode(cap)
+            fitted.addChildNode(cap)
             let brim = SCNCylinder(radius: 0.150, height: 0.009)
             brim.firstMaterial = material(fabric, roughness: 0.80)
             let rim = SCNNode(geometry: brim)
             rim.position = SCNVector3(0, 0.281, 0.008)
-            head.addChildNode(rim)
+            fitted.addChildNode(rim)
         case "hat_beret":
-            head.addChildNode(ellipsoid("Shadow beret", fabric, -0.027, 0.302, 0.006,
+            fitted.addChildNode(ellipsoid("Shadow beret", fabric, -0.027, 0.302, 0.006,
                                         0.143, 0.039, 0.117))
-            head.addChildNode(box("Beret stem", black, width: 0.013,
+            fitted.addChildNode(box("Beret stem", black, width: 0.013,
                                   height: 0.018, length: 0.011,
                                   x: -0.015, y: 0.340, z: 0, chamfer: 0.005))
         case "hat_hood":
-            head.addChildNode(ellipsoid("Covert hood", fabric, 0, 0.168, -0.076,
+            fitted.addChildNode(ellipsoid("Covert hood", fabric, 0, 0.168, -0.076,
                                         0.151, 0.180, 0.105))
             for side in [-1.0, 1.0] {
-                head.addChildNode(ellipsoid("Hood fabric edge", fabric,
+                fitted.addChildNode(ellipsoid("Hood fabric edge", fabric,
                                             Float(side) * 0.116, 0.163, 0.053,
                                             0.030, 0.137, 0.036))
             }
         case "hat_visor":
-            head.addChildNode(ellipsoid("Field visor band", fabric, 0, 0.253, 0,
+            fitted.addChildNode(ellipsoid("Field visor band", fabric, 0, 0.253, 0,
                                         0.119, 0.017, 0.102))
-            head.addChildNode(box("Visor brim", fabric, width: 0.205,
+            fitted.addChildNode(box("Visor brim", fabric, width: 0.205,
                                   height: 0.010, length: 0.103,
                                   x: 0, y: 0.249, z: 0.112, chamfer: 0.013))
         case "hat_beanie", "hat_winter":
-            head.addChildNode(ellipsoid("Knit cap", fabric, 0, 0.290, -0.003,
+            fitted.addChildNode(ellipsoid("Knit cap", fabric, 0, 0.290, -0.003,
                                         0.122, 0.076, 0.111))
-            head.addChildNode(ellipsoid("Knit cuff", fabric,
+            fitted.addChildNode(ellipsoid("Knit cuff", fabric,
                                         0, 0.260, 0.037, 0.124, 0.022, 0.078))
             if id == "hat_winter" {
-                head.addChildNode(ellipsoid("Snow patrol pom", UIColor.white,
+                fitted.addChildNode(ellipsoid("Snow patrol pom", UIColor.white,
                                             0, 0.374, 0, 0.030, 0.030, 0.030))
             }
         case "hat_newsboy":
-            head.addChildNode(ellipsoid("Eight-panel newsboy cap", fabric,
+            fitted.addChildNode(ellipsoid("Eight-panel newsboy cap", fabric,
                                         0, 0.297, -0.013, 0.140, 0.068, 0.133))
-            head.addChildNode(box("Newsboy peak", fabric, width: 0.196,
+            fitted.addChildNode(box("Newsboy peak", fabric, width: 0.196,
                                   height: 0.011, length: 0.090,
                                   x: 0, y: 0.264, z: 0.121, chamfer: 0.026))
-            head.addChildNode(ellipsoid("Cap button", black, 0, 0.365, 0,
+            fitted.addChildNode(ellipsoid("Cap button", black, 0, 0.365, 0,
                                         0.015, 0.007, 0.015))
         case "hat_director", "hat_pilot":
-            head.addChildNode(ellipsoid("Uniform peaked cap", fabric,
+            fitted.addChildNode(ellipsoid("Uniform peaked cap", fabric,
                                         0, 0.297, -0.013, 0.123, 0.069, 0.115))
-            head.addChildNode(box("Uniform hat brim", black,
+            fitted.addChildNode(box("Uniform hat brim", black,
                                   width: 0.210, height: 0.014, length: 0.088,
                                   x: 0, y: 0.270, z: 0.112, chamfer: 0.018))
-            head.addChildNode(box("Uniform gold band", gold,
+            fitted.addChildNode(box("Uniform gold band", gold,
                                   width: 0.178, height: 0.010, length: 0.010,
                                   x: 0, y: 0.283, z: 0.119, chamfer: 0.005,
                                   metalness: 0.67))
             if id == "hat_pilot" {
-                head.addChildNode(box("Air marshal insignia", gold,
+                fitted.addChildNode(box("Air marshal insignia", gold,
                                       width: 0.067, height: 0.012, length: 0.012,
                                       x: 0, y: 0.316, z: 0.119, chamfer: 0.004))
             } else {
-                head.addChildNode(ellipsoid("Director crest", gold,
+                fitted.addChildNode(ellipsoid("Director crest", gold,
                                             0, 0.323, 0.113,
                                             0.021, 0.028, 0.008,
                                             roughness: 0.29))
             }
         default:
-            head.addChildNode(ellipsoid("Patrol cap", fabric,
+            fitted.addChildNode(ellipsoid("Patrol cap", fabric,
                                         0, 0.289, -0.009, 0.122, 0.063, 0.112))
-            head.addChildNode(box("Patrol peak", fabric, width: 0.192,
+            fitted.addChildNode(box("Patrol peak", fabric, width: 0.192,
                                   height: 0.013, length: 0.088,
                                   x: 0, y: 0.267, z: 0.119, chamfer: 0.014))
         }
+        // A thin headband bridges the gap between a sculpted crown and skull.
+        // This is real fabric geometry, not a decal. Hood and visors have
+        // separate edge geometry already, so skip the full closed band.
+        if id != "hat_hood" && id != "hat_visor" {
+            let band = SCNTorus(ringRadius: 0.103, pipeRadius: 0.006)
+            band.firstMaterial = material(fabric, roughness: 0.97)
+            let strap = SCNNode(geometry: band)
+            strap.name = "Fitted headband \(id)"
+            strap.position = SCNVector3(0, 0.255, 0)
+            fitted.addChildNode(strap)
+        }
+        switch id {
+        case "hat_hood": fitted.position.y = 0
+        case "hat_visor": fitted.position.y = -0.007
+        case "hat_beret": fitted.position.y = -0.020
+        case "hat_fedora": fitted.position.y = -0.016
+        default: fitted.position.y = -0.014
+        }
+        head.addChildNode(fitted)
     }
 
     private static func makeBadge(into body: SCNNode, id: String?) {

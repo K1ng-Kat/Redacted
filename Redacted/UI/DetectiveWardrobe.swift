@@ -106,6 +106,7 @@ struct DetectiveCharacter: View {
     @ObservedObject var store: CampaignStore
     var size: CGFloat = 140
     var previewCosmetic: DetectiveCosmetic? = nil
+    var previewEmptySlot: CosmeticSlot? = nil
     var previewTheme: String? = nil
     var portraitMode = false
 
@@ -134,6 +135,9 @@ struct DetectiveCharacter: View {
         if let previewCosmetic {
             equipment[previewCosmetic.slot] = previewCosmetic.id
         }
+        if let previewEmptySlot {
+            equipment.removeValue(forKey: previewEmptySlot)
+        }
         return equipment
     }
 }
@@ -145,7 +149,7 @@ struct DetectiveWardrobeView: View {
     let back: () -> Void
 
     @State private var slot: CosmeticSlot = .headwear
-    @State private var selectedID = "hat_cap"
+    @State private var selectedID = ""
     @State private var isTryingOn = false
     @State private var showFaceDetail = false
     @State private var showSnippetShop = false
@@ -159,7 +163,6 @@ struct DetectiveWardrobeView: View {
 
     private var selectedItem: DetectiveCosmetic? {
         CosmeticCatalog.items(in: slot).first { $0.id == selectedID }
-            ?? CosmeticCatalog.items(in: slot).first
     }
 
     private var eligibleCount: Int {
@@ -193,8 +196,7 @@ struct DetectiveWardrobeView: View {
         }
         .background(GameBackdrop())
         .onAppear {
-            selectedID = store.equippedCosmetic(in: slot) ??
-                CosmeticCatalog.items(in: slot).first?.id ?? ""
+            selectedID = store.equippedCosmetic(in: slot) ?? ""
             isTryingOn = false
         }
         .confirmationDialog("PERMANENTLY UNLOCK COSMETIC?",
@@ -243,6 +245,7 @@ struct DetectiveWardrobeView: View {
                 }
                 DetectiveCharacter(store: store, size: 275,
                                    previewCosmetic: isTryingOn ? selectedItem : nil,
+                                   previewEmptySlot: isTryingOn && selectedID.isEmpty ? slot : nil,
                                    portraitMode: showFaceDetail)
                     .frame(maxWidth: .infinity)
                     .accessibilityHint("Preview includes the selected item before buying or equipping it")
@@ -357,7 +360,7 @@ struct DetectiveWardrobeView: View {
                     Button {
                         withAnimation(.easeInOut(duration: 0.18)) {
                             slot = option
-                            selectedID = store.equippedCosmetic(in: option) ?? CosmeticCatalog.items(in: option).first?.id ?? ""
+                            selectedID = store.equippedCosmetic(in: option) ?? ""
                             isTryingOn = false
                             notice = nil
                         }
@@ -392,10 +395,59 @@ struct DetectiveWardrobeView: View {
 
     private var collectionGrid: some View {
         LazyVGrid(columns: columns, spacing: 10) {
+            noneTile
             ForEach(CosmeticCatalog.items(in: slot)) { item in
                 itemTile(item)
             }
         }
+    }
+
+    private var noneTile: some View {
+        let isEquippedNone = store.equippedCosmetic(in: slot) == nil
+        return Button {
+            withAnimation(.easeInOut(duration: 0.16)) {
+                selectedID = ""
+                isTryingOn = true
+                notice = nil
+            }
+            GameEffects.shared.tap()
+        } label: {
+            VStack(alignment: .leading, spacing: 7) {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Art.ink.opacity(0.62))
+                    .overlay {
+                        VStack(spacing: 7) {
+                            Image(systemName: "nosign")
+                                .font(.system(size: 33, weight: .medium))
+                            Text(slot.label)
+                                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        }
+                        .foregroundStyle(Art.cyan)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 122)
+                Text("NONE")
+                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .foregroundStyle(Art.paper)
+                    .frame(height: 28, alignment: .topLeading)
+                Text(isEquippedNone ? "EQUIPPED · FREE" : "REMOVE ITEM · FREE")
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundStyle(isEquippedNone ? Art.mint : Art.faded)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(10)
+            .background(Art.blueDeep)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(selectedID.isEmpty ? Art.gold : Art.edge,
+                            lineWidth: selectedID.isEmpty ? 2.5 : 1)
+            }
+        }
+        .buttonStyle(PressGameStyle())
+        .accessibilityLabel("None, \(slot.label), \(isEquippedNone ? "equipped" : "preview removal")")
     }
 
     private func itemTile(_ item: DetectiveCosmetic) -> some View {
@@ -470,7 +522,32 @@ struct DetectiveWardrobeView: View {
 
     @ViewBuilder
     private var selectedDetail: some View {
-        if let item = selectedItem {
+        if selectedID.isEmpty {
+            GameCard(accent: Art.cyan) {
+                VStack(alignment: .leading, spacing: 12) {
+                    GameKicker(text: "SELECTED LOOK", color: Art.cyan)
+                    Text("NO \(slot.label)")
+                        .font(.system(size: 20, weight: .black, design: .rounded))
+                        .foregroundStyle(Art.paper)
+                    Text("Keep this slot empty. You can re-equip any owned item later for free.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Art.faded)
+                    if store.equippedCosmetic(in: slot) != nil {
+                        GameButton(title: "UNEQUIP \(slot.label)",
+                                   icon: "xmark.circle.fill") {
+                            store.unequipCosmetic(slot: slot)
+                            isTryingOn = false
+                            GameEffects.shared.success()
+                            notice = "\(slot.label.capitalized) removed. You can equip it again anytime."
+                        }
+                    } else {
+                        Label("NONE EQUIPPED", systemImage: "checkmark.circle.fill")
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .foregroundStyle(Art.mint)
+                    }
+                }
+            }
+        } else if let item = selectedItem {
             let owned = store.ownedCosmetics.contains(item.id)
             let equipped = store.equippedCosmetic(in: item.slot) == item.id
             let rankLocked = store.accountLevel < item.requiredRank

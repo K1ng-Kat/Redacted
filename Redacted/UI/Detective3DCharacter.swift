@@ -221,6 +221,44 @@ private enum DetectiveModelFactory {
         return scene
     }
 
+    /// Light random micro-movements keep the actor alive without a looping
+    /// robot-like pose. All children (hair and equipment) move with the head.
+    private static func startNaturalIdle(head: SCNNode, body: SCNNode) {
+        let inhale = SCNAction.moveBy(x: 0, y: 0.0035, z: 0, duration: 2.7)
+        let exhale = SCNAction.moveBy(x: 0, y: -0.0035, z: 0, duration: 3.1)
+        inhale.timingMode = .easeInEaseOut
+        exhale.timingMode = .easeInEaseOut
+        body.runAction(.repeatForever(.sequence([inhale, exhale])),
+                       forKey: "breathing")
+
+        let nextLook = SCNAction.run { node in
+            let x = CGFloat.random(in: -0.020...0.028)
+            let y = CGFloat.random(in: -0.075...0.075)
+            let z = CGFloat.random(in: -0.018...0.018)
+            let motion = SCNAction.rotateTo(
+                x: x, y: y, z: z,
+                duration: TimeInterval.random(in: 0.75...1.5),
+                usesShortestUnitArc: true
+            )
+            motion.timingMode = .easeInEaseOut
+            node.runAction(motion, forKey: "idleLook")
+        }
+        head.runAction(.repeatForever(.sequence([
+            .wait(duration: 2.2, withRange: 3.2), nextLook
+        ])), forKey: "idleLookScheduler")
+
+        let nextBlink = SCNAction.run { node in
+            let lids = node.childNodes.filter { $0.name == "Blink eyelid" }
+            let close = SCNAction.scaleY(to: 0.010, duration: 0.09)
+            let open = SCNAction.scaleY(to: 0.0008, duration: 0.13)
+            let blink = SCNAction.sequence([close, open])
+            for lid in lids { lid.runAction(blink, forKey: "blink") }
+        }
+        head.runAction(.repeatForever(.sequence([
+            .wait(duration: 2.0, withRange: 3.4), nextBlink
+        ])), forKey: "blinkScheduler")
+    }
+
     /// Tone-map face material before lights; the previous near-white skin
     /// combined with three intense lights washed away all facial detail.
     private static func balancedSkinColor(_ skin: DetectiveSkin) -> UIColor {
@@ -669,10 +707,10 @@ private enum DetectiveModelFactory {
             metal = gold; symbol = "★"
         }
         let plaque = box("3D " + id + " badge", metal,
-                         width: id.contains("royal") || id.contains("director") ? 0.058 : 0.049,
-                         height: id.contains("diamond") ? 0.068 : 0.057,
+                         width: id.contains("royal") || id.contains("director") ? 0.075 : 0.064,
+                         height: id.contains("diamond") ? 0.088 : 0.075,
                          length: 0.009,
-                         x: 0.142, y: 1.521, z: 0.150,
+                         x: 0.130, y: 1.521, z: 0.188,
                          chamfer: 0.010, metalness: 0.87)
         if id == "badge_diamond" {
             plaque.eulerAngles.z = .pi / 4
@@ -687,7 +725,7 @@ private enum DetectiveModelFactory {
         let mark = SCNNode(geometry: engraving)
         mark.name = id + " distinct emblem"
         mark.scale = SCNVector3(0.83, 0.83, 0.83)
-        mark.position = SCNVector3(0.128, 1.502, 0.158)
+        mark.position = SCNVector3(0.112, 1.505, 0.196)
         body.addChildNode(mark)
     }
 

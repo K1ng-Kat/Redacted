@@ -56,9 +56,11 @@ assert 'headwear: equipment[.headwear]' in drawing
 assert 'let coveredForehead = hood' in drawing
 assert 'guard !coveredForehead else { return }' in drawing
 assert 'if hood { return }' in drawing
-assert 'hat ? 0.026 : 0.043' in drawing
-assert 'let lowered: Float = hat ? -0.018 : 0' in drawing
-assert 'let thickness: CGFloat = hat ? 0.012 : 0.019' in drawing
+assert 'hat ? 0.029 : 0.043' in drawing
+assert 'let lowered: Float = hat ? -0.015 : 0' in drawing
+assert 'let thickness: CGFloat = hat ? 0.014 : 0.019' in drawing
+assert 'if !hood {' in drawing, "Allow low hair at temples under knit caps"
+assert 'if hood { return }' in drawing, "Keep hood material free of clipping hair"
 assert 'for index in 0..<6' in drawing
 assert 'for i in 0..<54' not in drawing
 assert 'let count = cutShort ? 28' not in drawing, "Do not restore dozens of knobby floating hair clumps"
@@ -67,6 +69,14 @@ assert 'SCNTorus(ringRadius: 0.103' not in drawing, "Remove hovering second hat 
 assert 'Text(shade.label.uppercased())' not in catalog
 assert 'Capsule()' in catalog and '.fill(shade.color)' in catalog
 assert 'Skin tone option' in catalog
+assert 'DetectiveSkin.allCases.count' in catalog, "Accessibility count must match new tones"
+assert 'LazyVGrid(' in catalog, "More shades must not overflow a horizontal row"
+assert 'count: 4)' in catalog, "Skin selection must have four columns"
+assert 'Text(shade.label.uppercased())' not in catalog
+for id in ('porcelain', 'peach', 'bronze', 'umber', 'deep',
+           'ivory', 'olive', 'mahogany'):
+    assert f'case .{id}:' in drawing, f"Missing skin palette: {id}"
+assert 'case ivory, porcelain, peach, olive, bronze, umber, mahogany, deep' in drawing
 assert "guard !wearingHeadwear else { return }" not in drawing
 for token in ('case .classic:', 'case .textured:', 'case .swept:', 'case .cropped:',
               'Clean parted fringe', 'Short textured fringe',

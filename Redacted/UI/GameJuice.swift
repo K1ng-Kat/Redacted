@@ -55,6 +55,7 @@ struct GameCoachOverlay: View {
     let button: String
     let symbol: String
     let portraitTheme: String?
+    var dismiss: (() -> Void)? = nil
     let action: () -> Void
 
     var body: some View {
@@ -83,6 +84,16 @@ struct GameCoachOverlay: View {
                     .font(.system(size: 34, weight: .black))
                     .foregroundStyle(Art.gold)
                 GameButton(title: button, icon: "hand.point.up.left.fill", action: action)
+                if let dismiss {
+                    Button("NOT NOW · OPEN THE GAME") {
+                        GameEffects.shared.tap()
+                        dismiss()
+                    }
+                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .foregroundStyle(Art.cyan)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .accessibilityLabel("Dismiss tutorial and open Redacted")
+                }
             }
             .frame(maxWidth: 350)
             .padding(23)

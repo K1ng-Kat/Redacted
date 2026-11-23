@@ -132,6 +132,46 @@ struct CosmeticItemThumbnail: View {
     }
 }
 
+/// The same face and hair materials, geometry and light rig used by the live
+/// detective are shown in small cached portraits, not flat approximate swatches.
+struct DetectiveLookThumbnail: View {
+    let skin: DetectiveSkin
+    let hair: DetectiveHair
+    @State private var image: UIImage?
+
+    private var key: String { "\(skin.rawValue)|\(hair.rawValue)" }
+
+    var body: some View {
+        ZStack {
+            // The true palette tone is visible while the lit scene renders.
+            RoundedRectangle(cornerRadius: 8)
+                .fill(skin.color.opacity(0.55))
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .transition(.opacity)
+            } else {
+                ProgressView().tint(.white)
+                    .scaleEffect(0.65)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .task(id: key) {
+            if let saved = CosmeticPreviewCache.shared.cachedStyle(key) {
+                image = saved
+                return
+            }
+            image = nil
+            let rendered = await CosmeticPreviewCache.shared.renderStyle(
+                skin: skin, hair: hair)
+            guard !Task.isCancelled else { return }
+            image = rendered
+        }
+        .accessibilityHidden(true)
+    }
+}
+
 private final class CosmeticPreviewCache {
     static let shared = CosmeticPreviewCache()
     private let images: NSCache<NSString, UIImage> = {
@@ -144,6 +184,51 @@ private final class CosmeticPreviewCache {
 
     func cached(_ id: String) -> UIImage? {
         images.object(forKey: id as NSString)
+    }
+
+    func cachedStyle(_ key: String) -> UIImage? {
+        images.object(forKey: ("look:" + key) as NSString)
+    }
+
+    /// A real close-up of the existing avatar, without equipped hats, so
+    /// every swatch matches the face's literal material under studio lights
+    /// and hairstyles are easy to compare side by side.
+    func renderStyle(skin: DetectiveSkin, hair: DetectiveHair) async -> UIImage? {
+        let key = skin.rawValue + "|" + hair.rawValue
+        if let old = cachedStyle(key) { return old }
+        return await withCheckedContinuation { continuation in
+            worker.async {
+                if let saved = self.cachedStyle(key) {
+                    continuation.resume(returning: saved)
+                    return
+                }
+                guard let device = MTLCreateSystemDefaultDevice() else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                let scene = DetectiveModelFactory.make(
+                    skin: skin, hair: hair, equipment: [:],
+                    theme: "midnight", closeup: true, animated: false)
+                let renderer = SCNRenderer(device: device, options: nil)
+                renderer.scene = scene
+                renderer.autoenablesDefaultLighting = false
+                guard let camera = scene.rootNode.childNode(
+                    withName: "Detective camera", recursively: false) else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                camera.camera?.fieldOfView = 34
+                camera.position = SCNVector3(0, 1.87, 0.76)
+                camera.look(at: SCNVector3(0, 1.85, 0))
+                renderer.pointOfView = camera
+                let result = renderer.snapshot(
+                    atTime: 0,
+                    with: CGSize(width: 220, height: 220),
+                    antialiasingMode: .multisampling2X)
+                self.images.setObject(result, forKey: ("look:" + key) as NSString)
+                continuation.resume(returning: result)
+            }
+        }
     }
 
     /// SceneKit offscreen rendering is serialized on a dedicated queue:

@@ -557,8 +557,7 @@ private enum DetectiveModelFactory {
             head.addChildNode(skinEllipsoid("Ear", skin, s * 0.103, 0.125, 0.005,
                                         0.014, 0.025, 0.014))
             head.addChildNode(skinEllipsoid("Upper cheek", skin, s * 0.053,
-                                       0.121, 0.060, 0.038, 0.031, 0.023,
-                                       roughness: 0.93))
+                                       0.121, 0.060, 0.038, 0.031, 0.023))
             head.addChildNode(ellipsoid("Eye white",
                              UIColor(red: 0.91, green: 0.89, blue: 0.85, alpha: 1),
                              s * 0.043, 0.161, 0.102,

@@ -222,8 +222,10 @@ struct ContentView: View {
             .simultaneousGesture(
                 DragGesture(minimumDistance: 45)
                     .onEnded { gesture in
+                        // Cases, Duels and Social have their own horizontal
+                        // interactions; do not steal their gestures for tabs.
                         guard showsMainTabs,
-                              !(route == .multiplayer && MultiplayerService.shared.phase == .playing),
+                              route == .home || route == .more,
                               abs(gesture.translation.width) > 75,
                               abs(gesture.translation.width) > abs(gesture.translation.height) * 1.7
                         else { return }

@@ -26,8 +26,10 @@ struct MissionPlayView: View {
     @State private var frequency: Double = 50
     @State private var matchedItems: Set<Int> = []
     @State private var mistakes = 0
-    @State private var hintUsed = false
-    @State private var hintVisible = false
+    // A redeemed clue belongs to the saved case, not one temporary view.
+    // This also refreshes automatically after a cloud-save restoration.
+    private var hintUsed: Bool { store.hasRevealedHint(for: mission.id) }
+    private var hintVisible: Bool { store.hasRevealedHint(for: mission.id) }
     @State private var confirmingHint = false
     @State private var feedback: String?
     @State private var payout: CasePayout?
@@ -88,9 +90,7 @@ struct MissionPlayView: View {
         .confirmationDialog("Reveal a detective hint?", isPresented: $confirmingHint,
                             titleVisibility: .visible) {
             Button(store.hintTickets > 0 ? "Use a free hint" : "Spend 2 crystals") {
-                if store.redeemHint() {
-                    hintVisible = true
-                    hintUsed = true
+                if store.redeemHint(for: mission.id) {
                     GameEffects.shared.success()
                 }
             }
@@ -319,10 +319,15 @@ struct MissionPlayView: View {
             ForEach(adjusted.timelineChoices.indices, id: \.self) { index in
                 let chosenPosition = selectedSequence.firstIndex(of: index)
                 Button {
-                    guard chosenPosition == nil else { return }
                     GameEffects.shared.tap()
-                    selectedSequence.append(index)
-
+                    if let chosenPosition {
+                        // Tapping an already-ordered event removes it without
+                        // wiping the other selected steps.
+                        selectedSequence.remove(at: chosenPosition)
+                    } else {
+                        selectedSequence.append(index)
+                    }
+                    feedback = nil
                 } label: {
                     HStack(spacing: 12) {
                         Image(systemName: "clock.fill")
@@ -350,7 +355,9 @@ struct MissionPlayView: View {
                         .stroke(chosenPosition != nil ? Art.mint : Art.edge.opacity(0.7), lineWidth: 1.4))
                 }
                 .buttonStyle(PressGameStyle())
-                .disabled(chosenPosition != nil)
+                .accessibilityHint(chosenPosition == nil
+                    ? "Add this event next in the sequence"
+                    : "Remove this event from the sequence")
             }
             if selectedSequence.count == 4 {
                 GameButton(title: "VERIFY TIMELINE", icon: "checkmark.seal.fill") {
@@ -494,10 +501,13 @@ struct MissionPlayView: View {
             HStack(spacing: 6) {
                 ForEach(scrambled.indices, id: \.self) { index in
                     Button {
-                        guard !usedLetterIndices.contains(index) else { return }
                         GameEffects.shared.tap()
-                        usedLetterIndices.append(index)
-
+                        if let position = usedLetterIndices.firstIndex(of: index) {
+                            usedLetterIndices.remove(at: position)
+                        } else {
+                            usedLetterIndices.append(index)
+                        }
+                        feedback = nil
                     } label: {
                         Text(String(scrambled[index]))
                             .font(.system(size: 21, weight: .black, design: .rounded))
@@ -507,7 +517,9 @@ struct MissionPlayView: View {
                             .background(usedLetterIndices.contains(index) ? Art.faded : Art.gold)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
-                    .disabled(usedLetterIndices.contains(index))
+                    .accessibilityHint(usedLetterIndices.contains(index)
+                        ? "Remove this letter from the answer"
+                        : "Add this letter to the answer")
                     .buttonStyle(PressGameStyle())
                 }
             }
@@ -663,7 +675,8 @@ struct MissionPlayView: View {
         selectedAnswer = nil
         mistakes = 0
         feedback = nil
-        // Purchased hints remain spent, and count against this run's score.
+        // Previously redeemed hints stay revealed on retry and revisit.
+        // They remain recorded in CampaignProgress, not this transient view.
     }
 
     private func victory(_ payout: CasePayout) -> some View {

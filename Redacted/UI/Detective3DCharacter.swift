@@ -87,8 +87,8 @@ struct Detective3DCharacter: UIViewRepresentable {
 }
 
 /// Static item-only renders of the *same SceneKit meshes* as the actor.
-/// One 320px Metal snapshot per cosmetic ID is cached so a scrolling grid
-/// never creates dozens of continuously-rendering 3D characters.
+/// Snapshots are produced on a serial worker queue and cached so scrolling
+/// never creates dozens of continuously-rendering 3D actors or blocks taps.
 struct CosmeticItemThumbnail: View {
     let item: DetectiveCosmetic
     @State private var image: UIImage?
@@ -109,48 +109,63 @@ struct CosmeticItemThumbnail: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task(id: item.id) {
-            if let saved = CosmeticPreviewCache.cached(item.id) {
+            if let saved = CosmeticPreviewCache.shared.cached(item.id) {
                 image = saved
                 return
             }
             image = nil
-            // Allows the item grid to paint before starting its first
-            // GPU snapshot. All subsequent appearances use the cache.
-            await Task.yield()
+            let rendered = await CosmeticPreviewCache.shared.render(
+                id: item.id, slot: item.slot)
             guard !Task.isCancelled else { return }
-            image = CosmeticPreviewCache.render(item)
+            image = rendered
         }
         .accessibilityHidden(true)
     }
 }
 
-@MainActor
-private enum CosmeticPreviewCache {
-    private static let images: NSCache<NSString, UIImage> = {
+private final class CosmeticPreviewCache {
+    static let shared = CosmeticPreviewCache()
+    private let images: NSCache<NSString, UIImage> = {
         let cache = NSCache<NSString, UIImage>()
         cache.countLimit = 48
         return cache
     }()
+    private let worker = DispatchQueue(
+        label: "redacted.cosmetic.snapshot.worker", qos: .userInitiated)
 
-    static func cached(_ id: String) -> UIImage? {
+    func cached(_ id: String) -> UIImage? {
         images.object(forKey: id as NSString)
     }
 
-    static func render(_ item: DetectiveCosmetic) -> UIImage? {
-        if let old = cached(item.id) { return old }
-        guard let device = MTLCreateSystemDefaultDevice() else { return nil }
-        let scene = DetectiveModelFactory.makeCosmeticPreview(item)
-        let renderer = SCNRenderer(device: device, options: nil)
-        renderer.scene = scene
-        renderer.autoenablesDefaultLighting = false
-        renderer.pointOfView = scene.rootNode.childNode(
-            withName: "Cosmetic product camera", recursively: false)
-        let result = renderer.snapshot(
-            atTime: 0,
-            with: CGSize(width: 320, height: 320),
-            antialiasingMode: .multisampling4X)
-        images.setObject(result, forKey: item.id as NSString)
-        return result
+    /// SceneKit offscreen rendering is serialized on a dedicated queue:
+    /// the product grid remains responsive while thumbnails are prepared.
+    func render(id: String, slot: CosmeticSlot) async -> UIImage? {
+        if let old = cached(id) { return old }
+        return await withCheckedContinuation { continuation in
+            worker.async {
+                if let old = self.cached(id) {
+                    continuation.resume(returning: old)
+                    return
+                }
+                guard let device = MTLCreateSystemDefaultDevice() else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                let scene = DetectiveModelFactory.makeCosmeticPreview(
+                    id: id, slot: slot)
+                let renderer = SCNRenderer(device: device, options: nil)
+                renderer.scene = scene
+                renderer.autoenablesDefaultLighting = false
+                renderer.pointOfView = scene.rootNode.childNode(
+                    withName: "Cosmetic product camera", recursively: false)
+                let result = renderer.snapshot(
+                    atTime: 0,
+                    with: CGSize(width: 320, height: 320),
+                    antialiasingMode: .multisampling4X)
+                self.images.setObject(result, forKey: id as NSString)
+                continuation.resume(returning: result)
+            }
+        }
     }
 }
 
@@ -163,7 +178,7 @@ private enum DetectiveModelFactory {
 
     /// Item only, never a disguised cropped avatar or a generic SF Symbol.
     /// Every slot calls the same mesh builders used in `make(skin:...)`.
-    static func makeCosmeticPreview(_ item: DetectiveCosmetic) -> SCNScene {
+    static func makeCosmeticPreview(id: String, slot: CosmeticSlot) -> SCNScene {
         let scene = SCNScene()
         scene.background.contents = UIColor.clear
 
@@ -173,26 +188,26 @@ private enum DetectiveModelFactory {
         let geometry = SCNNode()
         product.addChildNode(geometry)
 
-        switch item.slot {
+        switch slot {
         case .headwear:
-            makeHeadwear(into: geometry, id: item.id)
+            makeHeadwear(into: geometry, id: id)
             // Original head-local headwear center is around y=0.30.
             geometry.position = SCNVector3(0, -0.30, 0)
             product.scale = SCNVector3(1.65, 1.65, 1.65)
 
         case .eyewear:
-            makeEyewear(into: geometry, id: item.id)
+            makeEyewear(into: geometry, id: id)
             geometry.position = SCNVector3(0, -0.16, -0.125)
             product.scale = SCNVector3(2.15, 2.15, 2.15)
 
         case .badge:
-            makeBadge(into: geometry, id: item.id)
+            makeBadge(into: geometry, id: id)
             // Badges live on the torso at (0.13, 1.52, 0.19).
             geometry.position = SCNVector3(-0.13, -1.52, -0.19)
             product.scale = SCNVector3(5.0, 5.0, 5.0)
 
         case .coat:
-            let jacket = coatColor(item.id)
+            let jacket = coatColor(id)
             geometry.addChildNode(tailoredTorso(color: jacket))
             for side in [-1.0, 1.0] {
                 geometry.addChildNode(segment("Coat sleeve", jacket,
@@ -206,7 +221,7 @@ private enum DetectiveModelFactory {
                 lapel.eulerAngles.z = Float(side) * -0.15
                 geometry.addChildNode(lapel)
             }
-            makeCoatDetails(into: geometry, id: item.id, base: jacket)
+            makeCoatDetails(into: geometry, id: id, base: jacket)
             geometry.position = SCNVector3(0, -1.415, 0)
             product.scale = SCNVector3(0.93, 0.93, 0.93)
         }

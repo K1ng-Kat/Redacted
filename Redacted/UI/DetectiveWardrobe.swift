@@ -314,11 +314,15 @@ struct DetectiveWardrobeView: View {
                 Text("Skin tone")
                     .font(.system(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(Art.paper)
-                Text("Choose a tone visually. The portrait shows the lit skin; the strip beneath it shows the exact material color.")
+                Text("Eight natural shades, with no names. The face is shown under in-game lighting; the strip below is its exact base color.")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(Art.faded)
                     .fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: 6) {
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.flexible(minimum: 52), spacing: 7),
+                                   count: 4),
+                    spacing: 7
+                ) {
                     ForEach(DetectiveSkin.allCases) { shade in
                         Button {
                             store.setSkin(shade)
@@ -346,7 +350,7 @@ struct DetectiveWardrobeView: View {
                             }
                         }
                         .buttonStyle(PressGameStyle())
-                        .accessibilityLabel("Skin tone option \((DetectiveSkin.allCases.firstIndex(of: shade) ?? 0) + 1) of 5")
+                        .accessibilityLabel("Skin tone option \((DetectiveSkin.allCases.firstIndex(of: shade) ?? 0) + 1) of \(DetectiveSkin.allCases.count)")
                         .accessibilityAddTraits(store.skin == shade ? .isSelected : [])
                     }
                 }

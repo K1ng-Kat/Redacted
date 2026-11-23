@@ -733,6 +733,10 @@ private enum DetectiveModelFactory {
         let swept = style == .swept
         let textured = style == .textured
 
+        // A closed fabric hood encloses the entire temple and crown. Do not
+        // draw hidden hair through its side panels.
+        if hood { return }
+
         // Real temple/side hair, shaped differently on each side and per cut.
         // These remain visible beneath a fitted cap or beret.
         for side in [-1.0, 1.0] {

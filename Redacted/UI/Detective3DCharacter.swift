@@ -10,11 +10,11 @@ enum DetectiveSkin: String, CaseIterable, Identifiable, Codable {
     var label: String { rawValue.capitalized }
     var color: Color {
         switch self {
-        case .porcelain: Color(red: 0.98, green: 0.81, blue: 0.69)
-        case .peach: Color(red: 0.91, green: 0.64, blue: 0.47)
-        case .bronze: Color(red: 0.71, green: 0.44, blue: 0.30)
-        case .umber: Color(red: 0.48, green: 0.29, blue: 0.21)
-        case .deep: Color(red: 0.30, green: 0.18, blue: 0.15)
+        case .porcelain: Color(red: 0.93, green: 0.77, blue: 0.68)
+        case .peach: Color(red: 0.84, green: 0.65, blue: 0.53)
+        case .bronze: Color(red: 0.71, green: 0.49, blue: 0.36)
+        case .umber: Color(red: 0.51, green: 0.34, blue: 0.26)
+        case .deep: Color(red: 0.33, green: 0.22, blue: 0.18)
         }
     }
 }
@@ -507,13 +507,19 @@ private enum DetectiveModelFactory {
         ])), forKey: "idleLookScheduler")
 
         let nextBlink = SCNAction.run { node in
-            let lids = node.childNodes.filter { $0.name == "Upper eyelid" }
-            let close = SCNAction.moveBy(x: 0, y: -0.012, z: 0, duration: 0.09)
-            let open = SCNAction.moveBy(x: 0, y: 0.012, z: 0, duration: 0.12)
+            let lids = node.childNodes.filter { $0.name == "Blink eyelid" }
+            let close = SCNAction.moveBy(x: 0, y: -0.010, z: 0, duration: 0.085)
+            let open = SCNAction.moveBy(x: 0, y: 0.010, z: 0, duration: 0.115)
             close.timingMode = .easeIn
             open.timingMode = .easeOut
             for lid in lids {
-                lid.runAction(.sequence([close, open]), forKey: "blink")
+                // Only reveal the small lid during a blink; do not render a
+                // stationary second line in the open-eyed character.
+                lid.runAction(.sequence([
+                    .fadeOpacity(to: 1, duration: 0.018),
+                    close, open,
+                    .fadeOpacity(to: 0, duration: 0.018)
+                ]), forKey: "blink")
             }
         }
         head.runAction(.repeatForever(.sequence([
@@ -679,20 +685,23 @@ private enum DetectiveModelFactory {
                              UIColor(red: 0.037, green: 0.032, blue: 0.03, alpha: 1),
                              s * 0.043, 0.159, 0.116,
                              0.0032, 0.0038, 0.002, roughness: 0.28))
-            // Stable upper eyelid: a small real box in head-local units,
-            // animated by millimeters, never by changing the node's scale.
-            // The old implementation multiplied an ellipsoid scale of 0.0008
-            // up to 1.0, producing the giant white bars across the face.
-            let lid = box("Upper eyelid", skin,
-                          width: 0.043, height: 0.006, length: 0.006,
-                          x: s * 0.043, y: 0.175, z: 0.120,
-                          chamfer: 0.002)
+            // The eyelid is HIDDEN at rest. A visible horizontal skin bar
+            // was being mistaken for a second eyebrow over each eye.
+            let lid = box("Blink eyelid", skin,
+                          width: 0.036, height: 0.003, length: 0.003,
+                          x: s * 0.043, y: 0.173, z: 0.116,
+                          chamfer: 0.001)
             lid.geometry?.firstMaterial = skinMaterial(skin)
+            lid.opacity = 0
             head.addChildNode(lid)
-            let brow = box("Eyebrow", hairColor,
-                           width: 0.043, height: 0.005, length: 0.008,
-                           x: s * 0.044, y: 0.189, z: 0.106, chamfer: 0.004)
-            brow.eulerAngles.z = -s * 0.06
+
+            // Exactly one thin, slightly curved hair-colored eyebrow on
+            // each side. Rebuilds create a new complete scene, never stack.
+            let brow = ellipsoid("Single eyebrow", hairColor,
+                                 s * 0.044, 0.198, 0.101,
+                                 0.035, 0.004, 0.005,
+                                 roughness: 0.94)
+            brow.eulerAngles.z = -s * 0.09
             head.addChildNode(brow)
         }
         head.addChildNode(skinEllipsoid("Nose bridge", skin, 0, 0.136, 0.101,

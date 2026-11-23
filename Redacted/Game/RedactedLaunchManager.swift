@@ -80,6 +80,12 @@ final class RedactedLaunchManager: ObservableObject {
         guard !verifying && !ready else { return }
         issue = nil
         stage = "RETRYING CONNECTION"
+        // Restart the path monitor so Retry gets a fresh status even if the
+        // previous callback arrived while airplane mode was enabled.
+        monitor?.cancel()
+        monitor = nil
+        pathStatus = nil
+        beginMonitoring()
         await checkConnection()
     }
 
@@ -128,7 +134,7 @@ final class RedactedLaunchManager: ObservableObject {
 
         if let url = manifestURL {
             var request = URLRequest(url: url)
-            request.timeoutInterval = 5
+            request.timeoutInterval = 4
             request.cachePolicy = .reloadIgnoringLocalCacheData
             request.setValue("application/json", forHTTPHeaderField: "Accept")
             do {

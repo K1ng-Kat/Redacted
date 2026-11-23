@@ -385,25 +385,60 @@ struct CampaignSettingsView: View {
 struct CampaignGuideView: View {
     let back: () -> Void
     let begin: () -> Void
+    @AppStorage("redacted.age.mode") private var ageModeRaw = DetectiveAgeMode.investigator.rawValue
+
+    private var ageMode: DetectiveAgeMode {
+        DetectiveAgeMode(rawValue: ageModeRaw) ?? .investigator
+    }
 
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 16) {
-                ScreenHeader(title: "HOW TO PLAY", subtitle: "LEARN IN 30 SECONDS", back: back)
-                instruction("1", "READ THE CASE", "Each level starts with a tiny mystery and one clear objective.",
+                ScreenHeader(title: "HOW TO PLAY", subtitle: "THE CASEWORK PLAYBOOK", back: back)
+                GameCard(accent: Art.cyan) {
+                    VStack(alignment: .leading, spacing: 7) {
+                        GameKicker(text: "YOUR DETECTIVE PROFILE", color: Art.cyan)
+                        Text(ageMode.title.uppercased())
+                            .font(.system(size: 19, weight: .black, design: .rounded))
+                            .foregroundStyle(Art.paper)
+                        Text(ageMode.introduction)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Art.faded)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text("\(CaseEvidence.requiredEvidenceCount(for: ageMode)) verified \(CaseEvidence.requiredEvidenceCount(for: ageMode) == 1 ? "source" : "sources") to pin · \(ageMode.attemptsAllowed) attempts per case")
+                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                            .foregroundStyle(Art.gold)
+                    }
+                }
+                instruction("1", "OPEN THE CASE FILE",
+                            "Read the briefing. The answer isn't always in the opening text—check the records.",
                             symbol: "doc.text.magnifyingglass", color: Art.cyan)
-                instruction("2", "TAP, THINK, SOLVE", "Look for hidden objects, arrange events, decode words and solve puzzles using evidence.",
-                            symbol: "hand.point.up.left.fill", color: Art.gold)
-                instruction("3", "EARN YOUR STARS", "A wrong answer ends the attempt. Finish without mistakes or hints to earn 3 stars.",
+                instruction("2", "CHECK THE EVIDENCE",
+                            "Pin authentic records that support the case. You can unpin them by tapping again. Rumors and unrelated records can mislead you.",
+                            symbol: "pin.circle.fill", color: Art.gold)
+                instruction("3", "SOLVE THE PUZZLE",
+                            "Rebuild timelines, decode messages, test radio signals and make the strongest supported choice.",
+                            symbol: "hand.point.up.left.fill", color: Art.cyan)
+                if ageMode.needsClosingArgument {
+                    instruction("4", "DEFEND YOUR DEDUCTION",
+                                "Choose why the verified records prove your answer. A lucky guess isn't enough.",
+                                symbol: "text.book.closed.fill", color: Art.coral)
+                }
+                instruction(ageMode.needsClosingArgument ? "5" : "4",
+                            "EARN YOUR STARS",
+                            "Wrong submissions reduce your score; use fewer attempts and no hints for the best result. Every cleared case keeps its highest star rating.",
                             symbol: "star.fill", color: Art.mint)
-                instruction("4", "LEVEL UP", "New cases award coins and XP. Later detective identities require more XP and come with new looks.",
+                instruction(ageMode.needsClosingArgument ? "6" : "5",
+                            "LEVEL UP",
+                            "Complete cases to earn XP and coins. Finish all 10 in a district with 7 perfect results to unlock the next one.",
                             symbol: "rosette", color: Art.coral)
                 GameCard(accent: Art.gold) {
                     VStack(alignment: .leading, spacing: 9) {
                         GameKicker(text: "HINT ECONOMY", color: Art.gold)
-                        Text("You start with 50 coins and 2 free hints. Each new rank gives coins and another hint. Hints cost 30 coins after tickets run out, and reduce your star rating.")
-                            .font(.system(size: 14, weight: .medium))
+                        Text("You start with 2 free hint tickets. After that, revealing a new hint costs 2 crystals. Once revealed, a hint stays visible whenever you revisit that same case, at no additional cost. Using a hint can lower your star rating.")
+                            .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(Art.paper)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 GameButton(title: "LET'S PLAY", icon: "play.fill", action: begin)

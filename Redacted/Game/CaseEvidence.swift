@@ -57,7 +57,7 @@ enum CaseEvidence {
         guard note.corroborated else {
             return CaseEvidenceNote(
                 id: note.id, title: "SOMEONE'S GUESS",
-                detail: "Someone thinks the answer is \(mission.decoys.first ?? "this object"). Nobody checked it. A guess is not the same as proof.",
+                detail: "A witness guesses about the case, but has no photo, test, or checked report to back up the story. A guess is not proof.",
                 symbol: "bubble.left", corroborated: false)
         }
         let detail: String

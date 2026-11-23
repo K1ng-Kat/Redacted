@@ -29,6 +29,11 @@ struct ContentView: View {
             GameBackdrop()
             if setupComplete {
                 swipeNavigation
+                    // Outside the clipped swipe GeometryReader so the bar
+                    // background reaches the actual bottom home indicator.
+                    .safeAreaInset(edge: .bottom, spacing: 0) {
+                        if showsMainTabs { mainTabBar }
+                    }
                     .transition(.opacity)
             } else {
                 AgeOnboardingView { mode in
@@ -209,11 +214,6 @@ struct ContentView: View {
     @ViewBuilder
     private var mainGame: some View {
         screen(for: route)
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                if showsMainTabs {
-                    mainTabBar
-                }
-            }
             .simultaneousGesture(
                 DragGesture(minimumDistance: 45)
                     .onEnded { gesture in
@@ -255,7 +255,7 @@ struct ContentView: View {
                     Rectangle().fill(Art.edge.opacity(0.40))
                         .frame(height: 1)
                 }
-                .ignoresSafeArea(edges: .bottom)
+                .ignoresSafeArea(.container, edges: .bottom)
         }
         .accessibilityElement(children: .contain)
     }

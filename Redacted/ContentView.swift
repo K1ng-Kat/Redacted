@@ -241,27 +241,25 @@ struct ContentView: View {
             )
     }
 
-    // A single contiguous game tab control. Selected backing SLIDES between
-    // cells; no Liquid Glass and no separator gaps or uncovered safe-area band.
+    // Attach directly to the bottom safe-area edge. The background extends
+    // behind the home indicator; the controls never float in a padded capsule.
     private var mainTabBar: some View {
         HStack(spacing: 0) {
             mainTab(.home, symbol: "house.fill", label: "HOME")
             mainTab(.levels, symbol: "square.grid.2x2.fill", label: "CASES")
             mainTab(.multiplayer, symbol: "gamecontroller.fill", label: "DUELS")
             mainTab(.friends, symbol: "person.2.fill", label: "SOCIAL")
-            mainTab(.more, symbol: "square.grid.2x2", label: "MORE")
+            mainTab(.more, symbol: "ellipsis.circle.fill", label: "MORE")
         }
-        .padding(5)
-        .background(Art.blueDeep)
-        .clipShape(RoundedRectangle(cornerRadius: 17))
-        .overlay(RoundedRectangle(cornerRadius: 17)
-            .stroke(Art.edge.opacity(0.35), lineWidth: 1))
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 4)
         .padding(.top, 7)
-        .padding(.bottom, 3)
         .frame(maxWidth: .infinity)
         .background {
             Art.ink
+                .overlay(alignment: .top) {
+                    Rectangle().fill(Art.edge.opacity(0.40))
+                        .frame(height: 1)
+                }
                 .ignoresSafeArea(edges: .bottom)
         }
         .accessibilityElement(children: .contain)
@@ -295,16 +293,15 @@ struct ContentView: View {
                     .minimumScaleFactor(0.78)
             }
             .foregroundStyle(selected ? Art.ink : Art.faded)
-            .frame(maxWidth: .infinity, minHeight: 54)
+            .frame(maxWidth: .infinity, minHeight: 51)
             .background {
                 if selected {
-                    RoundedRectangle(cornerRadius: 13)
+                    RoundedRectangle(cornerRadius: 12)
                         .fill(Art.cyan)
                         .matchedGeometryEffect(id: "tab-slider", in: tabIndicator)
-                        .shadow(color: Art.cyan.opacity(0.20), radius: 10, y: 2)
                 }
             }
-            .contentShape(RoundedRectangle(cornerRadius: 13))
+            .contentShape(Rectangle())
         }
         .buttonStyle(PressGameStyle())
         .accessibilityLabel(target == .friends && onlineCount > 0

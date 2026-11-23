@@ -25,13 +25,18 @@ enum CaseEvidence {
         let visible: [CaseEvidenceNote]
         switch mode {
         case .junior:
-            visible = [records[0], records[2]]
+            // Only two short, readable notes. One is supported and one is a
+            // guess, so younger readers learn the difference without jargon.
+            visible = [simpleNote(records[0], for: mission),
+                       simpleNote(records[2], for: mission)]
         case .explorer:
-            visible = [records[0], records[1], records[2]]
+            visible = [records[0], records[1], simplerDecoy(records[2])]
         case .investigator:
             visible = Array(records.prefix(4))
         case .expert:
-            visible = records
+            // Authentic-looking but irrelevant records are more interesting
+            // than red herrings literally titled "UNVERIFIED".
+            visible = records.map { $0.corroborated ? $0 : nuancedDecoy($0) }
         }
         // A different, reproducible permutation for each level and age mode.
         // Use the same order when the view recomputes or the app restarts.
@@ -45,6 +50,72 @@ enum CaseEvidence {
             }
         }
         return shuffled
+    }
+
+    private static func simpleNote(_ note: CaseEvidenceNote,
+                                   for mission: CampaignMission) -> CaseEvidenceNote {
+        guard note.corroborated else {
+            return CaseEvidenceNote(
+                id: note.id, title: "SOMEONE'S GUESS",
+                detail: "Someone thinks the answer is \(mission.decoys.first ?? "this object"). Nobody checked it. A guess is not the same as proof.",
+                symbol: "bubble.left", corroborated: false)
+        }
+        let detail: String
+        let title: String
+        switch mission.kind {
+        case .findClue:
+            title = "SCENE PHOTOS"
+            detail = "Two photos show the scene before and after. Compare them to find what changed."
+        case .timeline:
+            title = "CAMERA TIME"
+            detail = "The camera shows what happened first. Watch for what had to happen next."
+        case .keypad:
+            title = "LOCK LABEL"
+            detail = "The lock's label ends in \(mission.solution). Use those three numbers."
+        case .contradiction:
+            title = "CHECKED RECORD"
+            detail = "This report was made when the event happened. It can check the witness's story."
+        case .anomaly:
+            title = "REAL ITEM GUIDE"
+            detail = "This guide shows the rule for real items. Find the one that breaks the rule."
+        case .escapeRoute:
+            title = "CAMERA MAP"
+            detail = "The cameras watched the main paths. Find a route they could not see."
+        case .anagram:
+            title = "SAVED LETTERS"
+            detail = "The saved letters are \(scrambledWord(for: mission).map(String.init).joined()). Rearrange all of them into a word."
+        case .signal:
+            title = "RADIO NOTE"
+            detail = "The radio worker wrote \(mission.solution) on the log. Try that channel."
+        case .connect:
+            title = "LAB CHECK"
+            detail = "The lab checked two matching clues. Find the pair that proves the same thing."
+        case .verdict:
+            title = "ACCESS RECORD"
+            detail = "This report shows who had permission to change the system. Who had that job?"
+        }
+        return CaseEvidenceNote(id: note.id, title: title, detail: detail,
+                                symbol: note.symbol, corroborated: true)
+    }
+
+    private static func simplerDecoy(_ note: CaseEvidenceNote) -> CaseEvidenceNote {
+        CaseEvidenceNote(id: note.id, title: "WITNESS TIP",
+                         detail: "This tip was never checked against the incident records. It might be true, but it does not prove anything yet.",
+                         symbol: "bubble.left", corroborated: false)
+    }
+
+    private static func nuancedDecoy(_ note: CaseEvidenceNote) -> CaseEvidenceNote {
+        let title: String
+        switch note.id {
+        case 2: title = "WITNESS INTERVIEW · FILE 03"
+        case 3: title = "ARCHIVE CROSS-REFERENCE"
+        default: title = "SUPPLEMENTAL INCIDENT RECORD"
+        }
+        // Preserve the original caveat in the report. Expert players must
+        // notice why it is insufficient, rather than being told by the title.
+        return CaseEvidenceNote(id: note.id, title: title,
+                                detail: note.detail, symbol: note.symbol,
+                                corroborated: false)
     }
 
     static func requiredEvidenceCount(for mode: DetectiveAgeMode) -> Int {

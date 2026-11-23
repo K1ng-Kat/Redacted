@@ -62,6 +62,11 @@ assert 'selectedSequence.remove(at: chosenPosition)' in mission
 assert '.disabled(chosenPosition != nil)' not in mission
 assert 'usedLetterIndices.remove(at: position)' in mission
 assert '.disabled(usedLetterIndices.contains(index))' not in mission
+# Caseboard content, including hints and the final help card, must scroll into
+# the physical bottom region instead of stopping above a useless blank strip.
+assert '.padding(.bottom, 10)' in mission
+assert '.ignoresSafeArea(.container, edges: .bottom)' in mission
+assert '.padding(.bottom, 26)' not in mission
 
 print("PASS: all Redacted routes and original options available; one loading screen, "
       "offline choice, distinct 3D equipment and future update policy present")

@@ -249,8 +249,14 @@ private enum DetectiveModelFactory {
 
         let nextBlink = SCNAction.run { node in
             let lids = node.childNodes.filter { $0.name == "Blink eyelid" }
-            let close = SCNAction.scaleY(to: 1.0, duration: 0.09)
-            let open = SCNAction.scaleY(to: 0.08, duration: 0.13)
+            let close = SCNAction.customAction(duration: 0.09) { eyelid, elapsed in
+                let fraction = Float(min(1, elapsed / 0.09))
+                eyelid.scale.y = 0.08 + fraction * 0.92
+            }
+            let open = SCNAction.customAction(duration: 0.13) { eyelid, elapsed in
+                let fraction = Float(min(1, elapsed / 0.13))
+                eyelid.scale.y = 1.0 - fraction * 0.92
+            }
             let blink = SCNAction.sequence([close, open])
             for lid in lids { lid.runAction(blink, forKey: "blink") }
         }

@@ -144,6 +144,7 @@ struct DetectiveWardrobeView: View {
 
     @State private var slot: CosmeticSlot = .headwear
     @State private var selectedID = "hat_cap"
+    @State private var isTryingOn = false
     @State private var showSnippetShop = false
     @State private var pendingItem: DetectiveCosmetic?
     @State private var payingCrystals = false
@@ -188,6 +189,11 @@ struct DetectiveWardrobeView: View {
             .frame(maxWidth: .infinity)
         }
         .background(GameBackdrop())
+        .onAppear {
+            selectedID = store.equippedCosmetic(in: slot) ??
+                CosmeticCatalog.items(in: slot).first?.id ?? ""
+            isTryingOn = false
+        }
         .confirmationDialog("PERMANENTLY UNLOCK COSMETIC?",
                             isPresented: Binding(
                                 get: { pendingItem != nil },
@@ -196,6 +202,7 @@ struct DetectiveWardrobeView: View {
             if let item = pendingItem {
                 Button("Unlock \(item.name) for \(payingCrystals ? item.crystalPrice : item.snippetPrice) \(payingCrystals ? "crystals" : "snippets")") {
                     if store.unlockCosmetic(item, crystals: payingCrystals) {
+                        isTryingOn = false
                         GameEffects.shared.success()
                         notice = "\(item.name) permanently unlocked and equipped."
                     } else {
@@ -231,14 +238,15 @@ struct DetectiveWardrobeView: View {
                         .background(Art.gold)
                         .clipShape(Capsule())
                 }
-                DetectiveCharacter(store: store, size: 215, previewCosmetic: selectedItem)
+                DetectiveCharacter(store: store, size: 215,
+                                   previewCosmetic: isTryingOn ? selectedItem : nil)
                     .frame(maxWidth: .infinity)
                     .accessibilityHint("Preview includes the selected item before buying or equipping it")
                 HStack(spacing: 7) {
                     Image(systemName: "eye.fill")
                         .foregroundStyle(Art.cyan)
                         .frame(width: 20, height: 20)
-                    Text("LIVE TRY-ON · SELECT AN ITEM BELOW")
+                    Text(isTryingOn ? "TRY-ON PREVIEW · NOT YET EQUIPPED" : "YOUR EQUIPPED DETECTIVE")
                         .foregroundStyle(Art.faded)
                         .font(.system(size: 10, weight: .heavy, design: .monospaced))
                         .lineLimit(1)
@@ -321,7 +329,8 @@ struct DetectiveWardrobeView: View {
                     Button {
                         withAnimation(.easeInOut(duration: 0.18)) {
                             slot = option
-                            selectedID = CosmeticCatalog.items(in: option).first?.id ?? ""
+                            selectedID = store.equippedCosmetic(in: option) ?? CosmeticCatalog.items(in: option).first?.id ?? ""
+                            isTryingOn = false
                             notice = nil
                         }
                         GameEffects.shared.tap()
@@ -370,14 +379,30 @@ struct DetectiveWardrobeView: View {
         return Button {
             withAnimation(.easeInOut(duration: 0.16)) {
                 selectedID = item.id
+                isTryingOn = true
                 notice = nil
             }
             GameEffects.shared.tap()
         } label: {
             VStack(alignment: .leading, spacing: 7) {
                 ZStack(alignment: .bottomTrailing) {
-                    DetectiveCharacter(store: store, size: 122, previewCosmetic: item)
+                    // A single live 3D actor is kept in the main preview.
+                    // Do not instantiate dozens of SceneKit scenes while
+                    // scrolling the equipment shop.
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Art.ink.opacity(0.62))
+                        .overlay {
+                            VStack(spacing: 7) {
+                                Image(systemName: item.symbol)
+                                    .font(.system(size: 32, weight: .medium))
+                                    .symbolRenderingMode(.hierarchical)
+                                Text(item.slot.label)
+                                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                            }
+                            .foregroundStyle(item.tint)
+                        }
                         .frame(maxWidth: .infinity)
+                        .frame(height: 122)
                         .opacity(rankLocked ? 0.58 : 1)
                     Image(systemName: rankLocked ? "lock.fill"
                           : isEquipped ? "checkmark.circle.fill"
@@ -447,12 +472,14 @@ struct DetectiveWardrobeView: View {
                         GameButton(title: equipped ? "CURRENTLY EQUIPPED" : "EQUIP THIS ITEM",
                                    icon: "checkmark.seal.fill", inactive: equipped) {
                             store.equipCosmetic(item)
+                            isTryingOn = false
                             GameEffects.shared.success()
                             notice = "\(item.name) is now equipped."
                         }
                         if equipped {
                             Button("REMOVE \(slot.label)") {
                                 store.unequipCosmetic(slot: slot)
+                                isTryingOn = false
                                 GameEffects.shared.tap()
                                 notice = "Returned to the default \(slot.label.lowercased())."
                             }

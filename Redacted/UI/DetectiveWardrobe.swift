@@ -107,13 +107,15 @@ struct DetectiveCharacter: View {
     var size: CGFloat = 140
     var previewCosmetic: DetectiveCosmetic? = nil
     var previewTheme: String? = nil
+    var portraitMode = false
 
     @AppStorage("redacted.profile.theme") private var theme = "midnight"
 
     var body: some View {
         Detective3DCharacter(skin: store.skin, hair: store.hair,
                              equipment: loadout,
-                             theme: previewTheme ?? theme, size: size)
+                             theme: previewTheme ?? theme, size: size,
+                             portraitMode: portraitMode)
             .frame(width: size, height: size)
             .clipShape(RoundedRectangle(cornerRadius: size * 0.14))
             .overlay {
@@ -145,6 +147,7 @@ struct DetectiveWardrobeView: View {
     @State private var slot: CosmeticSlot = .headwear
     @State private var selectedID = "hat_cap"
     @State private var isTryingOn = false
+    @State private var showFaceDetail = false
     @State private var showSnippetShop = false
     @State private var pendingItem: DetectiveCosmetic?
     @State private var payingCrystals = false
@@ -238,10 +241,35 @@ struct DetectiveWardrobeView: View {
                         .background(Art.gold)
                         .clipShape(Capsule())
                 }
-                DetectiveCharacter(store: store, size: 215,
-                                   previewCosmetic: isTryingOn ? selectedItem : nil)
+                DetectiveCharacter(store: store, size: 275,
+                                   previewCosmetic: isTryingOn ? selectedItem : nil,
+                                   portraitMode: showFaceDetail)
                     .frame(maxWidth: .infinity)
                     .accessibilityHint("Preview includes the selected item before buying or equipping it")
+                HStack(spacing: 8) {
+                    Button {
+                        showFaceDetail = false
+                        GameEffects.shared.tap()
+                    } label: {
+                        Label("FULL BODY", systemImage: "person.fill")
+                            .frame(maxWidth: .infinity, minHeight: 38)
+                            .foregroundStyle(showFaceDetail ? Art.faded : Art.ink)
+                            .background(showFaceDetail ? Art.ink : Art.cyan)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                    Button {
+                        showFaceDetail = true
+                        GameEffects.shared.tap()
+                    } label: {
+                        Label("FACE DETAIL", systemImage: "face.smiling")
+                            .frame(maxWidth: .infinity, minHeight: 38)
+                            .foregroundStyle(showFaceDetail ? Art.ink : Art.faded)
+                            .background(showFaceDetail ? Art.cyan : Art.ink)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                }
+                .font(.system(size: 10, weight: .black, design: .rounded))
+                .buttonStyle(PressGameStyle())
                 HStack(spacing: 7) {
                     Image(systemName: "eye.fill")
                         .foregroundStyle(Art.cyan)

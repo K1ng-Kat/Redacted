@@ -343,7 +343,7 @@ private enum DetectiveModelFactory {
         mannequin.addChildNode(head)
         makeFace(into: head, skin: color)
         makeHair(into: head, style: hair,
-                 wearingHeadwear: equipment[.headwear] != nil)
+                 headwear: equipment[.headwear])
         makeEyewear(into: head, id: equipment[.eyewear])
         makeHeadwear(into: head, id: equipment[.headwear])
         makeBadge(into: mannequin, id: equipment[.badge])
@@ -622,67 +622,122 @@ private enum DetectiveModelFactory {
     }
 
     private static func makeHair(into head: SCNNode, style: DetectiveHair,
-                                 wearingHeadwear: Bool) {
-        // Hair is actually hidden beneath a worn hat. Previously the full
-        // crown intersected the hat, making berets and caps float.
-        // Short side hair remains at the temples for a natural hairline.
+                                 headwear: String?) {
+        // Keep the four silhouettes different. A hat compresses the crown;
+        // it must not delete the fringe and sideburns that identify the haircut.
+        let coveredCrown = headwear != nil && headwear != "hat_visor"
+        let hood = headwear == "hat_hood"
+        let cutShort = style == .cropped
+        let swept = style == .swept
+        let textured = style == .textured
+
+        // Real temple/side hair, shaped differently on each side and per cut.
+        // These remain visible beneath a fitted cap or beret.
         for side in [-1.0, 1.0] {
-            let sideLock = ellipsoid("Hair at temple", hairColor,
-                                     Float(side) * 0.091, 0.204, 0.006,
-                                     0.018, 0.044, 0.064, roughness: 0.96)
+            let s = Float(side)
+            let sideWidth: CGFloat = cutShort ? 0.012 : textured ? 0.021 : 0.017
+            let sideLength: CGFloat = cutShort ? 0.028 :
+                swept && side < 0 ? 0.065 : 0.051
+            let sideLock = ellipsoid("Visible \(style.rawValue) sideburn", hairColor,
+                                     s * 0.097, 0.203 - Float(sideLength) * 0.12,
+                                     0.011,
+                                     sideWidth, sideLength, 0.050,
+                                     roughness: 0.97)
             head.addChildNode(sideLock)
         }
-        guard !wearingHeadwear else { return }
 
-        let foundationHeight: CGFloat = style == .cropped ? 0.035 : 0.055
-        head.addChildNode(ellipsoid("Scalp hair", hairColor, 0, 0.249, -0.017,
-                                    0.107, foundationHeight, 0.102,
-                                    roughness: 0.96))
-        let count = style == .cropped ? 29 : style == .textured ? 47 : 31
-        for i in 0..<count {
-            let theta = Float(i) * 2.3999632
-            let radius = Float(sqrt(Double(i + 1) / Double(count + 2))) * 0.083
-            let x = cos(theta) * radius
-            let z = sin(theta) * radius
-            let front = z > 0.020
-            let offset: Float
-            let height: CGFloat
-            let breadth: CGFloat
-            switch style {
-            case .cropped:
-                offset = 0
-                height = 0.009 + CGFloat(i % 3) * 0.002
-                breadth = 0.012
-            case .classic:
-                offset = x > 0 ? 0.004 : -0.003
-                height = 0.017 + CGFloat(i % 3) * 0.003
-                breadth = 0.015
-            case .textured:
-                offset = front ? 0.003 : 0
-                height = 0.019 + CGFloat(i % 7) * 0.004
-                breadth = 0.012
-            case .swept:
-                offset = 0.013
-                height = front ? 0.025 : 0.017
-                breadth = 0.014
+        if !coveredCrown {
+            let crownHeight: CGFloat = cutShort ? 0.023 :
+                textured ? 0.060 : swept ? 0.047 : 0.037
+            head.addChildNode(ellipsoid("Rooted \(style.rawValue) hair crown",
+                                         hairColor, 0, 0.254, -0.016,
+                                         0.103, crownHeight, 0.095,
+                                         roughness: 0.97))
+            let count = cutShort ? 28 : textured ? 54 : swept ? 39 : 36
+            for i in 0..<count {
+                let theta = Float(i) * 2.3999632
+                let radius = Float(sqrt(Double(i + 1) / Double(count + 1))) * 0.090
+                let x = cos(theta) * radius
+                let z = sin(theta) * radius - 0.016
+                let height: CGFloat
+                let width: CGFloat
+                switch style {
+                case .classic:
+                    height = 0.018 + CGFloat(i % 4) * 0.003
+                    width = 0.018
+                case .textured:
+                    height = 0.033 + CGFloat(i % 6) * 0.006
+                    width = 0.013
+                case .swept:
+                    height = 0.026 + CGFloat(i % 4) * 0.005
+                    width = 0.015
+                case .cropped:
+                    height = 0.008 + CGFloat(i % 3) * 0.003
+                    width = 0.013
+                }
+                let strand = ellipsoid("\(style.rawValue) sculpted hair clump",
+                                       hairColor,
+                                       x + (swept ? 0.011 : 0),
+                                       0.267 + Float(height) * 0.31,
+                                       z,
+                                       width, height, width * 0.90,
+                                       roughness: 0.97)
+                strand.eulerAngles.z = swept ? -0.58 :
+                    textured ? Float(i % 5 - 2) * 0.21 :
+                    cutShort ? 0 : -0.11
+                head.addChildNode(strand)
             }
-            let strand = ellipsoid("Groomed hair strand", hairColor,
-                                   x + offset, 0.271 + Float(height) * 0.35, z,
-                                   breadth, height, breadth * 1.21,
-                                   roughness: 0.96)
-            strand.eulerAngles.z = style == .swept ? -0.29 :
-                                    style == .classic ? -0.08 : Float(i % 3 - 1) * 0.08
-            head.addChildNode(strand)
         }
-        if style == .swept || style == .textured {
-            let amount = style == .swept ? 10 : 12
-            for i in 0..<amount {
-                let x = Float(i) / Float(max(1, amount - 1)) * 0.168 - 0.084
-                head.addChildNode(ellipsoid("Forehead fringe", hairColor,
-                                             x + (style == .swept ? 0.008 : 0),
-                                             0.244 + Float(i % 3) * 0.004, 0.087,
-                                             0.011, style == .swept ? 0.022 : 0.014,
-                                             0.012, roughness: 0.98))
+
+        // Distinct front hairline is intentionally *below* the hat band.
+        // All local coordinates are in head space, so head turns keep the
+        // fringe, temples and headwear together.
+        guard !hood else { return }
+        switch style {
+        case .classic:
+            // Neat side part with a low, controlled front edge.
+            for i in 0..<9 {
+                let x = Float(i) * 0.018 - 0.075
+                let part = ellipsoid("Classic parted fringe", hairColor,
+                                     x, 0.242 + (i > 6 ? 0.007 : 0),
+                                     0.091,
+                                     0.012, 0.017, 0.015, roughness: 0.97)
+                part.eulerAngles.z = -0.20
+                head.addChildNode(part)
+            }
+        case .textured:
+            // Loose, forward clumps that remain visible with a hat.
+            for i in 0..<12 {
+                let x = Float(i) * 0.014 - 0.077
+                let droop = Float(i % 4) * 0.004
+                let curl = ellipsoid("Textured forward curl", hairColor,
+                                      x, 0.240 - droop, 0.106,
+                                      0.011, 0.020 + CGFloat(i % 3) * 0.004,
+                                      0.014, roughness: 0.97)
+                curl.eulerAngles.z = Float(i % 5 - 2) * 0.24
+                head.addChildNode(curl)
+            }
+        case .swept:
+            // Strong diagonal sweep: largest locks fall to one side.
+            for i in 0..<9 {
+                let t = Float(i) / 8
+                let lock = ellipsoid("Side swept long fringe", hairColor,
+                                      -0.079 + t * 0.167,
+                                      0.260 - t * 0.022,
+                                      0.100,
+                                      0.015, 0.026, 0.017,
+                                      roughness: 0.97)
+                lock.eulerAngles.z = -0.67
+                head.addChildNode(lock)
+            }
+        case .cropped:
+            // The short cut has a crisp outline, not a fake long fringe.
+            for i in 0..<10 {
+                let x = Float(i) * 0.016 - 0.072
+                head.addChildNode(ellipsoid("Cropped hairline", hairColor,
+                                             x, 0.247, 0.087,
+                                             0.010, 0.007, 0.009,
+                                             roughness: 0.97))
             }
         }
     }

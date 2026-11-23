@@ -118,9 +118,14 @@ struct MissionPlayView: View {
                 .frame(maxWidth: 600)
                 .padding(.horizontal, 17)
                 .padding(.top, 10)
-                .padding(.bottom, 26)
+                .padding(.bottom, 10)
                 .frame(maxWidth: .infinity)
             }
+            // The previous inset ended scrolling above the home indicator,
+            // leaving the unused strip circled on the case screen. Let
+            // the caseboard scroll into the bottom edge while the full-bleed
+            // game backdrop continues behind the system gesture region.
+            .ignoresSafeArea(.container, edges: .bottom)
         }
         .preferredColorScheme(.dark)
         .confirmationDialog("Reveal a detective hint?", isPresented: $confirmingHint,

@@ -51,6 +51,8 @@ struct MissionPlayView: View {
     private var evidenceNeeded: Int {
         CaseEvidence.requiredEvidenceCount(for: ageMode)
     }
+    private var attemptLimit: Int { ageMode.attemptsAllowed }
+    private var attemptsRemaining: Int { max(0, attemptLimit - mistakes) }
 
     var body: some View {
         ZStack {
@@ -143,7 +145,9 @@ struct MissionPlayView: View {
             if coaching {
                 GameCoachOverlay(
                     title: mission.id == 1 ? "WELCOME, DETECTIVE!" : "NEW DISTRICT!",
-                    detail: "Investigate the records, pin the corroborating evidence, then make your deduction. Three unsupported attempts close a case. Aim for 3 stars!",
+                    detail: ageMode == .junior
+                        ? "Pick the checked clue, solve the puzzle and earn stars. You can try up to five times!"
+                        : "Compare the sources, pin good evidence and solve the puzzle. You have \(attemptLimit) attempts to make your case.",
                     button: "START INVESTIGATION",
                     symbol: "magnifyingglass",
                     portraitTheme: nil
@@ -198,6 +202,20 @@ struct MissionPlayView: View {
 
     private var missionIntro: some View {
         VStack(alignment: .leading, spacing: 11) {
+            HStack(spacing: 10) {
+                Label(ageMode == .junior ? "JUNIOR DETECTIVE" :
+                      ageMode == .explorer ? "EXPLORER" :
+                      ageMode == .investigator ? "INVESTIGATOR" : "EXPERT",
+                      systemImage: "shield.checkered")
+                    .font(.system(size: 11, weight: .black, design: .monospaced))
+                    .foregroundStyle(Art.cyan)
+                Spacer()
+                Label("\(attemptsRemaining) ATTEMPTS LEFT", systemImage: "heart.text.square.fill")
+                    .font(.system(size: 10, weight: .heavy, design: .monospaced))
+                    .foregroundStyle(attemptsRemaining <= 1 ? Art.coral : Art.gold)
+                    .monospacedDigit()
+            }
+            .padding(.horizontal, 3)
             ZStack(alignment: .bottomLeading) {
                 DistrictIllustration(episode: mission.episode)
                 LinearGradient(colors: [.clear, Art.ink.opacity(0.9)],
@@ -262,8 +280,8 @@ struct MissionPlayView: View {
                     .monospacedDigit()
             }
             Text(evidenceVerified
-                 ? "Your verified evidence has been filed. Review the record before finalizing your deduction."
-                 : "Not everything in the case file is reliable. Compare the source, timestamp and direct connection to the incident. Select independent records that support the case.")
+                 ? "Your evidence has been filed. Review the records if you need to double-check your deduction."
+                 : ageMode.sourceGuidance)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(Art.faded)
                 .fixedSize(horizontal: false, vertical: true)
@@ -356,7 +374,7 @@ struct MissionPlayView: View {
                         .foregroundStyle(Art.paper)
                 }
             }
-            Text("Your conclusion fits the puzzle. Now defend it: which reasoning is supported by the two verified records? A guess isn't enough to close the case.")
+            Text("Your answer fits the puzzle. Which explanation is actually supported by the verified evidence? Select the strongest reasoning to close the case.")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(Art.faded)
                 .fixedSize(horizontal: false, vertical: true)
@@ -417,11 +435,10 @@ struct MissionPlayView: View {
     private func recordMistake(_ reason: String) {
         mistakes += 1
         GameEffects.shared.mistake()
-        if mistakes >= 3 {
+        if mistakes >= attemptLimit {
             attemptFailed = true
             feedback = nil
         } else {
-            let attemptsRemaining = 3 - mistakes
             feedback = reason + " \(attemptsRemaining) \(attemptsRemaining == 1 ? "attempt" : "attempts") remaining."
         }
     }
@@ -590,7 +607,7 @@ struct MissionPlayView: View {
 
     private var keypadPuzzle: some View {
         VStack(spacing: 17) {
-            if ageMode == .investigator || ageMode == .expert {
+            if ageMode.needsClosingArgument {
                 Text(adjusted.instruction)
                     .font(.system(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(Art.gold)
@@ -633,7 +650,7 @@ struct MissionPlayView: View {
                 if typed.count == 3 {
                     let valid = typed == adjusted.actualCode
                     if !valid { typed = "" }
-                    check(valid, wrongText: "That combination didn't unlock it. Try the clue in the case brief.")
+                    check(valid, wrongText: "That combination didn't unlock it. Review the identifier and lock protocol on your caseboard.")
                 }
             } else if typed.count < 3 {
                 typed += title
@@ -777,7 +794,7 @@ struct MissionPlayView: View {
             }
             GameButton(title: "Lock frequency", icon: "waveform.path") {
                 check(abs(frequency - adjusted.frequency) < 2.6,
-                      wrongText: "No clear signal at this frequency. Try the frequency mentioned in the case.")
+                      wrongText: "No clear signal at this setting. Compare the transmitter log with the active receiver calibration.")
             }
         }
     }
@@ -840,7 +857,7 @@ struct MissionPlayView: View {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "info.circle.fill")
                     .foregroundStyle(Art.cyan)
-                Text("Your case closes after three unsupported submissions. Read the source records carefully. Unlock the next district by clearing all 10 cases and earning 3 stars on at least 7.")
+                Text("You have \(attemptLimit) attempts per case. Verify sources before making deductions. Complete all 10 cases and earn 3 stars on at least 7 to unlock the next district.")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Art.faded)
                     .fixedSize(horizontal: false, vertical: true)
@@ -855,7 +872,7 @@ struct MissionPlayView: View {
                     .font(.system(size: 54))
                     .foregroundStyle(Art.coral)
                 GameTitle(text: "CASE FAILED", size: 34)
-                Text("Three unsupported deductions exhausted this investigation. Review the evidence, then retry the case with a new approach.")
+                Text("Your \(attemptLimit) attempts are used up. Review the evidence and retry the case with a new plan.")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Art.faded)
                     .multilineTextAlignment(.center)

@@ -1,4 +1,5 @@
 import SceneKit
+import Metal
 import SwiftUI
 import UIKit
 
@@ -85,12 +86,160 @@ struct Detective3DCharacter: UIViewRepresentable {
     }
 }
 
+/// Static item-only renders of the *same SceneKit meshes* as the actor.
+/// One 320px Metal snapshot per cosmetic ID is cached so a scrolling grid
+/// never creates dozens of continuously-rendering 3D characters.
+struct CosmeticItemThumbnail: View {
+    let item: DetectiveCosmetic
+    @State private var image: UIImage?
+
+    var body: some View {
+        ZStack {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .padding(7)
+                    .transition(.opacity)
+            } else {
+                ProgressView()
+                    .tint(Art.cyan)
+                    .accessibilityLabel("Rendering cosmetic preview")
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .task(id: item.id) {
+            if let saved = CosmeticPreviewCache.cached(item.id) {
+                image = saved
+                return
+            }
+            image = nil
+            // Allows the item grid to paint before starting its first
+            // GPU snapshot. All subsequent appearances use the cache.
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            image = CosmeticPreviewCache.render(item)
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+@MainActor
+private enum CosmeticPreviewCache {
+    private static let images: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        cache.countLimit = 48
+        return cache
+    }()
+
+    static func cached(_ id: String) -> UIImage? {
+        images.object(forKey: id as NSString)
+    }
+
+    static func render(_ item: DetectiveCosmetic) -> UIImage? {
+        if let old = cached(item.id) { return old }
+        guard let device = MTLCreateSystemDefaultDevice() else { return nil }
+        let scene = DetectiveModelFactory.makeCosmeticPreview(item)
+        let renderer = SCNRenderer(device: device, options: nil)
+        renderer.scene = scene
+        renderer.autoenablesDefaultLighting = false
+        renderer.pointOfView = scene.rootNode.childNode(
+            withName: "Cosmetic product camera", recursively: false)
+        let result = renderer.snapshot(
+            atTime: 0,
+            with: CGSize(width: 320, height: 320),
+            antialiasingMode: .multisampling4X)
+        images.setObject(result, forKey: item.id as NSString)
+        return result
+    }
+}
+
 private enum DetectiveModelFactory {
     private static let navy = UIColor(red: 0.14, green: 0.18, blue: 0.24, alpha: 1)
     private static let fabricDark = UIColor(red: 0.085, green: 0.11, blue: 0.16, alpha: 1)
     private static let shirt = UIColor(red: 0.64, green: 0.68, blue: 0.72, alpha: 1)
     private static let metal = UIColor(red: 0.78, green: 0.81, blue: 0.85, alpha: 1)
     private static let hairColor = UIColor(red: 0.105, green: 0.078, blue: 0.065, alpha: 1)
+
+    /// Item only, never a disguised cropped avatar or a generic SF Symbol.
+    /// Every slot calls the same mesh builders used in `make(skin:...)`.
+    static func makeCosmeticPreview(_ item: DetectiveCosmetic) -> SCNScene {
+        let scene = SCNScene()
+        scene.background.contents = UIColor.clear
+
+        let product = SCNNode()
+        product.name = "Isolated cosmetic"
+        scene.rootNode.addChildNode(product)
+        let geometry = SCNNode()
+        product.addChildNode(geometry)
+
+        switch item.slot {
+        case .headwear:
+            makeHeadwear(into: geometry, id: item.id)
+            // Original head-local headwear center is around y=0.30.
+            geometry.position = SCNVector3(0, -0.30, 0)
+            product.scale = SCNVector3(1.65, 1.65, 1.65)
+
+        case .eyewear:
+            makeEyewear(into: geometry, id: item.id)
+            geometry.position = SCNVector3(0, -0.16, -0.125)
+            product.scale = SCNVector3(2.15, 2.15, 2.15)
+
+        case .badge:
+            makeBadge(into: geometry, id: item.id)
+            // Badges live on the torso at (0.13, 1.52, 0.19).
+            geometry.position = SCNVector3(-0.13, -1.52, -0.19)
+            product.scale = SCNVector3(5.0, 5.0, 5.0)
+
+        case .coat:
+            let jacket = coatColor(item.id)
+            geometry.addChildNode(tailoredTorso(color: jacket))
+            for side in [-1.0, 1.0] {
+                geometry.addChildNode(segment("Coat sleeve", jacket,
+                    from: SCNVector3(Float(side) * 0.224, 1.560, 0),
+                    to: SCNVector3(Float(side) * 0.260, 1.205, 0.014),
+                    radius: 0.073))
+                let lapel = box("Matching coat lapel", jacket,
+                                width: 0.067, height: 0.215, length: 0.024,
+                                x: Float(side) * 0.092, y: 1.517, z: 0.144,
+                                chamfer: 0.011)
+                lapel.eulerAngles.z = Float(side) * -0.15
+                geometry.addChildNode(lapel)
+            }
+            makeCoatDetails(into: geometry, id: item.id, base: jacket)
+            geometry.position = SCNVector3(0, -1.415, 0)
+            product.scale = SCNVector3(0.93, 0.93, 0.93)
+        }
+
+        // Rotate just enough to reveal the item depth and silhouette.
+        product.eulerAngles.y = 0.18
+
+        let ambient = SCNNode()
+        ambient.light = SCNLight()
+        ambient.light?.type = .ambient
+        ambient.light?.intensity = 130
+        ambient.light?.color = UIColor(white: 0.92, alpha: 1)
+        scene.rootNode.addChildNode(ambient)
+
+        scene.rootNode.addChildNode(light(
+            at: SCNVector3(-1.0, 1.5, 2.6), intensity: 590,
+            color: UIColor(red: 1.0, green: 0.95, blue: 0.91, alpha: 1)))
+        scene.rootNode.addChildNode(light(
+            at: SCNVector3(1.0, 0.8, -1.2), intensity: 210,
+            color: UIColor(red: 0.62, green: 0.77, blue: 1.0, alpha: 1)))
+
+        let camera = SCNNode()
+        camera.name = "Cosmetic product camera"
+        camera.camera = SCNCamera()
+        camera.camera?.wantsHDR = false
+        camera.camera?.wantsExposureAdaptation = false
+        camera.camera?.fieldOfView = 35
+        camera.camera?.zNear = 0.02
+        camera.position = SCNVector3(0, 0.03, 1.18)
+        camera.look(at: SCNVector3(0, 0, 0))
+        scene.rootNode.addChildNode(camera)
+        return scene
+    }
 
     static func make(skin: DetectiveSkin, hair: DetectiveHair,
                      equipment: [CosmeticSlot: String], theme: String,

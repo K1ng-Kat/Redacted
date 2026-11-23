@@ -29,6 +29,8 @@ struct MissionPlayView: View {
     @State private var pinnedEvidence: Set<Int> = []
     @State private var evidenceVerified = false
     @State private var showingVerifiedRecords = false
+    @State private var deductionSolved = false
+    @State private var selectedTheory: Int?
     // A redeemed clue belongs to the saved case, not one temporary view.
     // This also refreshes automatically after a cloud-save restoration.
     private var hintUsed: Bool { store.hasRevealedHint(for: mission.id) }
@@ -90,7 +92,11 @@ struct MissionPlayView: View {
                             }
                             .padding(.horizontal, 3)
                             if showingVerifiedRecords { evidenceBoard }
-                            puzzle
+                            if deductionSolved {
+                                closingArguments
+                            } else {
+                                puzzle
+                            }
                         } else {
                             evidenceBoard
                         }
@@ -334,6 +340,77 @@ struct MissionPlayView: View {
         .overlay {
             RoundedRectangle(cornerRadius: 18)
                 .strokeBorder(Art.gold.opacity(0.28), lineWidth: 1)
+        }
+    }
+
+    private var closingArguments: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 9) {
+                Image(systemName: "text.book.closed.fill")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(Art.gold)
+                VStack(alignment: .leading, spacing: 4) {
+                    GameKicker(text: "CLOSING ARGUMENT", color: Art.gold)
+                    Text("EXPLAIN YOUR DEDUCTION")
+                        .font(.system(size: 20, weight: .black, design: .rounded))
+                        .foregroundStyle(Art.paper)
+                }
+            }
+            Text("Your conclusion fits the puzzle. Now defend it: which reasoning is supported by the two verified records? A guess isn't enough to close the case.")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Art.faded)
+                .fixedSize(horizontal: false, vertical: true)
+
+            ForEach(CaseEvidence.theories(for: mission)) { theory in
+                Button {
+                    GameEffects.shared.tap()
+                    selectedTheory = selectedTheory == theory.id ? nil : theory.id
+                    feedback = nil
+                } label: {
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: selectedTheory == theory.id
+                              ? "checkmark.circle.fill" : "circle")
+                            .font(.system(size: 23))
+                            .foregroundStyle(selectedTheory == theory.id ? Art.mint : Art.gold)
+                        Text(theory.statement)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Art.paper)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(13)
+                    .background(Art.blueDeep)
+                    .clipShape(RoundedRectangle(cornerRadius: 15))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 15)
+                            .strokeBorder(selectedTheory == theory.id
+                                          ? Art.mint : Art.edge.opacity(0.45),
+                                          lineWidth: selectedTheory == theory.id ? 2 : 1)
+                    }
+                    .contentShape(RoundedRectangle(cornerRadius: 15))
+                }
+                .buttonStyle(PressGameStyle())
+                .accessibilityHint("Select or deselect this explanation")
+            }
+            GameButton(title: "CLOSE THE CASE", icon: "checkmark.seal.fill",
+                       inactive: selectedTheory == nil) {
+                guard let selection = selectedTheory else { return }
+                if CaseEvidence.theories(for: mission)
+                    .contains(where: { $0.id == selection && $0.supported }) {
+                    finalizeCase()
+                } else {
+                    selectedTheory = nil
+                    recordMistake("Your explanation does not account for the verified evidence. Reconsider the chain of proof.")
+                }
+            }
+        }
+        .padding(15)
+        .background(Art.ink.opacity(0.6))
+        .clipShape(RoundedRectangle(cornerRadius: 19))
+        .overlay {
+            RoundedRectangle(cornerRadius: 19)
+                .strokeBorder(Art.gold.opacity(0.36), lineWidth: 1)
         }
     }
 
@@ -814,6 +891,8 @@ struct MissionPlayView: View {
         pinnedEvidence = []
         evidenceVerified = false
         showingVerifiedRecords = false
+        deductionSolved = false
+        selectedTheory = nil
         mistakes = 0
         feedback = nil
         // Previously redeemed hints stay revealed on retry and revisit.
@@ -922,18 +1001,29 @@ struct MissionPlayView: View {
     private func check(_ success: Bool, wrongText: String? = nil) {
         guard payout == nil else { return }
         if success {
-            let previousRank = store.accountLevel
             GameEffects.shared.success()
             feedback = nil
-            payout = store.complete(mission.id, mistakes: mistakes, hintUsed: hintUsed)
-            if let payout,
-               let identity = DetectiveIdentity.latestUnlocked(
-                    previous: previousRank, current: payout.newRank) {
-                newIdentityTheme = identity.theme
-                newIdentityTitle = identity.name
+            if ageMode == .investigator || ageMode == .expert {
+                deductionSolved = true
+            } else {
+                finalizeCase()
             }
         } else {
             recordMistake(wrongText ?? "That deduction is not supported by the evidence.")
+        }
+    }
+
+    private func finalizeCase() {
+        guard payout == nil, !attemptFailed else { return }
+        let previousRank = store.accountLevel
+        GameEffects.shared.success()
+        feedback = nil
+        payout = store.complete(mission.id, mistakes: mistakes, hintUsed: hintUsed)
+        if let payout,
+           let identity = DetectiveIdentity.latestUnlocked(
+                previous: previousRank, current: payout.newRank) {
+            newIdentityTheme = identity.theme
+            newIdentityTitle = identity.name
         }
     }
 }

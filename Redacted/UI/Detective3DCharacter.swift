@@ -97,7 +97,7 @@ private enum DetectiveModelFactory {
                      closeup: Bool, animated: Bool) -> SCNScene {
         let scene = SCNScene()
         scene.background.contents = UIColor.clear
-        let color = UIColor(skin.color)
+        let color = balancedSkinColor(skin)
         let jacket = coatColor(equipment[.coat])
         let mannequin = SCNNode()
         scene.rootNode.addChildNode(mannequin)
@@ -169,19 +169,14 @@ private enum DetectiveModelFactory {
         head.position = SCNVector3(0, 1.700, 0)
         mannequin.addChildNode(head)
         makeFace(into: head, skin: color)
-        makeHair(into: head, style: hair)
+        makeHair(into: head, style: hair,
+                 wearingHeadwear: equipment[.headwear] != nil)
         makeEyewear(into: head, id: equipment[.eyewear])
         makeHeadwear(into: head, id: equipment[.headwear])
         makeBadge(into: mannequin, id: equipment[.badge])
 
         if animated {
-            let a = SCNAction.rotateTo(x: 0.005, y: 0.038, z: 0,
-                                       duration: 3.0, usesShortestUnitArc: true)
-            let b = SCNAction.rotateTo(x: -0.005, y: -0.035, z: 0,
-                                       duration: 3.2, usesShortestUnitArc: true)
-            a.timingMode = .easeInEaseOut
-            b.timingMode = .easeInEaseOut
-            head.runAction(.repeatForever(.sequence([a, b])))
+            startNaturalIdle(head: head, body: mannequin)
         }
 
         // Physically based studio lighting, soft contact shadow and camera.
@@ -194,18 +189,19 @@ private enum DetectiveModelFactory {
         let ambient = SCNNode()
         ambient.light = SCNLight()
         ambient.light?.type = .ambient
-        ambient.light?.intensity = 360
-        ambient.light?.color = UIColor(white: 0.78, alpha: 1)
+        ambient.light?.intensity = 115
+        ambient.light?.color = UIColor(white: 0.82, alpha: 1)
         scene.rootNode.addChildNode(ambient)
 
-        let key = light(at: SCNVector3(-1.8, 3.6, 3.0),
-                        intensity: 1070, color: UIColor(white: 0.95, alpha: 1))
+        let key = light(at: SCNVector3(-2.0, 3.0, 3.2),
+                        intensity: 480, color: UIColor(red: 1, green: 0.94,
+                                                        blue: 0.88, alpha: 1))
         key.light?.castsShadow = true
         key.light?.shadowRadius = 9
         key.light?.shadowSampleCount = 12
         scene.rootNode.addChildNode(key)
         scene.rootNode.addChildNode(light(at: SCNVector3(2.3, 2.6, -1.5),
-                                        intensity: 690,
+                                        intensity: 180,
                                         color: UIColor(red: 0.47, green: 0.69,
                                                        blue: 0.88, alpha: 1)))
 
@@ -213,8 +209,8 @@ private enum DetectiveModelFactory {
         camera.name = "Detective camera"
         camera.camera = SCNCamera()
         camera.camera?.fieldOfView = closeup ? 37 : 34
-        camera.camera?.wantsHDR = true
-        camera.camera?.exposureOffset = -0.08
+        camera.camera?.wantsHDR = false
+        camera.camera?.exposureOffset = -0.65
         camera.position = closeup
             ? SCNVector3(0, 1.80, 1.08)
             : SCNVector3(0, 1.12, 3.55)
@@ -223,6 +219,18 @@ private enum DetectiveModelFactory {
         camera.camera?.zNear = 0.025
         scene.rootNode.addChildNode(camera)
         return scene
+    }
+
+    /// Tone-map face material before lights; the previous near-white skin
+    /// combined with three intense lights washed away all facial detail.
+    private static func balancedSkinColor(_ skin: DetectiveSkin) -> UIColor {
+        let original = UIColor(skin.color)
+        var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+        guard original.getRed(&red, green: &green, blue: &blue, alpha: &alpha) else {
+            return original
+        }
+        return UIColor(red: red * 0.89, green: green * 0.89,
+                       blue: blue * 0.89, alpha: 1)
     }
 
     private static func material(_ color: UIColor,

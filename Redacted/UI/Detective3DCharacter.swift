@@ -137,6 +137,7 @@ private enum DetectiveModelFactory {
         mannequin.addChildNode(ellipsoid("Hip", navy, 0, 1.09, 0,
                                         0.193, 0.184, 0.108))
         mannequin.addChildNode(tailoredTorso(color: jacket))
+        makeCoatDetails(into: mannequin, id: equipment[.coat], base: jacket)
         mannequin.addChildNode(box("Shirt placket", shirt,
                                   width: 0.112, height: 0.370, length: 0.015,
                                   x: 0, y: 1.420, z: 0.137,
@@ -613,18 +614,115 @@ private enum DetectiveModelFactory {
 
     private static func makeBadge(into body: SCNNode, id: String?) {
         guard let id else { return }
-        let gold = id.contains("bronze") ? UIColor(red: 0.62, green: 0.40,
-                                                  blue: 0.22, alpha: 1) :
-                   id.contains("silver") || id.contains("diamond")
-                     ? metal : UIColor(red: 0.85, green: 0.65, blue: 0.30, alpha: 1)
-        let shield = box("Metal agency badge", gold,
-                         width: 0.047, height: 0.058, length: 0.008,
-                         x: 0.142, y: 1.522, z: 0.146, chamfer: 0.010,
-                         metalness: 0.94)
-        body.addChildNode(shield)
-        body.addChildNode(ellipsoid("Badge emblem", metal,
-                                    0.142, 1.528, 0.152,
-                                    0.010, 0.011, 0.003, roughness: 0.24))
+        let gold = UIColor(red: 0.86, green: 0.69, blue: 0.36, alpha: 1)
+        let steel = UIColor(red: 0.82, green: 0.88, blue: 0.92, alpha: 1)
+        let metal: UIColor
+        let symbol: String
+        switch id {
+        case "badge_bronze":
+            metal = UIColor(red: 0.71, green: 0.43, blue: 0.24, alpha: 1)
+            symbol = "★"
+        case "badge_silver":
+            metal = steel; symbol = "★"
+        case "badge_gold":
+            metal = gold; symbol = "★"
+        case "badge_compass":
+            metal = gold; symbol = "✦"
+        case "badge_case":
+            metal = UIColor(red: 0.31, green: 0.77, blue: 0.89, alpha: 1)
+            symbol = "✓"
+        case "badge_onyx":
+            metal = UIColor(red: 0.20, green: 0.24, blue: 0.29, alpha: 1)
+            symbol = "◆"
+        case "badge_diamond":
+            metal = steel; symbol = "◆"
+        case "badge_royal":
+            metal = gold; symbol = "♛"
+        case "badge_neon":
+            metal = UIColor(red: 0.18, green: 0.88, blue: 0.92, alpha: 1)
+            symbol = "✦"
+        case "badge_director":
+            metal = gold; symbol = "♛"
+        default:
+            metal = gold; symbol = "★"
+        }
+        let plaque = box("3D " + id + " badge", metal,
+                         width: id.contains("royal") || id.contains("director") ? 0.058 : 0.049,
+                         height: id.contains("diamond") ? 0.068 : 0.057,
+                         length: 0.009,
+                         x: 0.142, y: 1.521, z: 0.150,
+                         chamfer: 0.010, metalness: 0.87)
+        if id == "badge_diamond" {
+            plaque.eulerAngles.z = .pi / 4
+        }
+        body.addChildNode(plaque)
+        let engraving = SCNText(string: symbol, extrusionDepth: 0.0015)
+        engraving.font = UIFont.systemFont(ofSize: 0.042, weight: .heavy)
+        engraving.flatness = 0.001
+        engraving.firstMaterial = material(
+            id == "badge_onyx" ? steel : UIColor(red: 0.12, green: 0.18, blue: 0.24, alpha: 1),
+            roughness: 0.33, metalness: 0.65)
+        let mark = SCNNode(geometry: engraving)
+        mark.name = id + " distinct emblem"
+        mark.scale = SCNVector3(0.83, 0.83, 0.83)
+        mark.position = SCNVector3(0.128, 1.502, 0.158)
+        body.addChildNode(mark)
+    }
+
+    private static func makeCoatDetails(into body: SCNNode, id: String?, base: UIColor) {
+        guard let id else { return }
+        let gold = UIColor(red: 0.85, green: 0.67, blue: 0.33, alpha: 1)
+        let trim: UIColor
+        switch id {
+        case "coat_ghost", "coat_arctic": trim = UIColor(red: 0.19, green: 0.23, blue: 0.29, alpha: 1)
+        case "coat_royal", "coat_cipher": trim = gold
+        case "coat_sunset": trim = UIColor(red: 0.97, green: 0.66, blue: 0.31, alpha: 1)
+        default: trim = UIColor(red: 0.54, green: 0.61, blue: 0.68, alpha: 1)
+        }
+        if id == "coat_sand" || id == "coat_noir" || id == "coat_royal" {
+            let belt = box(id + " tailored belt", trim,
+                           width: 0.330, height: 0.028, length: 0.018,
+                           x: 0, y: 1.217, z: 0.122, chamfer: 0.006)
+            body.addChildNode(belt)
+            for side in [-1.0, 1.0] {
+                body.addChildNode(box("Double breasted button", gold,
+                           width: 0.013, height: 0.013, length: 0.007,
+                           x: Float(side) * 0.055, y: 1.390, z: 0.151,
+                           chamfer: 0.004, metalness: 0.8))
+            }
+        }
+        if id == "coat_arctic" {
+            let fur = UIColor(red: 0.91, green: 0.93, blue: 0.94, alpha: 1)
+            for side in [-1.0, 1.0] {
+                body.addChildNode(ellipsoid("Arctic insulated collar", fur,
+                                            Float(side) * 0.107, 1.614, 0.093,
+                                            0.089, 0.030, 0.062, roughness: 0.98))
+            }
+        } else if id == "coat_sunset" {
+            for side in [-1.0, 1.0] {
+                body.addChildNode(ellipsoid("Bomber jacket ribbed collar", trim,
+                                            Float(side) * 0.087, 1.610, 0.108,
+                                            0.069, 0.023, 0.039))
+            }
+        } else if id == "coat_evergreen" || id == "coat_cipher" {
+            let armPatch = box(id + " sleeve insignia", trim,
+                               width: 0.031, height: 0.052, length: 0.009,
+                               x: -0.279, y: 1.418, z: 0.070,
+                               chamfer: 0.009, metalness: 0.26)
+            body.addChildNode(armPatch)
+        }
+        if id == "coat_crimson" || id == "coat_navy" || id == "coat_ghost" {
+            body.addChildNode(box(id + " zipper", trim,
+                                  width: 0.007, height: 0.260, length: 0.009,
+                                  x: 0.008, y: 1.385, z: 0.157,
+                                  chamfer: 0.002, metalness: 0.73))
+        }
+        if id == "coat_royal" || id == "coat_cipher" {
+            body.addChildNode(box(id + " chest insignia", trim,
+                                  width: 0.067, height: 0.022, length: 0.010,
+                                  x: -0.117, y: 1.533, z: 0.146,
+                                  chamfer: 0.006, metalness: 0.78))
+        }
     }
 
     private static func light(at position: SCNVector3, intensity: CGFloat,

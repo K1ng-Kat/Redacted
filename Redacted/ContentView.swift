@@ -50,7 +50,8 @@ struct ContentView: View {
                     detail: "Tap PLAY to investigate. Solve cases to earn coins, stars, and new detective identities.",
                     button: "PLAY FIRST CASE",
                     symbol: "hand.point.up.left.fill",
-                    portraitTheme: nil
+                    portraitTheme: nil,
+                    dismiss: { homeCoached = true }
                 ) {
                     homeCoached = true
                     launch(store.nextLevel)

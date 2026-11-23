@@ -35,20 +35,33 @@ for token in ("CosmeticItemThumbnail", "CosmeticPreviewCache", "SCNRenderer",
 assert "CosmeticItemThumbnail(item: item)" in catalog
 assert "Image(systemName: item.symbol)" not in catalog, "Placeholder cosmetics returned"
 assert "skinMaterial(_ color: UIColor)" in drawing
-assert 'let lids = node.childNodes.filter { $0.name == "Upper eyelid" }' in drawing
+assert 'let lids = node.childNodes.filter { $0.name == "Blink eyelid" }' in drawing
+assert 'lid.opacity = 0' in drawing, "Resting eyelids must not resemble a second eyebrow"
+assert drawing.count('ellipsoid("Single eyebrow"') == 1, "Build exactly one eyebrow per side"
 assert "eyelid.scale.y =" not in drawing, "Old eye stretching must not recur"
 # Styling controls must show literal images rendered by the same SceneKit
 # factory and palette as the large live avatar, not an approximate swatch.
 assert "DetectiveLookThumbnail(skin: shade, hair: .cropped)" in catalog
 assert "DetectiveLookThumbnail(skin: store.skin, hair: style)" in catalog
 assert "showUncoveredHair" in catalog and "previewEmptySlot: showUncoveredHair" in catalog
-assert "showUncoveredHair = true" in catalog
+assert "showUncoveredHair.toggle()" in catalog, "Hat-free view must stay opt-in"
+assert "showUncoveredHair = true" not in catalog, "Choosing hair must not auto-hide hats"
+assert "store.setHair(style)" in catalog
 assert 'renderStyle(skin: DetectiveSkin, hair: DetectiveHair)' in drawing
 assert "skin: skin, hair: hair, equipment: [:]" in drawing
 assert "camera.position = SCNVector3(0, 1.87, 0.76)" in drawing
 # None of the four hairstyle modes can be erased just because a hat is worn.
 assert 'makeHair(into: head, style: hair,' in drawing
 assert 'headwear: equipment[.headwear]' in drawing
+assert 'let fullForeheadCover = hood' in drawing
+assert 'let fringeYOffset: Float = underBrim ? -0.043 : 0' in drawing
+assert 'let exposedSideLength = underBrim ? min(sideLength, 0.029)' in drawing
+assert 'guard !fullForeheadCover else { return }' in drawing
+assert 'fringeHeightScale' in drawing, "Hat brims must compress fringe geometry"
+# Keep IDs used by existing saves, but show only actual skin shades in the UI.
+assert 'Text(shade.label.uppercased())' not in catalog
+assert 'Capsule()' in catalog and '.fill(shade.color)' in catalog
+assert 'Skin tone option' in catalog
 assert "guard !wearingHeadwear else { return }" not in drawing
 for token in ('case .classic:', 'case .textured:', 'case .swept:', 'case .cropped:',
               'Classic parted fringe', 'Textured forward curl',

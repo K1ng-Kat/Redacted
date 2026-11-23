@@ -42,9 +42,10 @@ struct Detective3DCharacter: UIViewRepresentable {
     let equipment: [CosmeticSlot: String]
     let theme: String
     let size: CGFloat
+    var portraitMode: Bool = false
 
     private var signature: String {
-        ([skin.rawValue, hair.rawValue, theme] +
+        ([skin.rawValue, hair.rawValue, theme, portraitMode ? "portrait" : "body"] +
          CosmeticSlot.allCases.map { equipment[$0] ?? "-" }).joined(separator: "|")
     }
 
@@ -56,13 +57,13 @@ struct Detective3DCharacter: UIViewRepresentable {
         view.isOpaque = false
         view.allowsCameraControl = false
         view.autoenablesDefaultLighting = false
-        view.antialiasingMode = size >= 170 ? .multisampling4X : .none
+        view.antialiasingMode = size >= 170 ? .multisampling4X : .multisampling2X
         view.preferredFramesPerSecond = size >= 170 ? 30 : 15
         view.rendersContinuously = size >= 170
         view.isPlaying = size >= 170
         view.scene = DetectiveModelFactory.make(skin: skin, hair: hair,
                                                 equipment: equipment, theme: theme,
-                                                closeup: size < 100,
+                                                closeup: portraitMode || size < 130,
                                                 animated: size >= 170)
         view.pointOfView = view.scene?.rootNode.childNode(withName: "Detective camera", recursively: false)
         context.coordinator.signature = signature
@@ -74,7 +75,7 @@ struct Detective3DCharacter: UIViewRepresentable {
         context.coordinator.signature = signature
         view.scene = DetectiveModelFactory.make(skin: skin, hair: hair,
                                                 equipment: equipment, theme: theme,
-                                                closeup: size < 100,
+                                                closeup: portraitMode || size < 130,
                                                 animated: size >= 170)
         view.pointOfView = view.scene?.rootNode.childNode(withName: "Detective camera", recursively: false)
     }
@@ -210,14 +211,14 @@ private enum DetectiveModelFactory {
         let camera = SCNNode()
         camera.name = "Detective camera"
         camera.camera = SCNCamera()
-        camera.camera?.fieldOfView = closeup ? 32 : 38
+        camera.camera?.fieldOfView = closeup ? 37 : 34
         camera.camera?.wantsHDR = true
-        camera.camera?.exposureOffset = -0.30
+        camera.camera?.exposureOffset = -0.08
         camera.position = closeup
-            ? SCNVector3(0, 1.80, 0.91)
-            : SCNVector3(0, 1.11, 3.28)
-        camera.look(at: closeup ? SCNVector3(0, 1.79, 0)
-                                : SCNVector3(0, 1.01, 0))
+            ? SCNVector3(0, 1.80, 1.08)
+            : SCNVector3(0, 1.12, 3.55)
+        camera.look(at: closeup ? SCNVector3(0, 1.78, 0)
+                                : SCNVector3(0, 1.04, 0))
         camera.camera?.zNear = 0.025
         scene.rootNode.addChildNode(camera)
         return scene

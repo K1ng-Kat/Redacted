@@ -6,6 +6,7 @@ import UIKit
 struct DetectiveSocialHubView: View {
     @ObservedObject private var network = DetectiveSocialNetwork.shared
     @Environment(\.scenePhase) private var scenePhase
+    @AppStorage("redacted.offlineMode") private var offlineMode = false
 
     @State private var section: Section = .friends
     @State private var showingAdd = false
@@ -28,20 +29,22 @@ struct DetectiveSocialHubView: View {
             VStack(alignment: .leading, spacing: 13) {
                 titleBar
                 compactStatus
-                if network.configured && network.accountEmail == nil {
+                if network.configured && !offlineMode && network.accountEmail == nil {
                     RedactedAccountCard()
                 }
                 // Keep the original Friends and Task Force sections visible
                 // even before the online service is available.
                 picker
-                if section == .friends {
+                if offlineMode {
+                    offlineFeatures
+                } else if section == .friends {
                     friendsContent
                 } else {
                     taskForceContent
                 }
-                if !network.configured {
+                if !network.configured && !offlineMode {
                     setupNotice
-                } else if !network.message.isEmpty {
+                } else if !offlineMode && !network.message.isEmpty {
                     Text(network.message)
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Art.faded)
@@ -56,7 +59,7 @@ struct DetectiveSocialHubView: View {
             .frame(maxWidth: .infinity)
         }
         .background(GameBackdrop())
-        .refreshable { await network.refresh() }
+        .refreshable { if !offlineMode { await network.refresh() } }
         .sheet(isPresented: $showingAdd) { addFriendSheet }
         .sheet(isPresented: $showingTaskForceForm) { taskForceForm }
         .confirmationDialog("Leave this Task Force?", isPresented: $confirmingLeave) {
@@ -65,16 +68,21 @@ struct DetectiveSocialHubView: View {
             }
         }
         .task {
-            await network.connect()
+            if !offlineMode { await network.connect() }
             while !Task.isCancelled {
                 do { try await Task.sleep(for: .seconds(40)) }
                 catch { break }
-                guard !Task.isCancelled, scenePhase == .active else { continue }
+                guard !Task.isCancelled, !offlineMode, scenePhase == .active else { continue }
                 await network.refresh()
             }
         }
         .onChange(of: scenePhase) { _, next in
-            if next == .active { Task { await network.refresh() } }
+            if next == .active && !offlineMode {
+                Task { await network.refresh() }
+            }
+        }
+        .onChange(of: offlineMode) { _, isOffline in
+            if !isOffline { Task { await network.connect() } }
         }
     }
 
@@ -97,7 +105,7 @@ struct DetectiveSocialHubView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 12))
             }
             .buttonStyle(PressGameStyle())
-            .disabled(network.isBusy || !network.configured)
+            .disabled(network.isBusy || !network.configured || offlineMode)
             .accessibilityLabel("Refresh detective network")
         }
     }
@@ -105,17 +113,18 @@ struct DetectiveSocialHubView: View {
     private var compactStatus: some View {
         HStack(spacing: 9) {
             Circle()
-                .fill(network.connected ? Art.mint : Art.gold)
+                .fill(network.connected && !offlineMode ? Art.mint : Art.gold)
                 .frame(width: 10, height: 10)
-            Text(!network.configured ? "OFFLINE MODE" :
+            Text(offlineMode ? "OFFLINE MODE ENABLED" :
+                     !network.configured ? "ONLINE SERVICE UNAVAILABLE" :
                      network.connected ? "CONNECTED" :
                      network.accountEmail == nil ? "SIGN IN REQUIRED" : "NETWORK NOT CONNECTED")
                 .font(.system(size: 11, weight: .black, design: .rounded))
-                .foregroundStyle(network.connected ? Art.mint : Art.gold)
+                .foregroundStyle(network.connected && !offlineMode ? Art.mint : Art.gold)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
             Spacer(minLength: 4)
-            if network.connected {
+            if network.connected && !offlineMode {
                 Text("\(network.onlineFriends.count) ONLINE")
                     .font(.system(size: 12, weight: .black, design: .rounded))
                     .foregroundStyle(Art.paper)
@@ -127,6 +136,28 @@ struct DetectiveSocialHubView: View {
         .frame(height: 43)
         .background(Art.blueDeep.opacity(0.78))
         .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private var offlineFeatures: some View {
+        GameCard(accent: Art.cyan) {
+            VStack(alignment: .leading, spacing: 10) {
+                Label(section == .friends ? "FRIENDS" : "TASK FORCES",
+                      systemImage: section == .friends
+                      ? "person.2.fill" : "shield.lefthalf.filled")
+                    .font(.system(size: 16, weight: .black, design: .rounded))
+                    .foregroundStyle(Art.paper)
+                Text(section == .friends
+                     ? "Your friends list, requests and friend-code sharing will be available when you reconnect."
+                     : "Your Task Force, members, invitations and squad controls will be available when you reconnect.")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Art.faded)
+                    .fixedSize(horizontal: false, vertical: true)
+                Label("Offline Mode is on. Reconnect in More → Settings.",
+                      systemImage: "airplane")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Art.gold)
+            }
+        }
     }
 
     private var picker: some View {

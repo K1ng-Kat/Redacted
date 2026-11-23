@@ -60,11 +60,18 @@ struct MultiplayerLobbyView: View {
                     }
                 }
 
-                if network.accountEmail == nil {
+                if !network.configured {
+                    GameCard(accent: Art.gold) {
+                        Label("ONLINE MATCHES UNAVAILABLE", systemImage: "wifi.slash")
+                            .font(.system(size: 13, weight: .black, design: .rounded))
+                            .foregroundStyle(Art.gold)
+                        Text("Private matches, room codes and QR invites require the online service. The solo campaign stays playable.")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Art.faded)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                } else if network.accountEmail == nil {
                     RedactedAccountCard()
-                } else if !network.configured {
-                    Text("Online matches aren't available in this version. You can play the complete solo campaign offline.")
-                        .foregroundStyle(Art.gold)
                 }
 
                 switch service.phase {

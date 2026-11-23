@@ -12,6 +12,12 @@ struct CaseEvidenceNote: Identifiable, Equatable {
     let corroborated: Bool
 }
 
+struct CaseDeduction: Identifiable, Equatable {
+    let id: Int
+    let statement: String
+    let supported: Bool
+}
+
 enum CaseEvidence {
     static func dossier(for mission: CampaignMission,
                         mode: DetectiveAgeMode) -> [CaseEvidenceNote] {
@@ -94,6 +100,67 @@ enum CaseEvidence {
         }
         if word == Array(mission.solution) { word.reverse() }
         return word
+    }
+
+    /// Final cross-examination is available for the two older profiles.
+    /// This asks WHY the answer is supported, not only which one sounds right.
+    static func theories(for mission: CampaignMission) -> [CaseDeduction] {
+        let reason: String
+        let falseLeadA: String
+        let falseLeadB: String
+        switch mission.kind {
+        case .findClue:
+            reason = "The before/after images and the fresh contact trace corroborate the same physical change."
+            falseLeadA = "The object is closest to the most nervous witness, so it must be the evidence."
+            falseLeadB = "A hallway rumor establishes the physical trace even without an object-level comparison."
+        case .timeline:
+            reason = "Two synchronized records establish necessary before-and-after relationships."
+            falseLeadA = "The order in which records were discovered is the original order of the events."
+            falseLeadB = "A witness's recollection outweighs synchronized timestamps when their stories disagree."
+        case .keypad:
+            reason = "The photographed identifier and the active lock protocol must both be used to calculate the entry."
+            falseLeadA = "The retired combination is safer because technicians have used it before."
+            falseLeadB = "Any three digits from the identifier work as long as the number is from the correct depot."
+        case .contradiction:
+            reason = "An independent timestamped record can disprove a specific claim in the witness statement."
+            falseLeadA = "An interested witness repeating the same statement makes the original claim conclusive."
+            falseLeadB = "The testimony is automatically invalid because it sounds unusual."
+        case .anomaly:
+            reason = "The inspected item's unusual feature conflicts with a verified reference standard."
+            falseLeadA = "Any cosmetic difference proves forgery regardless of the approved specification."
+            falseLeadB = "An old, edited advertisement is more trustworthy than the official reference."
+        case .escapeRoute:
+            reason = "The service-access audit fits the missing public-camera trail and the route's geography."
+            falseLeadA = "The shortest public path is necessarily the escape route even if cameras show no suspect."
+            falseLeadB = "A tourist map proves no private maintenance passages exist."
+        case .anagram:
+            reason = "Every recovered tile is used once, producing a valid archive-length codeword."
+            falseLeadA = "A shorter word is acceptable if its meaning fits the investigation."
+            falseLeadB = "The messenger's incomplete transcription outranks the recovered original tiles."
+        case .signal:
+            reason = "The authenticated transmitter reading must be transformed using the receiver's current calibration."
+            falseLeadA = "The receiver's old preset is trustworthy even when calibration was changed."
+            falseLeadB = "The strongest static noise on the dial is proof that it is the authenticated signal."
+        case .connect:
+            reason = "The paired traces were independently logged and their documented connection supports one conclusion."
+            falseLeadA = "Two objects found close together must have the same origin."
+            falseLeadB = "An unsigned artifact is reliable when its story sounds like the other evidence."
+        case .verdict:
+            reason = "The suspect's privileged access matches the signed instruction and the timing of the system change."
+            falseLeadA = "A public sighting proves the visitor could authorize a protected system change."
+            falseLeadB = "Suspicion alone establishes responsibility even without an audit trail."
+        }
+        var options = [
+            CaseDeduction(id: 0, statement: reason, supported: true),
+            CaseDeduction(id: 1, statement: falseLeadA, supported: false),
+            CaseDeduction(id: 2, statement: falseLeadB, supported: false)
+        ]
+        var seed = UInt64(mission.id * 3253 + 13)
+        for i in stride(from: options.count - 1, through: 1, by: -1) {
+            seed = seed &* 6364136223846793005 &+ 1442695040888963407
+            options.swapAt(i, Int(seed % UInt64(i + 1)))
+        }
+        return options
     }
 
     static func failedEvidenceFeedback(mode: DetectiveAgeMode) -> String {
@@ -265,10 +332,10 @@ enum CaseEvidence {
         case .verdict:
             candidates = [
                 Record(title: "ACCESS PERMISSIONS",
-                       detail: "The action required privileged access to the protected system. The opportunity window is established by the bureau audit.",
+                       detail: "The action required privileged access. Revisit “\(CampaignCatalog.mission(mission.id - 2)?.title ?? "the earlier incident")”: the route or evidence trail established an opportunity window.",
                        symbol: "person.badge.key", reliable: true),
                 Record(title: "AUDIT TRAIL",
-                       detail: "A signed instruction and a system change coincide. Compare suspects' job responsibilities with the evidence in the district.",
+                       detail: "The signed system change coincides with “\(CampaignCatalog.mission(mission.id - 1)?.title ?? "the previous lead")”. Compare that lead with the suspects' responsibilities.",
                        symbol: "list.bullet.clipboard", reliable: true),
                 commonUnverified, rumor,
                 Record(title: "PUBLIC SIGHTING",

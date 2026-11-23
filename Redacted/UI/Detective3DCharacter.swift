@@ -5,16 +5,23 @@ import UIKit
 
 // Persisted style identifiers must remain stable across upgrades.
 enum DetectiveSkin: String, CaseIterable, Identifiable, Codable {
-    case porcelain, peach, bronze, umber, deep
+    // Preserve the five existing IDs: changing their raw values would
+    // silently reset the selected complexion in existing local/cloud saves.
+    // Three additional neutral/olive/warm tones improve the range without
+    // promising a one-to-one match to every real person's complexion.
+    case ivory, porcelain, peach, olive, bronze, umber, mahogany, deep
     var id: String { rawValue }
     var label: String { rawValue.capitalized }
     var color: Color {
         switch self {
-        case .porcelain: Color(red: 0.93, green: 0.77, blue: 0.68)
-        case .peach: Color(red: 0.84, green: 0.65, blue: 0.53)
-        case .bronze: Color(red: 0.71, green: 0.49, blue: 0.36)
-        case .umber: Color(red: 0.51, green: 0.34, blue: 0.26)
-        case .deep: Color(red: 0.33, green: 0.22, blue: 0.18)
+        case .ivory:    Color(red: 0.96, green: 0.84, blue: 0.76)
+        case .porcelain: Color(red: 0.92, green: 0.77, blue: 0.69)
+        case .peach:    Color(red: 0.84, green: 0.66, blue: 0.55)
+        case .olive:    Color(red: 0.77, green: 0.59, blue: 0.44)
+        case .bronze:   Color(red: 0.70, green: 0.50, blue: 0.39)
+        case .umber:    Color(red: 0.53, green: 0.36, blue: 0.28)
+        case .mahogany: Color(red: 0.42, green: 0.28, blue: 0.22)
+        case .deep:     Color(red: 0.31, green: 0.20, blue: 0.17)
         }
     }
 }
@@ -766,11 +773,13 @@ private enum DetectiveModelFactory {
 
         // The only hair visible beneath closed hats is physically below
         // their lower edge, not embedded in the hat's side or crown.
-        if !coveredForehead {
+        if !hood {
+            // Even under a knit cap a small, low temple edge is visible.
+            // The top of each strand remains beneath the lowest fabric edge.
             for side in [-1.0, 1.0] {
                 let s = Float(side)
                 let height: CGFloat = style == .cropped ? 0.020 :
-                    hat ? 0.026 : 0.043
+                    hat ? 0.029 : 0.043
                 lock("Tapered temple \(side)", s * 0.099,
                      hat ? 0.180 : 0.195,
                      0.005, 0.011, height, 0.035)
@@ -779,8 +788,9 @@ private enum DetectiveModelFactory {
         // Hoods and deep knit caps cover the entire hairline.
         guard !coveredForehead else { return }
 
-        let lowered: Float = hat ? -0.018 : 0
-        let thickness: CGFloat = hat ? 0.012 : 0.019
+        // A restrained 3 mm more fringe shows below the brim, not through it.
+        let lowered: Float = hat ? -0.015 : 0
+        let thickness: CGFloat = hat ? 0.014 : 0.019
         switch style {
         case .classic:
             // Short clean parted hairline, separated from the eyebrows.

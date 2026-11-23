@@ -9,7 +9,7 @@
 	<!-- Optional HTTPS JSON endpoint for minimum online build checks. -->
 	<!-- Blank means no online update-check claim is made. -->
 	<key>RDStartupManifestURL</key>
-	<string></string>
+	<string>https://raw.githubusercontent.com/K1ng-Kat/Redacted/main/Live/startup.json</string>
 	<key>RDSocialProjectURL</key>
 	<string></string>
 	<key>RDSocialPublishableKey</key>

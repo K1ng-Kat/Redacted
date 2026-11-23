@@ -193,7 +193,9 @@ struct DetectiveWardrobeView: View {
             .frame(maxWidth: 570)
             .padding(.horizontal, 16)
             .padding(.top, 8)
-            .padding(.bottom, 44)
+            // Keep the content close to the bottom safe area; the previous
+            // 44-point trailing pad created an unused empty strip.
+            .padding(.bottom, 10)
             .frame(maxWidth: .infinity)
         }
         .background(GameBackdrop())
@@ -453,7 +455,7 @@ struct DetectiveWardrobeView: View {
             }
             GameEffects.shared.tap()
         } label: {
-            VStack(alignment: .leading, spacing: 7) {
+            VStack(alignment: .leading, spacing: 5) {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(Art.ink.opacity(0.62))
                     .overlay {
@@ -470,7 +472,7 @@ struct DetectiveWardrobeView: View {
                 Text("NONE")
                     .font(.system(size: 11, weight: .black, design: .rounded))
                     .foregroundStyle(Art.paper)
-                    .frame(height: 28, alignment: .topLeading)
+                    .frame(height: 25, alignment: .topLeading)
                 Text(isEquippedNone ? "EQUIPPED · FREE" : "REMOVE ITEM · FREE")
                     .font(.system(size: 9, weight: .bold, design: .monospaced))
                     .foregroundStyle(isEquippedNone ? Art.mint : Art.faded)
@@ -506,7 +508,7 @@ struct DetectiveWardrobeView: View {
             }
             GameEffects.shared.tap()
         } label: {
-            VStack(alignment: .leading, spacing: 7) {
+            VStack(alignment: .leading, spacing: 5) {
                 ZStack(alignment: .bottomTrailing) {
                     // Actual item-only SceneKit mesh snapshot, cached by
                     // cosmetic ID. No generic icons or pasted-on artwork.
@@ -539,7 +541,7 @@ struct DetectiveWardrobeView: View {
                     .font(.system(size: 12, weight: .black, design: .rounded))
                     .foregroundStyle(Art.paper)
                     .lineLimit(2)
-                    .frame(height: 28, alignment: .topLeading)
+                    .frame(height: 25, alignment: .topLeading)
                 Text(isEquipped ? "EQUIPPED" :
                         isOwned ? "OWNED" :
                         rankLocked ? "RANK \(item.requiredRank) REQUIRED" :

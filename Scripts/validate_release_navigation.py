@@ -16,6 +16,8 @@ duels = read("Redacted/UI/MultiplayerViews.swift")
 wardrobe = read("Redacted/UI/DetectiveWardrobe.swift")
 actor = read("Redacted/UI/Detective3DCharacter.swift")
 plist = read("Redacted-Info.plist")
+mission = read("Redacted/UI/MissionPlay.swift")
+campaign = read("Redacted/Game/CampaignStore.swift")
 
 for route in (".home", ".levels", ".multiplayer", ".friends", ".more"):
     assert f"mainTab({route}," in navigation, f"Missing main tab {route}"
@@ -44,6 +46,22 @@ assert "isTryingOn" in wardrobe
 assert "DetectiveCharacter(store: store, size: 122, previewCosmetic: item)" not in wardrobe
 for token in ("makeHair", "makeHeadwear", "makeEyewear", "makeBadge", "makeCoatDetails"):
     assert token in actor, f"3D actor missing {token}"
+
+# A free or paid hint is permanently revealed per level in the same
+# progress snapshot that backs up/restores the player's other campaign data.
+for token in ('revealedHintLevels: Set<Int>', 'decodeIfPresent(Set<Int>.self,',
+              'hasRevealedHint(for level: Int)', 'func redeemHint(for level: Int)',
+              'if hasRevealedHint(for: level) { return true }',
+              'updated.revealedHintLevels.insert(level)', 'progress = updated'):
+    assert token in campaign, f"Hint persistence contract broken: {token}"
+assert 'store.redeemHint(for: mission.id)' in mission
+assert 'store.hasRevealedHint(for: mission.id)' in mission
+assert 'hintVisible = false' not in mission, "Reopening must not hide bought hints"
+# Ordering choices should be reversible without clearing the whole attempt.
+assert 'selectedSequence.remove(at: chosenPosition)' in mission
+assert '.disabled(chosenPosition != nil)' not in mission
+assert 'usedLetterIndices.remove(at: position)' in mission
+assert '.disabled(usedLetterIndices.contains(index))' not in mission
 
 print("PASS: all Redacted routes and original options available; one loading screen, "
       "offline choice, distinct 3D equipment and future update policy present")

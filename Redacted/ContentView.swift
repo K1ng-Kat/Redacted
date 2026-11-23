@@ -23,7 +23,7 @@ struct ContentView: View {
     @AppStorage("redacted.music.level.volume") private var levelVolume = 0.12
 
     private enum Route: Equatable {
-        case home, levels, play, settings, guide, stats, wardrobe, multiplayer, friends, season
+        case home, levels, play, settings, guide, stats, wardrobe, multiplayer, friends, season, more
     }
 
     var body: some View {
@@ -201,10 +201,10 @@ struct ContentView: View {
         }
     }
 
+    // Always show the full navigation. Online destinations stay visible
+    // and explain unavailable connections instead of disappearing.
     private var availableTabs: [Route] {
-        DetectiveSocialConfiguration.isConfigured
-            ? [.home, .multiplayer, .friends]
-            : [.home, .levels, .wardrobe]
+        [.home, .levels, .multiplayer, .friends, .more]
     }
 
     private var showsMainTabs: Bool {
@@ -223,7 +223,6 @@ struct ContentView: View {
                 DragGesture(minimumDistance: 45)
                     .onEnded { gesture in
                         guard showsMainTabs,
-                              DetectiveSocialConfiguration.isConfigured,
                               !(route == .multiplayer && MultiplayerService.shared.phase == .playing),
                               abs(gesture.translation.width) > 75,
                               abs(gesture.translation.width) > abs(gesture.translation.height) * 1.7
@@ -245,13 +244,10 @@ struct ContentView: View {
     private var mainTabBar: some View {
         HStack(spacing: 0) {
             mainTab(.home, symbol: "house.fill", label: "HOME")
-            if DetectiveSocialConfiguration.isConfigured {
-                mainTab(.multiplayer, symbol: "gamecontroller.fill", label: "DUELS")
-                mainTab(.friends, symbol: "person.2.fill", label: "SOCIAL")
-            } else {
-                mainTab(.levels, symbol: "square.grid.2x2.fill", label: "CASES")
-                mainTab(.wardrobe, symbol: "person.crop.square", label: "STYLE")
-            }
+            mainTab(.levels, symbol: "square.grid.2x2.fill", label: "CASES")
+            mainTab(.multiplayer, symbol: "gamecontroller.fill", label: "DUELS")
+            mainTab(.friends, symbol: "person.2.fill", label: "SOCIAL")
+            mainTab(.more, symbol: "square.grid.2x2", label: "MORE")
         }
         .padding(5)
         .background(Art.blueDeep)
@@ -373,6 +369,14 @@ struct ContentView: View {
             MultiplayerLobbyView(store: store, back: { selectTab(.home) })
         case .friends:
             DetectiveSocialHubView(openMultiplayer: { selectTab(.multiplayer) })
+        case .more:
+            CampaignMoreView(
+                settings: { show(.settings) },
+                guide: { show(.guide) },
+                stats: { show(.stats) },
+                wardrobe: { show(.wardrobe) },
+                season: { show(.season) }
+            )
         }
     }
 
@@ -436,7 +440,7 @@ struct ContentView: View {
     }
 
     private func show(_ next: Route) {
-        if next == .home || next == .multiplayer || next == .friends {
+        if next == .home || next == .multiplayer || next == .friends || next == .more {
             selectTab(next)
             return
         }

@@ -97,7 +97,7 @@ private enum DetectiveModelFactory {
                      closeup: Bool, animated: Bool) -> SCNScene {
         let scene = SCNScene()
         scene.background.contents = UIColor.clear
-        let color = balancedSkinColor(skin)
+        let color = UIColor(skin.color)
         let jacket = coatColor(equipment[.coat])
         let mannequin = SCNNode()
         scene.rootNode.addChildNode(mannequin)
@@ -116,9 +116,9 @@ private enum DetectiveModelFactory {
             mannequin.addChildNode(ellipsoid("Upper trouser leg", navy,
                                             x, 0.93, -0.006,
                                             0.103, 0.25, 0.105))
-            mannequin.addChildNode(ellipsoid("Hand", color,
+            mannequin.addChildNode(skinEllipsoid("Hand", color,
                                             Float(side) * 0.255, 0.885, 0.035,
-                                            0.038, 0.075, 0.030, roughness: 0.82))
+                                            0.038, 0.075, 0.030))
             // Jacket sleeves are real meshes, aligned to the arms.
             mannequin.addChildNode(segment("Upper jacket sleeve", jacket,
                            from: SCNVector3(Float(side) * 0.224, 1.560, 0),
@@ -159,8 +159,8 @@ private enum DetectiveModelFactory {
                              chamfer: 0.005)
             mannequin.addChildNode(pocket)
         }
-        mannequin.addChildNode(ellipsoid("Neck", color, 0, 1.690, 0,
-                                        0.068, 0.080, 0.068, roughness: 0.83))
+        mannequin.addChildNode(skinEllipsoid("Neck", color, 0, 1.690, 0,
+                                        0.068, 0.080, 0.068))
 
         // Pivot allows the entire head, hair, eyes and worn accessories to
         // animate together. Nothing is pasted onto a flat render.
@@ -189,19 +189,19 @@ private enum DetectiveModelFactory {
         let ambient = SCNNode()
         ambient.light = SCNLight()
         ambient.light?.type = .ambient
-        ambient.light?.intensity = 115
+        ambient.light?.intensity = 78
         ambient.light?.color = UIColor(white: 0.82, alpha: 1)
         scene.rootNode.addChildNode(ambient)
 
         let key = light(at: SCNVector3(-2.0, 3.0, 3.2),
-                        intensity: 480, color: UIColor(red: 1, green: 0.94,
+                        intensity: 290, color: UIColor(red: 1, green: 0.94,
                                                         blue: 0.88, alpha: 1))
         key.light?.castsShadow = true
         key.light?.shadowRadius = 9
         key.light?.shadowSampleCount = 12
         scene.rootNode.addChildNode(key)
         scene.rootNode.addChildNode(light(at: SCNVector3(2.3, 2.6, -1.5),
-                                        intensity: 180,
+                                        intensity: 105,
                                         color: UIColor(red: 0.47, green: 0.69,
                                                        blue: 0.88, alpha: 1)))
 
@@ -210,7 +210,8 @@ private enum DetectiveModelFactory {
         camera.camera = SCNCamera()
         camera.camera?.fieldOfView = closeup ? 37 : 34
         camera.camera?.wantsHDR = false
-        camera.camera?.exposureOffset = -0.65
+        camera.camera?.exposureOffset = -0.50
+        camera.camera?.wantsExposureAdaptation = false
         camera.position = closeup
             ? SCNVector3(0, 1.80, 1.08)
             : SCNVector3(0, 1.12, 3.55)
@@ -248,33 +249,39 @@ private enum DetectiveModelFactory {
         ])), forKey: "idleLookScheduler")
 
         let nextBlink = SCNAction.run { node in
-            let lids = node.childNodes.filter { $0.name == "Blink eyelid" }
-            let close = SCNAction.customAction(duration: 0.09) { eyelid, elapsed in
-                let fraction = Float(min(1, elapsed / 0.09))
-                eyelid.scale.y = 0.08 + fraction * 0.92
+            let lids = node.childNodes.filter { $0.name == "Upper eyelid" }
+            let close = SCNAction.moveBy(x: 0, y: -0.012, z: 0, duration: 0.09)
+            let open = SCNAction.moveBy(x: 0, y: 0.012, z: 0, duration: 0.12)
+            close.timingMode = .easeIn
+            open.timingMode = .easeOut
+            for lid in lids {
+                lid.runAction(.sequence([close, open]), forKey: "blink")
             }
-            let open = SCNAction.customAction(duration: 0.13) { eyelid, elapsed in
-                let fraction = Float(min(1, elapsed / 0.13))
-                eyelid.scale.y = 1.0 - fraction * 0.92
-            }
-            let blink = SCNAction.sequence([close, open])
-            for lid in lids { lid.runAction(blink, forKey: "blink") }
         }
         head.runAction(.repeatForever(.sequence([
             .wait(duration: 2.0, withRange: 3.4), nextBlink
         ])), forKey: "blinkScheduler")
     }
 
-    /// Tone-map face material before lights; the previous near-white skin
-    /// combined with three intense lights washed away all facial detail.
-    private static func balancedSkinColor(_ skin: DetectiveSkin) -> UIColor {
-        let original = UIColor(skin.color)
-        var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
-        guard original.getRed(&red, green: &green, blue: &blue, alpha: &alpha) else {
-            return original
-        }
-        return UIColor(red: red * 0.89, green: green * 0.89,
-                       blue: blue * 0.89, alpha: 1)
+    /// Skin is the literal selected palette color with *diffuse only*
+    /// shading. PBR specular highlights had clipped light skin to white.
+    /// This matte material preserves the tone selected in Style Lab.
+    private static func skinMaterial(_ color: UIColor) -> SCNMaterial {
+        let m = SCNMaterial()
+        m.lightingModel = .lambert
+        m.diffuse.contents = color
+        m.ambient.contents = UIColor(white: 0.22, alpha: 1)
+        m.emission.contents = UIColor.black
+        m.isDoubleSided = false
+        return m
+    }
+
+    private static func skinEllipsoid(_ name: String, _ color: UIColor,
+                                      _ x: Float, _ y: Float, _ z: Float,
+                                      _ rx: CGFloat, _ ry: CGFloat, _ rz: CGFloat) -> SCNNode {
+        let node = ellipsoid(name, color, x, y, z, rx, ry, rz)
+        node.geometry?.firstMaterial = skinMaterial(color)
+        return node
     }
 
     private static func material(_ color: UIColor,
@@ -392,21 +399,21 @@ private enum DetectiveModelFactory {
     }
 
     private static func makeFace(into head: SCNNode, skin: UIColor) {
-        head.addChildNode(ellipsoid("Skull", skin, 0, 0.134, 0,
-                                    0.104, 0.145, 0.098, roughness: 0.92))
-        head.addChildNode(ellipsoid("Jaw", skin, 0, 0.075, 0.020,
-                                    0.080, 0.063, 0.079, roughness: 0.91))
+        head.addChildNode(skinEllipsoid("Skull", skin, 0, 0.134, 0,
+                                    0.104, 0.145, 0.098))
+        head.addChildNode(skinEllipsoid("Jaw", skin, 0, 0.075, 0.020,
+                                    0.080, 0.063, 0.079))
         for side in [-1.0, 1.0] {
             let s = Float(side)
-            head.addChildNode(ellipsoid("Ear", skin, s * 0.103, 0.125, 0.005,
+            head.addChildNode(skinEllipsoid("Ear", skin, s * 0.103, 0.125, 0.005,
                                         0.014, 0.025, 0.014))
-            head.addChildNode(ellipsoid("Upper cheek", skin, s * 0.053,
+            head.addChildNode(skinEllipsoid("Upper cheek", skin, s * 0.053,
                                        0.121, 0.060, 0.038, 0.031, 0.023,
                                        roughness: 0.93))
             head.addChildNode(ellipsoid("Eye white",
                              UIColor(red: 0.91, green: 0.89, blue: 0.85, alpha: 1),
                              s * 0.043, 0.161, 0.102,
-                             0.020, 0.010, 0.008, roughness: 0.40))
+                             0.020, 0.010, 0.008))
             head.addChildNode(ellipsoid("Iris",
                              UIColor(red: 0.25, green: 0.36, blue: 0.40, alpha: 1),
                              s * 0.043, 0.160, 0.111,
@@ -415,25 +422,30 @@ private enum DetectiveModelFactory {
                              UIColor(red: 0.037, green: 0.032, blue: 0.03, alpha: 1),
                              s * 0.043, 0.159, 0.116,
                              0.0032, 0.0038, 0.002, roughness: 0.28))
-            let eyelid = ellipsoid("Blink eyelid", skin,
-                                     s * 0.043, 0.160, 0.122,
-                                     0.022, 0.010, 0.003, roughness: 0.91)
-            eyelid.scale.y *= 0.08
-            head.addChildNode(eyelid)
+            // Stable upper eyelid: a small real box in head-local units,
+            // animated by millimeters, never by changing the node's scale.
+            // The old implementation multiplied an ellipsoid scale of 0.0008
+            // up to 1.0, producing the giant white bars across the face.
+            let lid = box("Upper eyelid", skin,
+                          width: 0.043, height: 0.006, length: 0.006,
+                          x: s * 0.043, y: 0.175, z: 0.120,
+                          chamfer: 0.002)
+            lid.geometry?.firstMaterial = skinMaterial(skin)
+            head.addChildNode(lid)
             let brow = box("Eyebrow", hairColor,
                            width: 0.043, height: 0.005, length: 0.008,
                            x: s * 0.044, y: 0.189, z: 0.106, chamfer: 0.004)
             brow.eulerAngles.z = -s * 0.06
             head.addChildNode(brow)
         }
-        head.addChildNode(ellipsoid("Nose bridge", skin, 0, 0.136, 0.101,
+        head.addChildNode(skinEllipsoid("Nose bridge", skin, 0, 0.136, 0.101,
                                     0.013, 0.029, 0.018))
-        head.addChildNode(ellipsoid("Nose tip", skin, 0, 0.113, 0.117,
+        head.addChildNode(skinEllipsoid("Nose tip", skin, 0, 0.113, 0.117,
                                     0.018, 0.013, 0.015))
         head.addChildNode(ellipsoid("Mouth", UIColor(red: 0.39, green: 0.22,
                                     blue: 0.21, alpha: 1), 0, 0.075, 0.109,
                                     0.024, 0.003, 0.003))
-        head.addChildNode(ellipsoid("Lower lip", skin.withAlphaComponent(0.98),
+        head.addChildNode(skinEllipsoid("Lower lip", skin,
                                     0, 0.066, 0.108, 0.025, 0.005, 0.003))
     }
 

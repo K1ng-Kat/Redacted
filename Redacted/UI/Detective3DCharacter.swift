@@ -92,6 +92,7 @@ struct Detective3DCharacter: UIViewRepresentable {
 struct CosmeticItemThumbnail: View {
     let item: DetectiveCosmetic
     @State private var image: UIImage?
+    @State private var renderFailed = false
 
     var body: some View {
         ZStack {
@@ -101,6 +102,12 @@ struct CosmeticItemThumbnail: View {
                     .scaledToFit()
                     .padding(7)
                     .transition(.opacity)
+            } else if renderFailed {
+                Text("PREVIEW UNAVAILABLE")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(Art.faded)
+                    .padding(8)
             } else {
                 ProgressView()
                     .tint(Art.cyan)
@@ -114,10 +121,12 @@ struct CosmeticItemThumbnail: View {
                 return
             }
             image = nil
+            renderFailed = false
             let rendered = await CosmeticPreviewCache.shared.render(
                 id: item.id, slot: item.slot)
             guard !Task.isCancelled else { return }
             image = rendered
+            renderFailed = rendered == nil
         }
         .accessibilityHidden(true)
     }

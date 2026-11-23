@@ -314,7 +314,7 @@ struct DetectiveWardrobeView: View {
                 Text("Skin tone")
                     .font(.system(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(Art.paper)
-                Text("These portraits use the same skin material and studio lighting as your detective.")
+                Text("Choose a tone visually. The portrait shows the lit skin; the strip beneath it shows the exact material color.")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(Art.faded)
                     .fixedSize(horizontal: false, vertical: true)
@@ -325,16 +325,17 @@ struct DetectiveWardrobeView: View {
                             GameEffects.shared.tap()
                         } label: {
                             VStack(spacing: 5) {
+                                // Real skin material under the same lighting as the actor.
+                                // No names are shown: the reference chip displays the
+                                // underlying shade without light/exposure distortion.
                                 DetectiveLookThumbnail(skin: shade, hair: .cropped)
-                                    .frame(height: 64)
-                                Text(shade.label.uppercased())
-                                    .font(.system(size: 8, weight: .black,
-                                                  design: .rounded))
-                                    .foregroundStyle(store.skin == shade ? Art.gold : Art.paper)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.65)
+                                    .frame(height: 77)
+                                Capsule()
+                                    .fill(shade.color)
+                                    .frame(height: 7)
+                                    .padding(.horizontal, 6)
                             }
-                            .frame(maxWidth: .infinity, minHeight: 90)
+                            .frame(maxWidth: .infinity, minHeight: 93)
                             .padding(4)
                             .background(Art.blueDeep)
                             .clipShape(RoundedRectangle(cornerRadius: 11))
@@ -345,7 +346,7 @@ struct DetectiveWardrobeView: View {
                             }
                         }
                         .buttonStyle(PressGameStyle())
-                        .accessibilityLabel("\(shade.label) skin tone")
+                        .accessibilityLabel("Skin tone option \((DetectiveSkin.allCases.firstIndex(of: shade) ?? 0) + 1) of 5")
                         .accessibilityAddTraits(store.skin == shade ? .isSelected : [])
                     }
                 }
@@ -356,8 +357,8 @@ struct DetectiveWardrobeView: View {
                     ForEach(DetectiveHair.allCases) { style in
                         Button {
                             store.setHair(style)
-                            // Reveal the hair in the main preview when changed.
-                            showUncoveredHair = true
+                            // Hair changes must NEVER silently remove or hide equipped
+                            // headwear. The separate preview toggle is opt-in only.
                             GameEffects.shared.tap()
                         } label: {
                             VStack(spacing: 5) {

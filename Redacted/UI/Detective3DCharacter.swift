@@ -719,8 +719,16 @@ private enum DetectiveModelFactory {
                                  headwear: String?) {
         // Keep the four silhouettes different. A hat compresses the crown;
         // it must not delete the fringe and sideburns that identify the haircut.
+        // Different hats cover different regions of the hair. The crown is
+        // hidden under closed hats, while a visor lets the top emerge above
+        // its band. Sideburns and a short fringe can remain beneath brims.
         let coveredCrown = headwear != nil && headwear != "hat_visor"
         let hood = headwear == "hat_hood"
+        let fullForeheadCover = hood ||
+            headwear == "hat_beanie" || headwear == "hat_winter"
+        let underBrim = headwear != nil
+        let fringeYOffset: Float = underBrim ? -0.043 : 0
+        let fringeHeightScale: CGFloat = underBrim ? 0.60 : 1
         let cutShort = style == .cropped
         let swept = style == .swept
         let textured = style == .textured
@@ -732,19 +740,26 @@ private enum DetectiveModelFactory {
             let sideWidth: CGFloat = cutShort ? 0.012 : textured ? 0.021 : 0.017
             let sideLength: CGFloat = cutShort ? 0.028 :
                 swept && side < 0 ? 0.065 : 0.051
+            // Crop the hidden roots to stay BELOW the hat's fitted lower
+            // edge rather than allowing strands to cut through the band.
+            let exposedSideLength = underBrim ? min(sideLength, 0.029) : sideLength
+            let templeY: Float = underBrim ? 0.188 : 0.203
             let sideLock = ellipsoid("Visible \(style.rawValue) sideburn", hairColor,
-                                     s * 0.097, 0.203 - Float(sideLength) * 0.12,
+                                     s * 0.097, templeY - Float(exposedSideLength) * 0.12,
                                      0.011,
-                                     sideWidth, sideLength, 0.050,
+                                     sideWidth, exposedSideLength, 0.045,
                                      roughness: 0.97)
             head.addChildNode(sideLock)
         }
 
         if !coveredCrown {
-            let crownHeight: CGFloat = cutShort ? 0.023 :
+            let naturalCrownHeight: CGFloat = cutShort ? 0.023 :
                 textured ? 0.060 : swept ? 0.047 : 0.037
+            let visor = headwear == "hat_visor"
+            let crownHeight = visor ? min(naturalCrownHeight, 0.038) :
+                naturalCrownHeight
             head.addChildNode(ellipsoid("Rooted \(style.rawValue) hair crown",
-                                         hairColor, 0, 0.254, -0.016,
+                                         hairColor, 0, visor ? 0.287 : 0.254, -0.016,
                                          0.103, crownHeight, 0.095,
                                          roughness: 0.97))
             let count = cutShort ? 28 : textured ? 54 : swept ? 39 : 36
@@ -772,7 +787,8 @@ private enum DetectiveModelFactory {
                 let strand = ellipsoid("\(style.rawValue) sculpted hair clump",
                                        hairColor,
                                        x + (swept ? 0.011 : 0),
-                                       0.267 + Float(height) * 0.31,
+                                       (headwear == "hat_visor" ? 0.292 : 0.267)
+                                         + Float(height) * 0.31,
                                        z,
                                        width, height, width * 0.90,
                                        roughness: 0.97)
@@ -786,16 +802,19 @@ private enum DetectiveModelFactory {
         // Distinct front hairline is intentionally *below* the hat band.
         // All local coordinates are in head space, so head turns keep the
         // fringe, temples and headwear together.
-        guard !hood else { return }
+        // Beanies, winter caps and hoods cover the forehead completely.
+        // The visible hair stops below their lower edge; no overlapping
+        // fake fringe is drawn through the hat fabric.
+        guard !fullForeheadCover else { return }
         switch style {
         case .classic:
             // Neat side part with a low, controlled front edge.
             for i in 0..<9 {
                 let x = Float(i) * 0.018 - 0.075
                 let part = ellipsoid("Classic parted fringe", hairColor,
-                                     x, 0.242 + (i > 6 ? 0.007 : 0),
+                                     x, 0.242 + (i > 6 ? 0.007 : 0) + fringeYOffset,
                                      0.091,
-                                     0.012, 0.017, 0.015, roughness: 0.97)
+                                     0.012, 0.017 * fringeHeightScale, 0.015, roughness: 0.97)
                 part.eulerAngles.z = -0.20
                 head.addChildNode(part)
             }
@@ -805,8 +824,9 @@ private enum DetectiveModelFactory {
                 let x = Float(i) * 0.014 - 0.077
                 let droop = Float(i % 4) * 0.004
                 let curl = ellipsoid("Textured forward curl", hairColor,
-                                      x, 0.240 - droop, 0.106,
-                                      0.011, 0.020 + CGFloat(i % 3) * 0.004,
+                                      x, 0.240 - droop + fringeYOffset, 0.106,
+                                      0.011, (0.020 + CGFloat(i % 3) * 0.004)
+                                        * fringeHeightScale,
                                       0.014, roughness: 0.97)
                 curl.eulerAngles.z = Float(i % 5 - 2) * 0.24
                 head.addChildNode(curl)
@@ -817,9 +837,9 @@ private enum DetectiveModelFactory {
                 let t = Float(i) / 8
                 let lock = ellipsoid("Side swept long fringe", hairColor,
                                       -0.079 + t * 0.167,
-                                      0.260 - t * 0.022,
+                                      0.260 - t * 0.022 + fringeYOffset,
                                       0.100,
-                                      0.015, 0.026, 0.017,
+                                      0.015, 0.026 * fringeHeightScale, 0.017,
                                       roughness: 0.97)
                 lock.eulerAngles.z = -0.67
                 head.addChildNode(lock)
@@ -829,8 +849,8 @@ private enum DetectiveModelFactory {
             for i in 0..<10 {
                 let x = Float(i) * 0.016 - 0.072
                 head.addChildNode(ellipsoid("Cropped hairline", hairColor,
-                                             x, 0.247, 0.087,
-                                             0.010, 0.007, 0.009,
+                                             x, 0.247 + fringeYOffset, 0.087,
+                                             0.010, 0.007 * fringeHeightScale, 0.009,
                                              roughness: 0.97))
             }
         }

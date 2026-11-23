@@ -438,42 +438,80 @@ private enum DetectiveModelFactory {
 
     private static func makeEyewear(into head: SCNNode, id: String?) {
         guard let id else { return }
-        let dark = UIColor(red: 0.10, green: 0.12, blue: 0.15, alpha: 1)
-        let frame: UIColor = id == "glasses_clear" ? metal :
-                             id == "glasses_monocle" ? UIColor(red: 0.78, green: 0.61, blue: 0.32, alpha: 1)
-                             : dark
-        let shield = ["glasses_visor", "glasses_night", "glasses_ice", "glasses_holo"]
-        if shield.contains(id) {
-            let glass = box("3D eye visor", UIColor(red: 0.15, green: 0.33,
-                            blue: 0.40, alpha: 0.88),
-                            width: 0.177, height: 0.046, length: 0.015,
-                            x: 0, y: 0.161, z: 0.128, chamfer: 0.014)
-            glass.geometry?.firstMaterial?.transparency = id == "glasses_holo" ? 0.60 : 0.88
+        let dark = UIColor(red: 0.08, green: 0.11, blue: 0.15, alpha: 1)
+        let steel = UIColor(red: 0.63, green: 0.69, blue: 0.75, alpha: 1)
+        if ["glasses_visor", "glasses_night", "glasses_ice", "glasses_holo"].contains(id) {
+            let lens: UIColor
+            switch id {
+            case "glasses_night": lens = UIColor(red: 0.16, green: 0.46, blue: 0.23, alpha: 1)
+            case "glasses_ice": lens = UIColor(red: 0.60, green: 0.79, blue: 0.88, alpha: 1)
+            case "glasses_holo": lens = UIColor(red: 0.15, green: 0.80, blue: 0.91, alpha: 1)
+            default: lens = UIColor(red: 0.15, green: 0.31, blue: 0.42, alpha: 1)
+            }
+            let wide = id == "glasses_visor" || id == "glasses_holo"
+            let glass = box("3D " + id, lens,
+                            width: wide ? 0.186 : 0.172,
+                            height: wide ? 0.052 : 0.067, length: 0.020,
+                            x: 0, y: 0.160, z: 0.126, chamfer: 0.015,
+                            metalness: id == "glasses_holo" ? 0.30 : 0.10)
+            glass.geometry?.firstMaterial?.transparency = id == "glasses_holo" ? 0.48 : 0.73
             head.addChildNode(glass)
+            let band = box("Visor upper frame", dark,
+                           width: 0.194, height: 0.008, length: 0.023,
+                           x: 0, y: 0.194, z: 0.124, chamfer: 0.004)
+            head.addChildNode(band)
+            if id == "glasses_night" {
+                for side in [-1.0, 1.0] {
+                    let optic = SCNCylinder(radius: 0.022, height: 0.022)
+                    optic.firstMaterial = material(dark, roughness: 0.3)
+                    let node = SCNNode(geometry: optic)
+                    node.name = "Night optic barrel"
+                    node.eulerAngles.x = .pi / 2
+                    node.position = SCNVector3(Float(side) * 0.043, 0.164, 0.149)
+                    head.addChildNode(node)
+                }
+            }
             return
         }
-        let monocle = id == "glasses_monocle"
-        for side in [-1.0, 1.0] where !monocle || side == 1 {
-            let lens = SCNTorus(ringRadius: 0.026, pipeRadius: 0.003)
-            lens.firstMaterial = material(frame, roughness: 0.30, metalness: 0.7)
-            let rim = SCNNode(geometry: lens)
-            rim.name = "Real 3D eyeglass frame"
-            rim.position = SCNVector3(Float(side) * 0.045, 0.159, 0.122)
+
+        let mono = id == "glasses_monocle"
+        let round = id == "glasses_round" || mono
+        let frame = id == "glasses_clear" ? steel :
+                    mono ? UIColor(red: 0.84, green: 0.67, blue: 0.32, alpha: 1) :
+                    dark
+        for side in [-1.0, 1.0] where !mono || side > 0 {
+            let geom = SCNTorus(ringRadius: round ? 0.024 : 0.027,
+                                pipeRadius: id == "glasses_clear" ? 0.0019 : 0.0032)
+            geom.firstMaterial = material(frame, roughness: 0.30, metalness: 0.65)
+            let rim = SCNNode(geometry: geom)
+            rim.name = "3D " + id + " rim"
             rim.eulerAngles.x = .pi / 2
+            if !round { rim.scale.y = 0.77 }
+            rim.position = SCNVector3(Float(side) * 0.045, 0.157, 0.119)
             head.addChildNode(rim)
-            if id == "glasses_amber" || id == "glasses_ruby" {
-                let tint = id == "glasses_ruby" ? UIColor.systemRed : UIColor.systemOrange
-                let lens = ellipsoid("Tinted lens", tint.withAlphaComponent(0.20),
-                                    Float(side) * 0.045, 0.159, 0.122,
-                                    0.023, 0.022, 0.0015, roughness: 0.17)
-                lens.geometry?.firstMaterial?.transparency = 0.25
+            if id == "glasses_amber" || id == "glasses_ruby" || id == "glasses_clear" {
+                let color: UIColor = id == "glasses_ruby" ? UIColor.systemRed :
+                                     id == "glasses_amber" ? UIColor.systemOrange : steel
+                let lens = ellipsoid("3D " + id + " lens", color,
+                                    Float(side) * 0.045, 0.157, 0.123,
+                                    0.024, round ? 0.024 : 0.019, 0.0015,
+                                    roughness: 0.12)
+                lens.geometry?.firstMaterial?.transparency =
+                    id == "glasses_clear" ? 0.14 : 0.33
                 head.addChildNode(lens)
             }
         }
-        if !monocle {
-            head.addChildNode(box("3D spectacle bridge", frame, width: 0.035,
-                                  height: 0.004, length: 0.006,
-                                  x: 0, y: 0.162, z: 0.123, chamfer: 0.001))
+        if mono {
+            let chain = SCNTorus(ringRadius: 0.006, pipeRadius: 0.001)
+            chain.firstMaterial = material(frame, roughness: 0.20, metalness: 0.9)
+            let charm = SCNNode(geometry: chain)
+            charm.eulerAngles.x = .pi / 2
+            charm.position = SCNVector3(0.084, 0.089, 0.111)
+            head.addChildNode(charm)
+        } else {
+            head.addChildNode(box("Glasses bridge", frame,
+                                  width: 0.037, height: 0.004, length: 0.009,
+                                  x: 0, y: 0.164, z: 0.126, chamfer: 0.001))
         }
     }
 

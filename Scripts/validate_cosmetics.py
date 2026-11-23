@@ -37,7 +37,7 @@ assert "Image(systemName: item.symbol)" not in catalog, "Placeholder cosmetics r
 assert "skinMaterial(_ color: UIColor)" in drawing
 assert 'let lids = node.childNodes.filter { $0.name == "Blink eyelid" }' in drawing
 assert 'lid.opacity = 0' in drawing, "Resting eyelids must not resemble a second eyebrow"
-assert drawing.count('ellipsoid("Single eyebrow"') == 1, "Build exactly one eyebrow per side"
+assert drawing.count('box("Single eyebrow"') == 1, "Exactly one low-profile eyebrow per side"
 assert "eyelid.scale.y =" not in drawing, "Old eye stretching must not recur"
 # Styling controls must show literal images rendered by the same SceneKit
 # factory and palette as the large live avatar, not an approximate swatch.
@@ -53,20 +53,25 @@ assert "camera.position = SCNVector3(0, 1.87, 0.76)" in drawing
 # None of the four hairstyle modes can be erased just because a hat is worn.
 assert 'makeHair(into: head, style: hair,' in drawing
 assert 'headwear: equipment[.headwear]' in drawing
-assert 'let fullForeheadCover = hood' in drawing
-assert 'let fringeYOffset: Float = underBrim ? -0.043 : 0' in drawing
-assert 'let exposedSideLength = underBrim ? min(sideLength, 0.029)' in drawing
-assert 'guard !fullForeheadCover else { return }' in drawing
-assert 'fringeHeightScale' in drawing, "Hat brims must compress fringe geometry"
+assert 'let coveredForehead = hood' in drawing
+assert 'guard !coveredForehead else { return }' in drawing
+assert 'if hood { return }' in drawing
+assert 'hat ? 0.026 : 0.043' in drawing
+assert 'let lowered: Float = hat ? -0.018 : 0' in drawing
+assert 'let thickness: CGFloat = hat ? 0.012 : 0.019' in drawing
+assert 'for index in 0..<6' in drawing
+assert 'for i in 0..<54' not in drawing
+assert 'let count = cutShort ? 28' not in drawing, "Do not restore dozens of knobby floating hair clumps"
+assert 'SCNTorus(ringRadius: 0.103' not in drawing, "Remove hovering second hat band"
 # Keep IDs used by existing saves, but show only actual skin shades in the UI.
 assert 'Text(shade.label.uppercased())' not in catalog
 assert 'Capsule()' in catalog and '.fill(shade.color)' in catalog
 assert 'Skin tone option' in catalog
 assert "guard !wearingHeadwear else { return }" not in drawing
 for token in ('case .classic:', 'case .textured:', 'case .swept:', 'case .cropped:',
-              'Classic parted fringe', 'Textured forward curl',
-              'Side swept long fringe', 'Cropped hairline',
-              'Fitted headband', 'head.addChildNode(fitted)'):
+              'Clean parted fringe', 'Short textured fringe',
+              'Side-part sweep', 'Close-cropped front edge',
+              'Continuous', 'head.addChildNode(fitted)'):
     assert token in drawing, f"Missing fitted headwear/hair component: {token}"
 for kind in ("headwear", "eyewear", "badge", "coat"):
     assert sum(item.startswith({"headwear": "hat_", "eyewear": "glasses_",

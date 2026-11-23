@@ -517,41 +517,97 @@ private enum DetectiveModelFactory {
 
     private static func makeHeadwear(into head: SCNNode, id: String?) {
         guard let id else { return }
+        let black = UIColor(red: 0.08, green: 0.10, blue: 0.14, alpha: 1)
+        let gold = UIColor(red: 0.83, green: 0.65, blue: 0.30, alpha: 1)
         let fabric: UIColor
         switch id {
-        case "hat_beret": fabric = UIColor(red: 0.34, green: 0.10, blue: 0.14, alpha: 1)
-        case "hat_newsboy": fabric = UIColor(red: 0.40, green: 0.31, blue: 0.22, alpha: 1)
-        case "hat_winter": fabric = UIColor(red: 0.75, green: 0.80, blue: 0.85, alpha: 1)
-        case "hat_visor": fabric = UIColor(red: 0.11, green: 0.32, blue: 0.28, alpha: 1)
-        case "hat_cap": fabric = UIColor(red: 0.15, green: 0.24, blue: 0.33, alpha: 1)
-        default: fabric = UIColor(red: 0.09, green: 0.12, blue: 0.16, alpha: 1)
+        case "hat_cap": fabric = UIColor(red: 0.14, green: 0.25, blue: 0.36, alpha: 1)
+        case "hat_beret": fabric = UIColor(red: 0.40, green: 0.13, blue: 0.20, alpha: 1)
+        case "hat_fedora": fabric = black
+        case "hat_director": fabric = UIColor(red: 0.16, green: 0.19, blue: 0.27, alpha: 1)
+        case "hat_beanie": fabric = UIColor(red: 0.10, green: 0.16, blue: 0.23, alpha: 1)
+        case "hat_newsboy": fabric = UIColor(red: 0.43, green: 0.32, blue: 0.22, alpha: 1)
+        case "hat_visor": fabric = UIColor(red: 0.13, green: 0.37, blue: 0.36, alpha: 1)
+        case "hat_winter": fabric = UIColor(red: 0.72, green: 0.78, blue: 0.84, alpha: 1)
+        case "hat_hood": fabric = UIColor(red: 0.09, green: 0.15, blue: 0.20, alpha: 1)
+        case "hat_pilot": fabric = UIColor(red: 0.15, green: 0.23, blue: 0.33, alpha: 1)
+        default: fabric = black
         }
-        if id == "hat_fedora" {
-            let crown = SCNCylinder(radius: 0.092, height: 0.093)
-            crown.firstMaterial = material(fabric)
+        switch id {
+        case "hat_fedora":
+            let crown = SCNCylinder(radius: 0.093, height: 0.082)
+            crown.firstMaterial = material(fabric, roughness: 0.92)
             let cap = SCNNode(geometry: crown)
             cap.position = SCNVector3(0, 0.319, 0)
             head.addChildNode(cap)
-            let brim = SCNCylinder(radius: 0.147, height: 0.012)
-            brim.firstMaterial = material(fabric)
+            let brim = SCNCylinder(radius: 0.150, height: 0.009)
+            brim.firstMaterial = material(fabric, roughness: 0.80)
             let rim = SCNNode(geometry: brim)
-            rim.position = SCNVector3(0, 0.278, 0.01)
+            rim.position = SCNVector3(0, 0.281, 0.008)
             head.addChildNode(rim)
-        } else if id == "hat_beret" {
-            head.addChildNode(ellipsoid("3D wool beret", fabric, -0.017, 0.294, 0,
-                                       0.142, 0.036, 0.114))
-        } else if id == "hat_hood" {
-            head.addChildNode(ellipsoid("3D hood behind head", fabric, 0, 0.179, -0.066,
-                                       0.140, 0.175, 0.080))
-        } else {
-            head.addChildNode(ellipsoid("3D cap crown", fabric, 0, 0.289, -0.005,
-                                       0.116, 0.057, 0.110))
-            if id != "hat_beanie" && id != "hat_winter" {
-                let brim = box("3D visor brim", fabric,
-                                width: 0.184, height: 0.011, length: 0.075,
-                                x: 0, y: 0.281, z: 0.113, chamfer: 0.008)
-                head.addChildNode(brim)
+        case "hat_beret":
+            head.addChildNode(ellipsoid("Shadow beret", fabric, -0.027, 0.302, 0.006,
+                                        0.143, 0.039, 0.117))
+            head.addChildNode(box("Beret stem", black, width: 0.013,
+                                  height: 0.018, length: 0.011,
+                                  x: -0.015, y: 0.340, z: 0, chamfer: 0.005))
+        case "hat_hood":
+            head.addChildNode(ellipsoid("Covert hood", fabric, 0, 0.168, -0.076,
+                                        0.151, 0.180, 0.105))
+            for side in [-1.0, 1.0] {
+                head.addChildNode(ellipsoid("Hood fabric edge", fabric,
+                                            Float(side) * 0.116, 0.163, 0.053,
+                                            0.030, 0.137, 0.036))
             }
+        case "hat_visor":
+            head.addChildNode(ellipsoid("Field visor band", fabric, 0, 0.253, 0,
+                                        0.119, 0.017, 0.102))
+            head.addChildNode(box("Visor brim", fabric, width: 0.205,
+                                  height: 0.010, length: 0.103,
+                                  x: 0, y: 0.249, z: 0.112, chamfer: 0.013))
+        case "hat_beanie", "hat_winter":
+            head.addChildNode(ellipsoid("Knit cap", fabric, 0, 0.290, -0.003,
+                                        0.122, 0.076, 0.111))
+            head.addChildNode(ellipsoid("Knit cuff", fabric,
+                                        0, 0.260, 0.037, 0.124, 0.022, 0.078))
+            if id == "hat_winter" {
+                head.addChildNode(ellipsoid("Snow patrol pom", UIColor.white,
+                                            0, 0.374, 0, 0.030, 0.030, 0.030))
+            }
+        case "hat_newsboy":
+            head.addChildNode(ellipsoid("Eight-panel newsboy cap", fabric,
+                                        0, 0.297, -0.013, 0.140, 0.068, 0.133))
+            head.addChildNode(box("Newsboy peak", fabric, width: 0.196,
+                                  height: 0.011, length: 0.090,
+                                  x: 0, y: 0.264, z: 0.121, chamfer: 0.026))
+            head.addChildNode(ellipsoid("Cap button", black, 0, 0.365, 0,
+                                        0.015, 0.007, 0.015))
+        case "hat_director", "hat_pilot":
+            head.addChildNode(ellipsoid("Uniform peaked cap", fabric,
+                                        0, 0.297, -0.013, 0.123, 0.069, 0.115))
+            head.addChildNode(box("Uniform hat brim", black,
+                                  width: 0.210, height: 0.014, length: 0.088,
+                                  x: 0, y: 0.270, z: 0.112, chamfer: 0.018))
+            head.addChildNode(box("Uniform gold band", gold,
+                                  width: 0.178, height: 0.010, length: 0.010,
+                                  x: 0, y: 0.283, z: 0.119, chamfer: 0.005,
+                                  metalness: 0.67))
+            if id == "hat_pilot" {
+                head.addChildNode(box("Air marshal insignia", gold,
+                                      width: 0.067, height: 0.012, length: 0.012,
+                                      x: 0, y: 0.316, z: 0.119, chamfer: 0.004))
+            } else {
+                head.addChildNode(ellipsoid("Director crest", gold,
+                                            0, 0.323, 0.113,
+                                            0.021, 0.028, 0.008,
+                                            roughness: 0.29))
+            }
+        default:
+            head.addChildNode(ellipsoid("Patrol cap", fabric,
+                                        0, 0.289, -0.009, 0.122, 0.063, 0.112))
+            head.addChildNode(box("Patrol peak", fabric, width: 0.192,
+                                  height: 0.013, length: 0.088,
+                                  x: 0, y: 0.267, z: 0.119, chamfer: 0.014))
         }
     }
 

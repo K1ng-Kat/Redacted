@@ -29,6 +29,11 @@ struct ContentView: View {
             GameBackdrop()
             if setupComplete {
                 swipeNavigation
+                    // Outside the clipped swipe GeometryReader so the bar
+                    // background reaches the actual bottom home indicator.
+                    .safeAreaInset(edge: .bottom, spacing: 0) {
+                        if showsMainTabs { mainTabBar }
+                    }
                     .transition(.opacity)
             } else {
                 AgeOnboardingView { mode in
@@ -209,11 +214,6 @@ struct ContentView: View {
     @ViewBuilder
     private var mainGame: some View {
         screen(for: route)
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                if showsMainTabs {
-                    mainTabBar
-                }
-            }
             .simultaneousGesture(
                 DragGesture(minimumDistance: 45)
                     .onEnded { gesture in
@@ -255,7 +255,7 @@ struct ContentView: View {
                     Rectangle().fill(Art.edge.opacity(0.40))
                         .frame(height: 1)
                 }
-                .ignoresSafeArea(edges: .bottom)
+                .ignoresSafeArea(.container, edges: .bottom)
         }
         .accessibilityElement(children: .contain)
     }
@@ -467,6 +467,7 @@ struct CampaignHomeView: View {
     let wardrobe: () -> Void
     let season: () -> Void
     @ObservedObject private var seasons = SeasonDirector.shared
+    @State private var showingHowToPlay = false
 
     private var episode: CampaignEpisode {
         CampaignCatalog.episodes[(store.nextLevel - 1) / 10]
@@ -493,6 +494,16 @@ struct CampaignHomeView: View {
             }
         }
         .background(GameBackdrop())
+        .sheet(isPresented: $showingHowToPlay) {
+            CampaignGuideView(
+                back: { showingHowToPlay = false },
+                begin: {
+                    showingHowToPlay = false
+                    play()
+                }
+            )
+            .presentationDragIndicator(.visible)
+        }
     }
 
     private var topBar: some View {
@@ -526,7 +537,9 @@ struct CampaignHomeView: View {
             Spacer(minLength: 2)
 
             HStack(spacing: 6) {
-                smallTopButton("questionmark.circle.fill", name: "How to play", action: guide)
+                smallTopButton("questionmark.circle.fill", name: "How to play") {
+                    showingHowToPlay = true
+                }
                 smallTopButton("gearshape.fill", name: "Settings", action: settings)
                 smallTopButton("person.crop.circle.fill", name: "Detective profile", action: stats)
             }

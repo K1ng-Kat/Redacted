@@ -16,6 +16,9 @@ struct CampaignProgress: Codable {
     var crystalDistricts: Set<Int> = []
     var hintTickets = 2
     var hintsBought = 0
+    // Once purchased or redeemed, a clue stays revealed for that case.
+    // It travels with the campaign save (including account/cloud restore).
+    var revealedHintLevels: Set<Int> = []
     var snippets = 0
     var ownedCosmetics: Set<String> = []
     var equippedCosmetics: [String: String] = [:]
@@ -34,7 +37,7 @@ struct CampaignProgress: Codable {
     enum CodingKeys: String, CodingKey {
         case bestStars, lastLevel, tutorialComplete, totalAttempts,
              firstLaunchDate, xp, coins, crystals, crystalDistricts, hintTickets, hintsBought,
-             snippets, ownedCosmetics, equippedCosmetics, skinStyle, hairStyle,
+             revealedHintLevels, snippets, ownedCosmetics, equippedCosmetics, skinStyle, hairStyle,
              friendContacts, socialID
     }
 
@@ -63,6 +66,11 @@ struct CampaignProgress: Codable {
         }
         hintTickets = try box.decodeIfPresent(Int.self, forKey: .hintTickets) ?? 2
         hintsBought = try box.decodeIfPresent(Int.self, forKey: .hintsBought) ?? 0
+        revealedHintLevels = try box.decodeIfPresent(Set<Int>.self,
+                                                       forKey: .revealedHintLevels) ?? []
+        // Old saves did not have this field and safely start with no revealed
+        // clues; never alter their existing ticket/crystal balances.
+        revealedHintLevels = Set(revealedHintLevels.filter { (1...100).contains($0) })
         snippets = max(0, try box.decodeIfPresent(Int.self, forKey: .snippets) ?? 0)
         ownedCosmetics = try box.decodeIfPresent(Set<String>.self, forKey: .ownedCosmetics) ?? []
         equippedCosmetics = try box.decodeIfPresent([String: String].self, forKey: .equippedCosmetics) ?? [:]
@@ -286,21 +294,34 @@ final class CampaignStore: ObservableObject {
         progress.equippedCosmetics.removeValue(forKey: slot.rawValue)
     }
 
-    func redeemHint() -> Bool {
-        if progress.hintTickets > 0 {
-            progress.hintTickets -= 1
-            return true
+    func hasRevealedHint(for level: Int) -> Bool {
+        progress.revealedHintLevels.contains(level)
+    }
+
+    /// Idempotent per case: reopening/retrying a revealed clue is always free.
+    /// Balance deduction and reveal marker are committed in one save update.
+    @discardableResult
+    func redeemHint(for level: Int) -> Bool {
+        guard (1...100).contains(level), isUnlocked(level) else { return false }
+        if hasRevealedHint(for: level) { return true }
+        var updated = progress
+        if updated.hintTickets > 0 {
+            updated.hintTickets -= 1
+        } else {
+            guard updated.crystals >= Self.hintPrice else { return false }
+            updated.crystals -= Self.hintPrice
+            updated.hintsBought += 1
         }
-        guard progress.crystals >= Self.hintPrice else { return false }
-        progress.crystals -= Self.hintPrice
-        progress.hintsBought += 1
+        updated.revealedHintLevels.insert(level)
+        progress = updated
         return true
     }
 
     @discardableResult
     func complete(_ level: Int, mistakes: Int, hintUsed: Bool) -> CasePayout? {
         guard isUnlocked(level), (1...100).contains(level) else { return nil }
-        let stars = max(1, 3 - (mistakes > 0 ? 1 : 0) - (mistakes > 2 || hintUsed ? 1 : 0))
+        let stars = max(1, 3 - (mistakes > 0 ? 1 : 0) -
+                        (mistakes > 2 || hintUsed || hasRevealedHint(for: level) ? 1 : 0))
         let previousStars = progress.bestStars[level] ?? 0
         let isFirstClear = previousStars == 0
         let improvedStars = max(0, stars - previousStars)

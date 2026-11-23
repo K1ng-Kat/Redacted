@@ -97,7 +97,7 @@ private enum DetectiveModelFactory {
                      closeup: Bool, animated: Bool) -> SCNScene {
         let scene = SCNScene()
         scene.background.contents = UIColor.clear
-        let color = UIColor(skin.color)
+        let color = balancedSkinColor(skin)
         let jacket = coatColor(equipment[.coat])
         let mannequin = SCNNode()
         scene.rootNode.addChildNode(mannequin)
@@ -169,19 +169,14 @@ private enum DetectiveModelFactory {
         head.position = SCNVector3(0, 1.700, 0)
         mannequin.addChildNode(head)
         makeFace(into: head, skin: color)
-        makeHair(into: head, style: hair)
+        makeHair(into: head, style: hair,
+                 wearingHeadwear: equipment[.headwear] != nil)
         makeEyewear(into: head, id: equipment[.eyewear])
         makeHeadwear(into: head, id: equipment[.headwear])
         makeBadge(into: mannequin, id: equipment[.badge])
 
         if animated {
-            let a = SCNAction.rotateTo(x: 0.005, y: 0.038, z: 0,
-                                       duration: 3.0, usesShortestUnitArc: true)
-            let b = SCNAction.rotateTo(x: -0.005, y: -0.035, z: 0,
-                                       duration: 3.2, usesShortestUnitArc: true)
-            a.timingMode = .easeInEaseOut
-            b.timingMode = .easeInEaseOut
-            head.runAction(.repeatForever(.sequence([a, b])))
+            startNaturalIdle(head: head, body: mannequin)
         }
 
         // Physically based studio lighting, soft contact shadow and camera.
@@ -194,18 +189,19 @@ private enum DetectiveModelFactory {
         let ambient = SCNNode()
         ambient.light = SCNLight()
         ambient.light?.type = .ambient
-        ambient.light?.intensity = 360
-        ambient.light?.color = UIColor(white: 0.78, alpha: 1)
+        ambient.light?.intensity = 115
+        ambient.light?.color = UIColor(white: 0.82, alpha: 1)
         scene.rootNode.addChildNode(ambient)
 
-        let key = light(at: SCNVector3(-1.8, 3.6, 3.0),
-                        intensity: 1070, color: UIColor(white: 0.95, alpha: 1))
+        let key = light(at: SCNVector3(-2.0, 3.0, 3.2),
+                        intensity: 480, color: UIColor(red: 1, green: 0.94,
+                                                        blue: 0.88, alpha: 1))
         key.light?.castsShadow = true
         key.light?.shadowRadius = 9
         key.light?.shadowSampleCount = 12
         scene.rootNode.addChildNode(key)
         scene.rootNode.addChildNode(light(at: SCNVector3(2.3, 2.6, -1.5),
-                                        intensity: 690,
+                                        intensity: 180,
                                         color: UIColor(red: 0.47, green: 0.69,
                                                        blue: 0.88, alpha: 1)))
 
@@ -213,8 +209,8 @@ private enum DetectiveModelFactory {
         camera.name = "Detective camera"
         camera.camera = SCNCamera()
         camera.camera?.fieldOfView = closeup ? 37 : 34
-        camera.camera?.wantsHDR = true
-        camera.camera?.exposureOffset = -0.08
+        camera.camera?.wantsHDR = false
+        camera.camera?.exposureOffset = -0.65
         camera.position = closeup
             ? SCNVector3(0, 1.80, 1.08)
             : SCNVector3(0, 1.12, 3.55)
@@ -223,6 +219,62 @@ private enum DetectiveModelFactory {
         camera.camera?.zNear = 0.025
         scene.rootNode.addChildNode(camera)
         return scene
+    }
+
+    /// Light random micro-movements keep the actor alive without a looping
+    /// robot-like pose. All children (hair and equipment) move with the head.
+    private static func startNaturalIdle(head: SCNNode, body: SCNNode) {
+        let inhale = SCNAction.moveBy(x: 0, y: 0.0035, z: 0, duration: 2.7)
+        let exhale = SCNAction.moveBy(x: 0, y: -0.0035, z: 0, duration: 3.1)
+        inhale.timingMode = .easeInEaseOut
+        exhale.timingMode = .easeInEaseOut
+        body.runAction(.repeatForever(.sequence([inhale, exhale])),
+                       forKey: "breathing")
+
+        let nextLook = SCNAction.run { node in
+            let x = CGFloat.random(in: -0.020...0.028)
+            let y = CGFloat.random(in: -0.075...0.075)
+            let z = CGFloat.random(in: -0.018...0.018)
+            let motion = SCNAction.rotateTo(
+                x: x, y: y, z: z,
+                duration: TimeInterval.random(in: 0.75...1.5),
+                usesShortestUnitArc: true
+            )
+            motion.timingMode = .easeInEaseOut
+            node.runAction(motion, forKey: "idleLook")
+        }
+        head.runAction(.repeatForever(.sequence([
+            .wait(duration: 2.2, withRange: 3.2), nextLook
+        ])), forKey: "idleLookScheduler")
+
+        let nextBlink = SCNAction.run { node in
+            let lids = node.childNodes.filter { $0.name == "Blink eyelid" }
+            let close = SCNAction.customAction(duration: 0.09) { eyelid, elapsed in
+                let fraction = Float(min(1, elapsed / 0.09))
+                eyelid.scale.y = 0.08 + fraction * 0.92
+            }
+            let open = SCNAction.customAction(duration: 0.13) { eyelid, elapsed in
+                let fraction = Float(min(1, elapsed / 0.13))
+                eyelid.scale.y = 1.0 - fraction * 0.92
+            }
+            let blink = SCNAction.sequence([close, open])
+            for lid in lids { lid.runAction(blink, forKey: "blink") }
+        }
+        head.runAction(.repeatForever(.sequence([
+            .wait(duration: 2.0, withRange: 3.4), nextBlink
+        ])), forKey: "blinkScheduler")
+    }
+
+    /// Tone-map face material before lights; the previous near-white skin
+    /// combined with three intense lights washed away all facial detail.
+    private static func balancedSkinColor(_ skin: DetectiveSkin) -> UIColor {
+        let original = UIColor(skin.color)
+        var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+        guard original.getRed(&red, green: &green, blue: &blue, alpha: &alpha) else {
+            return original
+        }
+        return UIColor(red: red * 0.89, green: green * 0.89,
+                       blue: blue * 0.89, alpha: 1)
     }
 
     private static func material(_ color: UIColor,
@@ -340,56 +392,72 @@ private enum DetectiveModelFactory {
     }
 
     private static func makeFace(into head: SCNNode, skin: UIColor) {
-        head.addChildNode(ellipsoid("Skull", skin, 0, 0.135, 0,
-                                    0.110, 0.153, 0.098, roughness: 0.86))
-        head.addChildNode(ellipsoid("Jaw", skin, 0, 0.073, 0.023,
-                                    0.082, 0.070, 0.089, roughness: 0.88))
+        head.addChildNode(ellipsoid("Skull", skin, 0, 0.134, 0,
+                                    0.104, 0.145, 0.098, roughness: 0.92))
+        head.addChildNode(ellipsoid("Jaw", skin, 0, 0.075, 0.020,
+                                    0.080, 0.063, 0.079, roughness: 0.91))
         for side in [-1.0, 1.0] {
             let s = Float(side)
-            head.addChildNode(ellipsoid("Ear", skin, s * 0.108, 0.124, 0.007,
-                                        0.019, 0.033, 0.016))
-            head.addChildNode(ellipsoid("Upper cheek", skin, s * 0.055,
-                                       0.121, 0.070, 0.047, 0.044, 0.033))
+            head.addChildNode(ellipsoid("Ear", skin, s * 0.103, 0.125, 0.005,
+                                        0.014, 0.025, 0.014))
+            head.addChildNode(ellipsoid("Upper cheek", skin, s * 0.053,
+                                       0.121, 0.060, 0.038, 0.031, 0.023,
+                                       roughness: 0.93))
             head.addChildNode(ellipsoid("Eye white",
                              UIColor(red: 0.91, green: 0.89, blue: 0.85, alpha: 1),
                              s * 0.043, 0.161, 0.102,
-                             0.024, 0.013, 0.008, roughness: 0.28))
+                             0.020, 0.010, 0.008, roughness: 0.40))
             head.addChildNode(ellipsoid("Iris",
                              UIColor(red: 0.25, green: 0.36, blue: 0.40, alpha: 1),
                              s * 0.043, 0.160, 0.111,
-                             0.008, 0.009, 0.004, roughness: 0.24))
+                             0.0065, 0.0070, 0.004, roughness: 0.32))
             head.addChildNode(ellipsoid("Pupil",
                              UIColor(red: 0.037, green: 0.032, blue: 0.03, alpha: 1),
                              s * 0.043, 0.159, 0.116,
-                             0.0035, 0.005, 0.002, roughness: 0.20))
+                             0.0032, 0.0038, 0.002, roughness: 0.28))
+            let eyelid = ellipsoid("Blink eyelid", skin,
+                                     s * 0.043, 0.160, 0.122,
+                                     0.022, 0.010, 0.003, roughness: 0.91)
+            eyelid.scale.y *= 0.08
+            head.addChildNode(eyelid)
             let brow = box("Eyebrow", hairColor,
-                           width: 0.044, height: 0.007, length: 0.010,
+                           width: 0.043, height: 0.005, length: 0.008,
                            x: s * 0.044, y: 0.189, z: 0.106, chamfer: 0.004)
             brow.eulerAngles.z = -s * 0.06
             head.addChildNode(brow)
         }
-        head.addChildNode(ellipsoid("Nose bridge", skin, 0, 0.139, 0.103,
-                                    0.017, 0.036, 0.023))
-        head.addChildNode(ellipsoid("Nose tip", skin, 0, 0.116, 0.124,
-                                    0.022, 0.015, 0.020))
+        head.addChildNode(ellipsoid("Nose bridge", skin, 0, 0.136, 0.101,
+                                    0.013, 0.029, 0.018))
+        head.addChildNode(ellipsoid("Nose tip", skin, 0, 0.113, 0.117,
+                                    0.018, 0.013, 0.015))
         head.addChildNode(ellipsoid("Mouth", UIColor(red: 0.39, green: 0.22,
                                     blue: 0.21, alpha: 1), 0, 0.075, 0.109,
-                                    0.030, 0.004, 0.003))
+                                    0.024, 0.003, 0.003))
         head.addChildNode(ellipsoid("Lower lip", skin.withAlphaComponent(0.98),
                                     0, 0.066, 0.108, 0.025, 0.005, 0.003))
     }
 
-    private static func makeHair(into head: SCNNode, style: DetectiveHair) {
-        // Four different hair silhouettes. Thin volume strands sit above the
-        // scalp instead of large disconnected spheres.
-        let foundationHeight: CGFloat = style == .cropped ? 0.039 : 0.058
-        head.addChildNode(ellipsoid("Scalp hair", hairColor, 0, 0.255, -0.015,
-                                    0.108, foundationHeight, 0.101,
-                                    roughness: 0.98))
-        let count = style == .cropped ? 36 : style == .textured ? 52 : 32
+    private static func makeHair(into head: SCNNode, style: DetectiveHair,
+                                 wearingHeadwear: Bool) {
+        // Hair is actually hidden beneath a worn hat. Previously the full
+        // crown intersected the hat, making berets and caps float.
+        // Short side hair remains at the temples for a natural hairline.
+        for side in [-1.0, 1.0] {
+            let sideLock = ellipsoid("Hair at temple", hairColor,
+                                     Float(side) * 0.091, 0.204, 0.006,
+                                     0.018, 0.044, 0.064, roughness: 0.96)
+            head.addChildNode(sideLock)
+        }
+        guard !wearingHeadwear else { return }
+
+        let foundationHeight: CGFloat = style == .cropped ? 0.035 : 0.055
+        head.addChildNode(ellipsoid("Scalp hair", hairColor, 0, 0.249, -0.017,
+                                    0.107, foundationHeight, 0.102,
+                                    roughness: 0.96))
+        let count = style == .cropped ? 29 : style == .textured ? 47 : 31
         for i in 0..<count {
             let theta = Float(i) * 2.3999632
-            let radius = Float(sqrt(Double(i + 1) / Double(count + 2))) * 0.089
+            let radius = Float(sqrt(Double(i + 1) / Double(count + 2))) * 0.083
             let x = cos(theta) * radius
             let z = sin(theta) * radius
             let front = z > 0.020
@@ -399,40 +467,38 @@ private enum DetectiveModelFactory {
             switch style {
             case .cropped:
                 offset = 0
-                height = 0.010 + CGFloat(i % 3) * 0.002
+                height = 0.009 + CGFloat(i % 3) * 0.002
                 breadth = 0.012
             case .classic:
-                offset = x > 0 ? 0.006 : -0.005
-                height = 0.020 + CGFloat(i % 3) * 0.003
-                breadth = 0.016
+                offset = x > 0 ? 0.004 : -0.003
+                height = 0.017 + CGFloat(i % 3) * 0.003
+                breadth = 0.015
             case .textured:
-                offset = front ? 0.004 : 0
-                height = 0.026 + CGFloat(i % 7) * 0.006
+                offset = front ? 0.003 : 0
+                height = 0.019 + CGFloat(i % 7) * 0.004
                 breadth = 0.012
             case .swept:
-                offset = 0.017
-                height = front ? 0.028 : 0.020
-                breadth = 0.016
+                offset = 0.013
+                height = front ? 0.025 : 0.017
+                breadth = 0.014
             }
-            let strand = ellipsoid("Sculpted hair strand", hairColor,
-                                   x + offset, 0.279 + Float(height) * 0.5, z,
-                                   breadth, height, breadth * 1.25,
-                                   roughness: 0.97)
-            strand.eulerAngles.z = style == .swept ? -0.35 :
-                                    style == .classic ? -0.10 : Float(i % 3 - 1) * 0.10
+            let strand = ellipsoid("Groomed hair strand", hairColor,
+                                   x + offset, 0.271 + Float(height) * 0.35, z,
+                                   breadth, height, breadth * 1.21,
+                                   roughness: 0.96)
+            strand.eulerAngles.z = style == .swept ? -0.29 :
+                                    style == .classic ? -0.08 : Float(i % 3 - 1) * 0.08
             head.addChildNode(strand)
         }
         if style == .swept || style == .textured {
-            let count = style == .swept ? 10 : 13
-            for i in 0..<count {
-                let x = Float(i) / Float(max(1, count - 1)) * 0.176 - 0.088
-                let fringe = ellipsoid("Hair fringe", hairColor,
-                                       x + (style == .swept ? 0.012 : 0),
-                                       0.251 + Float(i % 4) * 0.005, 0.094,
-                                       0.012, style == .swept ? 0.024 : 0.016,
-                                       0.013, roughness: 0.97)
-                fringe.eulerAngles.z = style == .swept ? -0.38 : 0
-                head.addChildNode(fringe)
+            let amount = style == .swept ? 10 : 12
+            for i in 0..<amount {
+                let x = Float(i) / Float(max(1, amount - 1)) * 0.168 - 0.084
+                head.addChildNode(ellipsoid("Forehead fringe", hairColor,
+                                             x + (style == .swept ? 0.008 : 0),
+                                             0.244 + Float(i % 3) * 0.004, 0.087,
+                                             0.011, style == .swept ? 0.022 : 0.014,
+                                             0.012, roughness: 0.98))
             }
         }
     }
@@ -647,10 +713,10 @@ private enum DetectiveModelFactory {
             metal = gold; symbol = "★"
         }
         let plaque = box("3D " + id + " badge", metal,
-                         width: id.contains("royal") || id.contains("director") ? 0.058 : 0.049,
-                         height: id.contains("diamond") ? 0.068 : 0.057,
+                         width: id.contains("royal") || id.contains("director") ? 0.075 : 0.064,
+                         height: id.contains("diamond") ? 0.088 : 0.075,
                          length: 0.009,
-                         x: 0.142, y: 1.521, z: 0.150,
+                         x: 0.130, y: 1.521, z: 0.188,
                          chamfer: 0.010, metalness: 0.87)
         if id == "badge_diamond" {
             plaque.eulerAngles.z = .pi / 4
@@ -665,7 +731,7 @@ private enum DetectiveModelFactory {
         let mark = SCNNode(geometry: engraving)
         mark.name = id + " distinct emblem"
         mark.scale = SCNVector3(0.83, 0.83, 0.83)
-        mark.position = SCNVector3(0.128, 1.502, 0.158)
+        mark.position = SCNVector3(0.112, 1.505, 0.196)
         body.addChildNode(mark)
     }
 

@@ -209,10 +209,10 @@ enum CaseEvidence {
         case .findClue:
             candidates = [
                 Record(title: "BEFORE / AFTER IMAGES",
-                       detail: "The original scene photo and the post-incident frame show a new physical alteration at the focal point. Nearby items match their earlier condition.",
+                       detail: "The inspected detail differs from a verified reference or its earlier documented condition. The nearby comparison objects show no matching discrepancy.",
                        symbol: "photo.on.rectangle.angled", reliable: true),
                 Record(title: "FORENSIC COMPARISON",
-                       detail: "The altered feature has a fresh contact pattern; the examiner ruled out ordinary weathering and routine handling.",
+                       detail: "An independent examination confirms that the disputed detail is meaningful to the incident, not ordinary wear, packaging variation or unrelated background.",
                        symbol: "viewfinder", reliable: true),
                 commonUnverified, oldReport,
                 Record(title: "VAGUE SECURITY REPORT",
@@ -264,7 +264,7 @@ enum CaseEvidence {
         case .anomaly:
             candidates = [
                 Record(title: "APPROVED REFERENCE",
-                       detail: "The official inventory standard was published before the incident. Every genuine specimen must comply with that reference.",
+                       detail: "\(mission.setup) The standard predates the incident and was independently authenticated.",
                        symbol: "checkmark.seal", reliable: true),
                 Record(title: "CURRENT INSPECTION",
                        detail: "One inspected item has a feature inconsistent with the authorized specification. The other samples were checked against the reference.",
@@ -332,7 +332,7 @@ enum CaseEvidence {
         case .verdict:
             candidates = [
                 Record(title: "ACCESS PERMISSIONS",
-                       detail: "The action required privileged access. Revisit “\(CampaignCatalog.mission(mission.id - 2)?.title ?? "the earlier incident")”: the route or evidence trail established an opportunity window.",
+                       detail: "\(mission.hint) Revisit “\(CampaignCatalog.mission(mission.id - 2)?.title ?? "the earlier incident")” for the opportunity window.",
                        symbol: "person.badge.key", reliable: true),
                 Record(title: "AUDIT TRAIL",
                        detail: "The signed system change coincides with “\(CampaignCatalog.mission(mission.id - 1)?.title ?? "the previous lead")”. Compare that lead with the suspects' responsibilities.",

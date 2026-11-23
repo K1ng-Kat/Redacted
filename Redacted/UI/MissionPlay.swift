@@ -286,6 +286,27 @@ struct MissionPlayView: View {
                 .foregroundStyle(Art.faded)
                 .fixedSize(horizontal: false, vertical: true)
 
+            if ageMode == .junior || ageMode == .explorer {
+                Button {
+                    narrator.stopSpeaking(at: .immediate)
+                    let spoken = dossier.map { "\($0.title). \($0.detail)" }
+                        .joined(separator: ". ")
+                    let utterance = AVSpeechUtterance(string: spoken)
+                    utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+                    utterance.rate = ageMode == .junior ? 0.43 : 0.49
+                    narrator.speak(utterance)
+                } label: {
+                    Label("READ EVIDENCE ALOUD", systemImage: "speaker.wave.2.fill")
+                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .foregroundStyle(Art.gold)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(Art.blueDeep)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(PressGameStyle())
+                .accessibilityHint("Read the caseboard records using speech")
+            }
+
             ForEach(dossier) { record in
                 Button {
                     guard !evidenceVerified else { return }
@@ -912,6 +933,7 @@ struct MissionPlayView: View {
         selectedTheory = nil
         mistakes = 0
         feedback = nil
+        narrator.stopSpeaking(at: .immediate)
         // Previously redeemed hints stay revealed on retry and revisit.
         // They remain recorded in CampaignProgress, not this transient view.
     }
